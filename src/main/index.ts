@@ -11,9 +11,8 @@ import { MemoryService, type MemoryProvider } from './memory-service'
 import { GrowthExperiments } from './growth-experiments'
 import { ConversationStore, isModelProfile, MAX_BATCH_CONVERSATIONS } from './conversation-store'
 import { electronSecretCodec, publicSettings, publicSnapshot, SecretProtectionUnavailableError } from './secret-storage'
-import { linkClaudeUserResources } from './claude-resource-links'
-import { CLAUDE_BASE_URL, DEFAULT_CLAUDE_MODEL, findClaudeExecutable, probeAnthropicEndpoint } from './claude-code'
-import { seedClaudeMemory } from './claude-memory'
+import { DEEPSEEK_ANTHROPIC_BASE_URL, DEEPSEEK_DEFAULT_MODEL } from './deepseek-endpoint'
+import { APP_SLASH_COMMANDS, parseAppSlashCommand } from './app-commands'
 import { loadWindowsMcpConfig } from './mcp-config'
 import { setPersonaDirectory } from './persona'
 import { seedMemoryDocument } from './memory-document'
@@ -28,6 +27,7 @@ import { normalizeDshModel } from './dsh-model'
 import { DshAcpRuntime, toAcpMcpServer, type DshAcpMcpServer } from './dsh-acp-runtime'
 import { DshAcpAgentClient } from './dsh-acp-agent'
 import { PetMcpBridge } from './pet-mcp-server'
+import { WinMcpClient } from './win-mcp-client'
 import { deepSeekBaseUrl, deepSeekModel, deepSeekProfile, ONBOARDING_PAGES, readOnboardingMarker, shouldOfferOnboarding, writeOnboardingMarker, type OnboardingPage } from './onboarding'
 import { normalizeApiKey } from '../shared/onboarding'
 import { DeepSeekClient } from './deepseek'
@@ -44,11 +44,10 @@ import { registerVoiceIpc } from './voice-ipc'
 import { InboxWatcher } from './inbox-watcher'
 import { isLibraryItem, isLibraryKind } from '../shared/libraries'
 import { generateConversationTitle } from './title-generation'
-import { APP_SLASH_COMMANDS, listClaudeWorkflows, parseAppSlashCommand } from './claude-workflows'
 import { attachmentPreviewPath, prepareDroppedFile, readImagePreview, searchWorkspaceFiles, stagePastedAttachment, validAttachmentList, verifyDroppedFilePath } from './local-context'
 import { findSourceProjectRoot, isUsableWorkspace, isWritableWorkspace, readSavedWorkspace, resolveAgentWorkspace, writeSavedWorkspace } from './workspace-root'
 import { isEffortLevel } from '../shared/effort'
-import type { AgentKernelKind, AvatarSize, BubbleLayout, ClaudeWorkflowOption, ConversationSettings, PanelDirection, PanelPlacement, UiSize, UserAttachment } from '../shared/contracts'
+import type { AgentKernelKind, AvatarSize, BubbleLayout, AppCommandOption, ConversationSettings, PanelDirection, PanelPlacement, UiSize, UserAttachment } from '../shared/contracts'
 import { normalizeAgentKernelKind, normalizeModelMode, isApprovalMode, isAutoCompactPercent, isAvatarRenderer, PANEL_MIN_HEIGHT, PANEL_MIN_WIDTH } from '../shared/contracts'
 import { isPersonaId } from '../shared/personas'
 import { approvalAnchor, approvalCardHeight, approvalCardHtml, approvalCardWidth, approvalPointerLeft, placeApprovalCard, type ApprovalRect } from './approval-card'
@@ -59,6 +58,7 @@ import { probeLibrary } from './library-health'
 const projectRoot = app.isPackaged ? path.dirname(process.execPath) : path.resolve(__dirname, '../..')
 const dataProjectRoot = findSourceProjectRoot(projectRoot) ?? projectRoot
 // 隔离冒烟测试/便携数据目录：显式指定时不再使用项目下的 data/。
+app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion')
 const dataRootOverride = process.env.DESKTOP_PET_DATA?.trim()
 const dataRoot = dataRootOverride && path.isAbsolute(dataRootOverride)
   ? dataRootOverride
@@ -73,7 +73,6 @@ mkdirSync(userDataDirectory, { recursive: true })
 mkdirSync(path.join(dataRoot, 'claude'), { recursive: true })
 // A fresh install ships with an editable personal-settings file for the
 // engine; existing files are the user's and never touched (see claude-memory).
-seedClaudeMemory(path.join(dataRoot, 'claude'))
 // 长期记忆文档：写在这里的约定每轮都跟着消息进模型，新开的对话也一样。
 seedMemoryDocument(dataRoot)
 setPersonaDirectory(path.join(dataRoot, 'persona'))
@@ -118,7 +117,7 @@ const BALANCE_POINTER = 8
 const BALANCE_INSET_Y = 16
 /** Medium card (124) plus the requested 10px lower edge. All avatar sizes
  *  share this height so the type and buttons stay identical. */
-const BALANCE_WINDOW_HEIGHT = 134
+const BALANCE_WINDOW_HEIGHT = 124
 /** 人物图片的视觉重心比几何中心偏上，卡片跟着上提一点才看着齐。 */
 const BALANCE_LIFT = 6
 /** 三角尖到角色左缘的呼吸间距。 */
@@ -217,6 +216,9 @@ function applyPointerShape(): void {
   // 贴合面板的矩形，不需要再裁剪。
   win.setShape(avatarShape(win.getBounds()))
 }
+
+/** 左上角缩放手柄的独立置顶小窗：面板不置顶，画在面板里会被别的窗口盖住。
+ *  这里只负责显示角标，鼠标事件穿透给面板里的 10×10 热区。 */
 
 /** 面板窗口只包住面板矩形（逻辑舞台里的 bubbleRegion）。左/右贴边时直接
  *  相对头像窗口定位，不再走“舞台”的上下布局。 */
@@ -355,8 +357,21 @@ function schedulePanelSizeSave(): void {
 }
 
 const apiKey = getEnabledDeepSeekKey(process.env)
-const claudeKey = process.env.DEEPSEEK_API_KEY?.trim()
-const claudeExecutable = findClaudeExecutable(process.env)
+const deepseekKey = process.env.DEEPSEEK_API_KEY?.trim()
+/** 探测模型端点：直接请求 Anthropic 兼容的 /messages。原先的实现随 Claude 模块删除。 */
+async function probeAnthropicEndpoint(profile: { baseUrl: string; apiKey: string; model: string }): Promise<{ ok: boolean; message: string }> {
+  try {
+    const response = await fetch(`${profile.baseUrl.replace(/\/+$/, '')}/messages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-api-key': profile.apiKey, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: profile.model, max_tokens: 1, messages: [{ role: 'user', content: 'ping' }] }),
+      signal: AbortSignal.timeout(10_000)
+    })
+    return { ok: response.ok, message: response.ok ? '连接正常' : `接口返回 ${response.status}` }
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : '连接失败' }
+  }
+}
 const libraryStore = new LibraryStore(dataRoot, { homeDir: userHome, workspace: agentWorkspace, dshSkillsDir: path.join(dataRoot, 'dsh-home', 'skills') })
 const voiceService = new VoiceService({
   dataRoot,
@@ -525,12 +540,12 @@ async function backgroundProvider(): Promise<MemoryProvider | null> {
   const settings = (await activeController().getLibraryState()).settings
   const profile = settings.modelProfiles.find((item) => item.id === settings.activeModelProfileId)
   if (profile?.apiKey) return { baseUrl: profile.baseUrl, apiKey: profile.apiKey, model: profile.model, smallModel: profile.smallModel }
-  const key = claudeKey || apiKey
-  return key ? { baseUrl: CLAUDE_BASE_URL, apiKey: key, model: DEFAULT_CLAUDE_MODEL, smallModel: 'deepseek-flash' } : null
+  const key = deepseekKey || apiKey
+  return key ? { baseUrl: DEEPSEEK_ANTHROPIC_BASE_URL, apiKey: key, model: DEEPSEEK_DEFAULT_MODEL, smallModel: 'deepseek-flash' } : null
 }
 
 const growth = new GrowthExperiments({
-  projectRoot: dataProjectRoot, dataRoot, claudeExecutable,
+  projectRoot: dataProjectRoot, dataRoot,
   provider: backgroundProvider
 })
 /** Every Nth publish re-sends the whole history, so a renderer that somehow
@@ -689,13 +704,32 @@ const mcpBridgeScript = (() => {
 // from a saved model profile instead of the launch environment.
 // One runtime (and one engine connection) per conversation that actually
 // runs; the controller creates them on demand through this factory.
+const winMcpClient = new WinMcpClient()
 const createRuntime = (conversationId: string, onChange: () => void, persistSession = true, enableEvolve = true): AgentRuntime => {
-  const key = claudeKey ?? apiKey ?? ''
+  const key = deepseekKey ?? apiKey ?? ''
   const dshModel = useDshKernel() && dshBin
     ? (() => {
       const bridge = new PetMcpBridge(key)
       // 打包/重启这类请示走角色旁的小批准卡，绿勾批准、红叉拒绝。
       bridge.setApprovalBridge({ request: (title, detail) => requestApproval(title, detail) })
+      // 宿主侧提问卡：和内核提问共用面板上的同一张卡片，用来批准计划或选择方案。
+      bridge.setAskBridge({
+        ask: async (questions) => {
+          const runtime = activeController().displayedRuntime()
+          if (!runtime) throw new Error('当前没有正在显示的对话，无法提问。')
+          return await runtime.askHost(questions)
+        }
+      })
+      // 内置 Windows 工具：宿主转发给 windows-mcp 的 Python 后端，模型侧不再走 MCP。
+      bridge.setWindowsMcpClient(winMcpClient)
+      // 计划模式：模型用 submit_plan 把计划交给面板批准，批准后自动退出计划模式。
+      bridge.setPlanBridge({
+        submit: async (plan) => {
+          const runtime = activeController().displayedRuntime()
+          if (!runtime) throw new Error('当前没有正在显示的对话，无法提交计划。')
+          return await runtime.askHostPlan(plan)
+        }
+      })
       // 用 adapter 目录里的模型 id：deepseek-flash 声明了图片输入，deepseek-v4-flash 不在目录里，会被读图工具判定为不支持图片。
       const model = normalizeDshModel(process.env.DSH_MODEL)
       if (process.env.DESKTOP_PET_DSH_TRANSPORT === 'sdk-minimal') {
@@ -748,20 +782,11 @@ const createRuntime = (conversationId: string, onChange: () => void, persistSess
                 ]
               })
             }
-            // Reuse the user's installed Windows MCP (and its env) directly;
-            // do not keep a second copy in the app's library.
-            for (const [name, raw] of Object.entries(loadWindowsMcpConfig(path.join(userHome, '.claude.json')))) {
-              const config = raw as { type?: string; command?: string; args?: string[]; env?: Record<string, string> }
-              if (config.type !== 'stdio' || !config.command) continue
-              if (servers.some((server) => server.name === name)) continue
-              servers.push({
-                name,
-                command: config.command,
-                args: config.args ?? [],
-                env: Object.entries(config.env ?? {}).map(([key, value]) => ({ name: key, value }))
-              })
-            }
+            // Windows 工具已由宿主内置转发（win_*），这里不再把用户的
+            // windows-mcp 作为独立 MCP 服务器交给 DSH，避免模型看到两套。
             for (const [name, raw] of Object.entries(dshLibraries.mcp)) {
+              // Windows 工具已内置；库里的同名 MCP 不再交给 DSH。
+              if (/windows[-_]?mcp/iu.test(name)) continue
               const server = toAcpMcpServer(name, raw)
               if (server) servers.push(server)
             }
@@ -785,13 +810,13 @@ controller = new ConversationController(
   createRuntime,
   () => publishSnapshot(),
   (error) => { console.error('Conversation background task failed:', error) },
-  claudeKey || apiKey
-    ? (source, locale, model) => generateConversationTitle((claudeKey || apiKey)!, source, AbortSignal.timeout(20_000), locale, model)
+  deepseekKey || apiKey
+    ? (source, locale, model) => generateConversationTitle((deepseekKey || apiKey)!, source, AbortSignal.timeout(20_000), locale, model)
     : undefined,
   // The launch environment, materialized as the first editable profile.
-  claudeKey
-    ? { id: 'default', name: 'DeepSeek', baseUrl: CLAUDE_BASE_URL, apiKey: claudeKey,
-        model: DEFAULT_CLAUDE_MODEL, smallModel: 'deepseek-flash' }
+  deepseekKey
+    ? { id: 'default', name: 'DeepSeek', baseUrl: DEEPSEEK_ANTHROPIC_BASE_URL, apiKey: deepseekKey,
+        model: DEEPSEEK_DEFAULT_MODEL, smallModel: 'deepseek-flash' }
     : undefined,
   resolveLibraries
 )
@@ -1023,27 +1048,31 @@ function resizeGhostAt(pos: { x: number; y: number } | null): void {
       resizable: false,
       focusable: false,
       show: false,
-      webPreferences: { sandbox: false }
+      webPreferences: { sandbox: false, backgroundThrottling: false }
     })
-    win.setAlwaysOnTop(true, 'screen-saver')
+    win.setAlwaysOnTop(true, 'screen-saver', 1)
     win.setIgnoreMouseEvents(true)
     const html = '<!doctype html><html><body style="margin:0;overflow:hidden;background:transparent">'
       + '<svg width="240" height="240" viewBox="0 0 240 240" style="position:absolute;inset:0;overflow:visible">'
-      + '<path d="M135 105 L120 105 A15 15 0 0 0 105 120 L105 135" fill="none" stroke="rgba(80,160,255,.22)" stroke-width="36" stroke-linecap="round" filter="blur(9px)"/>'
-      + '<path d="M135 105 L120 105 A15 15 0 0 0 105 120 L105 135" fill="none" stroke="rgba(90,180,255,.4)" stroke-width="22" stroke-linecap="round" filter="blur(5px)"/>'
-      + '<path d="M135 105 L120 105 A15 15 0 0 0 105 120 L105 135" fill="none" stroke="rgba(150,220,255,.65)" stroke-width="11" stroke-linecap="round" filter="blur(2px)"/>'
-      + '<path d="M135 105 L120 105 A15 15 0 0 0 105 120 L105 135" fill="none" stroke="#e8f9ff" stroke-width="2.6" stroke-linecap="round"/></svg></body></html>'
+      + '<path d="M130 110 L122 110 A12 12 0 0 0 110 122 L110 130" fill="none" stroke="rgba(80,160,255,.22)" stroke-width="28.8" stroke-linecap="round" filter="blur(7.2px)"/>'
+      + '<path d="M130 110 L122 110 A12 12 0 0 0 110 122 L110 130" fill="none" stroke="rgba(90,180,255,.4)" stroke-width="17.6" stroke-linecap="round" filter="blur(4px)"/>'
+      + '<path d="M130 110 L122 110 A12 12 0 0 0 110 122 L110 130" fill="none" stroke="rgba(150,220,255,.65)" stroke-width="8.8" stroke-linecap="round" filter="blur(1.6px)"/>'
+      + '<path d="M130 110 L122 110 A12 12 0 0 0 110 122 L110 130" fill="none" stroke="#e8f9ff" stroke-width="2.1" stroke-linecap="round"/></svg></body></html>'
     void win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
     resizeGhostWindow = win
   }
   resizeGhostWindow.setBounds({
-    // 圆弧的 45° 点（圆心 48,48，半径 22）对准鼠标。
-    x: Math.round(pos.x - (120 - 15 / Math.SQRT2)),
-    y: Math.round(pos.y - (120 - 15 / Math.SQRT2)),
+    // 弧的 45° 点（圆心 122,122，半径 12）对准鼠标，和原来的跟随方式一致。
+    x: Math.round(pos.x - (122 - 12 / Math.SQRT2)),
+    y: Math.round(pos.y - (122 - 12 / Math.SQRT2)),
     width: RESIZE_GHOST_SIZE,
     height: RESIZE_GHOST_SIZE
   }, false)
   if (!resizeGhostWindow.isVisible()) resizeGhostWindow.showInactive()
+  // 任何应用之上：每次跟随都重新声明置顶，避免 show/其它窗口把它压下去。
+  resizeGhostWindow.setAlwaysOnTop(true, 'screen-saver', 1)
+  resizeGhostWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+  resizeGhostWindow.moveTop()
 }
 
 function createPanelWindow(): BrowserWindow {
@@ -1610,6 +1639,7 @@ function hidePanel(): void {
   panelOpen = false
   panelWindow?.setOpacity(1)
   panelWindow?.hide()
+  // 面板隐藏后置顶角标也要收起来，否则会孤零零留在桌面上。
   avatarWindow?.webContents.send('pet:panel-open', false)
   if (shapeShrinkTimer) clearTimeout(shapeShrinkTimer)
   shapeShrinkTimer = undefined
@@ -2222,6 +2252,10 @@ function registerIpc(): void {
     if (!trusted(event) || !Array.isArray(ids) || ids.some((id) => typeof id !== 'string')) throw new Error('标签顺序无效。')
     await activeController().setTabOrder(ids as string[])
   })
+  ipcMain.handle('pet:set-hidden-tabs', async (event, ids: unknown) => {
+    if (!trusted(event) || !Array.isArray(ids) || ids.some((id) => typeof id !== 'string')) throw new Error('隐藏标签无效。')
+    await activeController().updateSettings({ hiddenTabIds: ids as string[] })
+  })
   ipcMain.handle('pet:archive-conversation', async (event, id: unknown) => {
     if (!trusted(event) || typeof id !== 'string') throw new Error('会话编号无效。')
     await activeController().archiveConversation(id)
@@ -2296,31 +2330,10 @@ function registerIpc(): void {
     if (conversationId !== undefined && typeof conversationId !== 'string') throw new Error('会话编号无效。')
     return activeController().compactConversation(conversationId as string | undefined)
   })
-  ipcMain.handle('pet:list-claude-workflows', async (event) => {
+  ipcMain.handle('pet:list-app-commands', async (event) => {
     if (!trusted(event)) throw new Error('无效的界面请求。')
     await activeController().initialize()
-    const workflowMode = activeController().getSnapshot().mode === 'dsh' && Boolean(claudeExecutable)
-    const workflows = workflowMode
-      ? await listClaudeWorkflows({ projectRoot: agentWorkspace, userConfigRoot: path.join(userHome, '.claude') })
-      : []
-    const options = new Map<string, ClaudeWorkflowOption>(workflows.map(({ name, description, kind, source }) => [
-      name.toLowerCase(), { name, description, kind, source }
-    ]))
-    const catalog = workflowMode ? activeController().commandCatalog() : undefined
-    for (const [kind, names] of [['command', catalog?.commands ?? []], ['skill', catalog?.skills ?? []]] as const) {
-      for (const rawName of names) {
-        const name = rawName.replace(/^[/\$]/u, '').trim()
-        if (!/^[a-zA-Z0-9][a-zA-Z0-9_:-]*$/u.test(name) || options.has(name.toLowerCase())) continue
-        options.set(name.toLowerCase(), { name, description: kind === 'skill' ? '本机技能' : '本机命令', kind, source: 'builtin' })
-      }
-    }
-    const appCommands = APP_SLASH_COMMANDS.filter((command) => workflowMode || command.name !== 'compact')
-    for (const command of appCommands) options.set(command.name, command)
-    return [
-      ...appCommands,
-      ...[...options.values()].filter((option) => !appCommands.some((command) => command.name === option.name.toLowerCase()))
-        .sort((a, b) => a.name.localeCompare(b.name))
-    ]
+    return APP_SLASH_COMMANDS.map(({ name, description, kind, source }) => ({ name, description, kind, source }))
   })
   ipcMain.handle('pet:search-workspace-files', (event, query: unknown) => {
     if (!trusted(event) || typeof query !== 'string' || query.length > 120) throw new Error('文件搜索条件无效。')
@@ -2583,12 +2596,13 @@ function registerIpc(): void {
   ipcMain.handle('pet:get-balance', async (event) => {
     if (!trusted(event) && !balanceTrusted(event)) throw new Error('无效的界面请求。')
     const settings = (await activeController().getLibraryState()).settings
-    const key = getDeepSeekBalanceKey(settings, claudeKey)
+    const key = getDeepSeekBalanceKey(settings, deepseekKey)
     if (!key) throw new Error('请在设置中添加 DeepSeek API Key。')
     return fetchDeepSeekBalance(key)
   })
   ipcMain.handle('pet:open-external', async (event, value: unknown) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
+    // 余额卡在独立的 balance 窗口里渲染，同样要能打开充值/用量页。
+    if (!trusted(event) && !balanceTrusted(event)) throw new Error('无效的界面请求。')
     if (typeof value !== 'string' || value.length > 2_000) throw new Error('无效的链接。')
     const url = new URL(value)
     if (!['http:', 'https:', 'mailto:'].includes(url.protocol)) throw new Error('不支持的链接。')
@@ -2861,9 +2875,6 @@ if (ownsSingleInstance) void app.whenReady().then(async () => {
     app.quit()
     return
   }
-  await linkClaudeUserResources(path.join(dataRoot, 'claude'), userHome).catch((error: unknown) => {
-    console.warn('Claude user resource links unavailable:', error instanceof Error ? error.message : String(error))
-  })
   await activeController().initialize()
   inboxWatcher = new InboxWatcher(path.join(dataRoot, 'inbox'), activeController())
   inboxWatcher.start()
