@@ -78,7 +78,7 @@ body.panel-theme-light .panel-resize-grip::before{
   inset: 4px;
   border: 2px solid rgba(0, 22, 57, 0.72);
   border-radius: 12px;
-  clip-path: inset(0 18px 18px 0);
+  clip-path: inset(0 16px 16px 0);
   pointer-events: none;
   opacity: .8;
   filter: drop-shadow(0 0 3px rgba(0, 45, 95, 0.34));
@@ -88,7 +88,7 @@ body.panel-theme-light .panel-resize-grip::before{
 body.panel-theme-light .panel-resize-grip::after{ content: ''; position: absolute; left: 0; top: 0; width: 10px; height: 10px; pointer-events: auto; }
 body.panel-theme-light .panel-resize-grip:hover::before, body.panel-theme-light .panel-resize-grip.is-resizing::before{ opacity: 1; border-color: rgba(0, 20, 50, 0.95); filter: drop-shadow(0 0 3px rgba(0, 45, 95, 0.55)); }
 body.panel-theme-light.panel-direction-down .panel-resize-grip{ top: auto; bottom: 0; cursor: nesw-resize; }
-body.panel-theme-light.panel-direction-down .panel-resize-grip::before{ clip-path: inset(18px 18px 0 0); }
+body.panel-theme-light.panel-direction-down .panel-resize-grip::before{ clip-path: inset(16px 16px 0 0); }
 body.panel-theme-light.panel-direction-down .panel-resize-grip::after{ top: auto; bottom: 0; }
 /* While dragging, the cursor must not flip back to text/pointer as the window
    moves under the pointer; remove the class on every way a drag can end. */
@@ -102,7 +102,7 @@ body.panel-theme-light.is-resizing-panel .panel-resize-grip::before{
   box-shadow: none !important;
 }
 /* 展开时会话库按钮紧贴手柄热区右缘。 */
-body.panel-theme-light .panel-bubble.is-expanded .panel-chat-header{ padding-left: 22px; }
+body.panel-theme-light .panel-bubble.is-expanded .panel-chat-header{ padding-left: 24px; }
 body.panel-theme-light .panel-window-action{ position: absolute; z-index: 20; top: 7px; display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 9px; color: #03112d; background: transparent; }
 body.panel-theme-light .panel-expand-toggle{ right: 49px; }
 body.panel-theme-light .panel-window-close{ right: 13px; }
@@ -182,7 +182,7 @@ body.panel-theme-light .panel-side-meta .panel-side-paused{ margin-left: 0; }
 body.panel-theme-light .panel-side-intro{ margin: 2px 0 12px; padding: 0 2px; color: #193562; font-size: var(--text-xs); line-height: 1.45; }
 body.panel-theme-light .panel-history-loading{ margin: 12px 2px; color: #193562; font-size: var(--text-xs); line-height: 1.45; }
 
-body.panel-theme-light .panel-chat-header{ position: relative; z-index: 5; display: flex; align-items: center; gap: 6px; flex: none; min-width: 0; height: 46px; padding: 4px 83px 0 22px; border-bottom: 1px solid rgba(0, 24, 67, 0.14); }
+body.panel-theme-light .panel-chat-header{ position: relative; z-index: 5; display: flex; align-items: center; gap: 6px; flex: none; min-width: 0; height: 46px; padding: 4px 83px 0 24px; border-bottom: 1px solid rgba(0, 24, 67, 0.14); }
 body.panel-theme-light .panel-library-toggle{ display: grid; place-items: center; flex: none; width: 28px; height: 28px; margin-bottom: 0; padding: 0; border: 0; border-radius: 9px; color: #000f2c; background: rgba(4, 29, 77, 0.09); }
 body.panel-theme-light .panel-library-toggle:hover{ color: #000000; background: rgba(4, 29, 77, 0.2); }
 body.panel-theme-light .panel-library-toggle svg{ width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
@@ -718,10 +718,10 @@ body.panel-theme-light .panel-cluster-body .panel-thought, body.panel-theme-ligh
    统计点一列。 */
 body.panel-theme-light .panel-working{ position: relative; display: flex; align-items: center; gap: 9px; margin: 1px 0 15px; padding-left: 14px; color: #203860; font-size: var(--text-sm); }
 body.panel-theme-light .panel-working-dots{ display: inline-flex; flex: none; gap: 3px; }
-/* 三个点各走各的相位（原 .18s/.36s 错峰的等价物），变量由 30fps 的计时器推进。 */
-body.panel-theme-light .panel-working-dots i{ width: 5px; height: 5px; border-radius: 50%; background: #005980; opacity: calc(.4 + .6 * var(--panel-bounce-p1, 1)); transform: translateY(calc(-3px * var(--panel-bounce-p1, 1))); }
-body.panel-theme-light .panel-working-dots i:nth-child(2){ background: #000d56; opacity: calc(.4 + .6 * var(--panel-bounce-p2, 1)); transform: translateY(calc(-3px * var(--panel-bounce-p2, 1))); }
-body.panel-theme-light .panel-working-dots i:nth-child(3){ background: #110047; opacity: calc(.4 + .6 * var(--panel-bounce-p3, 1)); transform: translateY(calc(-3px * var(--panel-bounce-p3, 1))); }
+/* 三个等待点常亮且不跳动：运行状态由文字和圆点颜色表达。 */
+body.panel-theme-light .panel-working-dots i{ width: 5px; height: 5px; border-radius: 50%; background: #005980; opacity: 1; transform: none; }
+body.panel-theme-light .panel-working-dots i:nth-child(2){ background: #000d56; }
+body.panel-theme-light .panel-working-dots i:nth-child(3){ background: #110047; }
 body.panel-theme-light .panel-working-text{ color: #000d24; }
 body.panel-theme-light .panel-working-time{ color: #2b436f; font-variant-numeric: tabular-nums; }
 /* 子任务：每个 Task 子 agent 一个机器人头，点开是只读详情与它自己的步骤。 */
