@@ -76,14 +76,25 @@ body.panel-direction-down .panel-bubble:not([hidden]) { animation-name: panel-ap
 /* 手柄的可见部分仍是左上角的 L 形；真正接收指针的是圆角中心的一个小圆点，
    这样它不会盖住旁边的会话库按钮。 */
 .panel-resize-grip { position: absolute; z-index: 9; top: 0; left: 0; width: 44px; height: 44px; cursor: nwse-resize; touch-action: none; pointer-events: none; transition: transform .19s cubic-bezier(.22, .75, .25, 1); }
-/* 可见弧线从窗口边缘内缩 3px，和面板自身的圆角边之间留出一点缝；保留
-   圆弧两端各约 6px 的直线，不再是光秃秃的四分之一圆。 */
-.panel-resize-grip::before { content: ''; position: absolute; inset: 3px; border: 2px solid rgba(190, 214, 255, .52); border-radius: 15px; clip-path: inset(0 17px 17px 0); opacity: .85; transition: opacity .12s ease, border-color .12s ease, filter .12s ease; pointer-events: none; }
+/* 可见角标和面板共用同一个 18px 圆心：18px 弧 + 两端各 6px 直线。
+   只画这一层，不再叠第二段弧。 */
+.panel-resize-grip::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border: 2px solid rgba(198, 220, 255, .72);
+  border-radius: 12px;
+  clip-path: inset(0 18px 18px 0);
+  pointer-events: none;
+  opacity: .8;
+  filter: drop-shadow(0 0 3px rgba(160, 205, 255, .34));
+  transition: opacity .16s ease, border-color .16s ease, filter .16s ease;
+}
 /* 只有左上角 10×10 接收指针：紧贴窗口边缘，不会盖住从 17px 起的会话库按钮。 */
 .panel-resize-grip::after { content: ''; position: absolute; left: 0; top: 0; width: 10px; height: 10px; pointer-events: auto; }
 .panel-resize-grip:hover::before, .panel-resize-grip.is-resizing::before { opacity: 1; border-color: rgba(205, 225, 255, .95); filter: drop-shadow(0 0 3px rgba(160, 205, 255, .55)); }
 body.panel-direction-down .panel-resize-grip { top: auto; bottom: 0; cursor: nesw-resize; }
-body.panel-direction-down .panel-resize-grip::before { clip-path: inset(17px 17px 0 0); }
+body.panel-direction-down .panel-resize-grip::before { clip-path: inset(18px 18px 0 0); }
 body.panel-direction-down .panel-resize-grip::after { top: auto; bottom: 0; }
 /* While dragging, the cursor must not flip back to text/pointer as the window
    moves under the pointer; remove the class on every way a drag can end. */
@@ -97,8 +108,8 @@ body.is-resizing-panel .panel-resize-grip::before {
   box-shadow: none !important;
 }
 /* 展开时会话库按钮紧贴手柄热区右缘。 */
-.panel-bubble.is-expanded .panel-chat-header { padding-left: 12px; }
-.panel-window-action { position: absolute; z-index: 8; top: 7px; display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 9px; color: #d2e0fc; background: transparent; }
+.panel-bubble.is-expanded .panel-chat-header { padding-left: 22px; }
+.panel-window-action { position: absolute; z-index: 20; top: 7px; display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 9px; color: #d2e0fc; background: transparent; }
 .panel-expand-toggle { right: 49px; }
 .panel-window-close { right: 13px; }
 .panel-window-action:hover { color: #fff; background: rgba(178, 203, 251, .18); }
@@ -129,39 +140,8 @@ body.panel-window .panel-bubble:not(.is-empty)::after {
   right: auto;
   transform: translateX(-50%);
 }
-/* 尾巴尖上的小白点：5px 热区（半径 2.5px），横向拖动人物。只改 x，
-   主进程会把人物限制在屏幕工作区内，左右不会出界。 */
-.panel-tail-dot { display: none; }
-body.panel-window .panel-tail-dot {
-  position: absolute;
-  z-index: 6;
-  left: var(--panel-tail-x, 50%);
-  bottom: -8px;
-  display: block;
-  width: 5px;
-  height: 5px;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  transform: translate(-50%, 50%);
-  cursor: ew-resize;
-  touch-action: none;
-}
-.panel-tail-dot::before {
-  content: '';
-  position: absolute;
-  inset: .5px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 0 3px rgba(160, 205, 255, .55);
-  pointer-events: none;
-}
-body.panel-placement-left .panel-tail-dot,
-body.panel-placement-right .panel-tail-dot { display: none; }
 /* 麦克风按钮完整留在工具栏内：下半部分曾经被裁到不可点。 */
-.panel-composer-toolbar .panel-microphone-button { position: relative; z-index: 3; min-height: 29px; }
+.panel-composer-toolbar .panel-microphone-button { position: relative; z-index: 7; min-height: 29px; }
 
 /* 贴在人物左侧/右侧时，面板填满窗口高度，不画上下小三角（侧向贴边以窗口
    边缘本身表示方向）。 */
@@ -212,7 +192,7 @@ body.panel-placement-right .panel-bubble::after { display: none; }
 .panel-side-intro { margin: 2px 0 12px; padding: 0 2px; color: #9db9e6; font-size: var(--text-xs); line-height: 1.45; }
 .panel-history-loading { margin: 12px 2px; color: #9db9e6; font-size: var(--text-xs); line-height: 1.45; }
 
-.panel-chat-header { position: relative; z-index: 5; display: flex; align-items: center; gap: 6px; flex: none; min-width: 0; height: 46px; padding: 4px 83px 0 10px; border-bottom: 1px solid rgba(188, 212, 255, .14); }
+.panel-chat-header { position: relative; z-index: 5; display: flex; align-items: center; gap: 6px; flex: none; min-width: 0; height: 46px; padding: 4px 83px 0 22px; border-bottom: 1px solid rgba(188, 212, 255, .14); }
 .panel-library-toggle { display: grid; place-items: center; flex: none; width: 28px; height: 28px; margin-bottom: 0; padding: 0; border: 0; border-radius: 9px; color: #d3e2ff; background: rgba(178, 203, 251, .09); }
 .panel-library-toggle:hover { color: #fff; background: rgba(178, 203, 251, .2); }
 .panel-library-toggle svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
@@ -264,9 +244,6 @@ body.panel-placement-right .panel-bubble::after { display: none; }
 .panel-toast-error { color: #ffced3; background: linear-gradient(155deg, rgba(105, 32, 67, .97), rgba(76, 22, 50, .97)); border: 1px solid rgba(243, 167, 170, .45); }
 .panel-toast-voice { color: #ffe8c2; background: linear-gradient(155deg, rgba(110, 75, 20, .97), rgba(76, 52, 14, .97)); border: 1px solid rgba(255, 200, 130, .45); }
 @keyframes toast-appear { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-.panel-voice-caption { display: flex; align-items: center; gap: 8px; flex: none; padding: 6px 8px; border-radius: 8px; color: #d5e7ff; background: rgba(9, 35, 82, .45); font-size: var(--text-sm); line-height: 1.45; }
-.panel-voice-dot { width: 7px; height: 7px; border-radius: 50%; background: #9fbfff; }
-.panel-voice-dot.is-active { animation: voice-pulse 1s ease-in-out infinite; background: #ff6b6b; }
 
 /* Flex/grid boxes between the bubble and a message's text: none may take its
    width from its content's min-content. One unbreakable run (a long code line,
@@ -413,7 +390,6 @@ body.panel-placement-right .panel-bubble::after { display: none; }
 .panel-session-edit button.panel-session-save svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .panel-session-confirm { justify-content: flex-end; }
 .panel-session-confirm span { flex: 1; color: #f4d5d7; font-size: var(--text-xs); }
-.panel-library-hint { flex: none; margin: 0; padding: 7px 12px 10px; color: #b4c9ee; font-size: var(--text-xs); line-height: 1.35; }
 .panel-library-error { flex: none; margin: 2px 12px 7px; color: #ffd2d6; font-size: var(--text-xs); line-height: 1.35; }
 .panel-library-select[aria-pressed="true"] { color: #fff; background: rgba(178, 203, 251, .22); }
 .panel-library-batch { display: flex; align-items: center; gap: 3px; flex: none; min-height: 43px; padding: 5px 10px; border-top: 1px solid rgba(190, 212, 255, .16); }
@@ -427,8 +403,14 @@ body.panel-placement-right .panel-bubble::after { display: none; }
 .panel-quick-tabs::-webkit-scrollbar { display: none; }
 /* 会话标签是悬浮的小圆角矩形：四周留出空隙，不再把侧边线接到栏底。
    当前会话只用背景和描边高亮，不再加顶部强调线。 */
-.panel-quick-tab { display: flex; align-items: center; justify-content: center; gap: 5px; flex: 1 1 70px; min-width: 0; max-width: 150px; height: 26px; padding: 0 8px; overflow: hidden; border: 1px solid transparent; border-radius: 7px; color: #aebfe0; background: rgba(155, 190, 252, .055); font-size: var(--text-sm) !important; white-space: nowrap; touch-action: none; }
+.panel-quick-tab { position: relative; display: flex; align-items: center; justify-content: center; gap: 5px; flex: 1 1 0; min-width: 0; max-width: none; height: 26px; padding: 0 20px 0 8px; overflow: hidden; border: 1px solid transparent; border-radius: 7px; color: #aebfe0; background: rgba(155, 190, 252, .055); font-size: var(--text-sm) !important; white-space: nowrap; touch-action: none; }
 .panel-quick-tab-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 关闭标签：鼠标悬停时才露出来，点了只把会话从顶部移回未归档。 */
+.panel-quick-tab-close { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); flex: none; display: grid; place-items: center; width: 13px; height: 13px; border-radius: 4px; color: #9db3d8; font-size: var(--text-2xs); line-height: 1; opacity: 0; transition: opacity .12s ease, background .12s ease, color .12s ease; }
+.panel-quick-tab:hover .panel-quick-tab-close, .panel-quick-tab:focus-visible .panel-quick-tab-close { opacity: .85; }
+/* 展开态常显：聚焦窗口里每个标签都要能直接点掉，不靠悬停才发现。 */
+.panel-bubble.is-expanded .panel-quick-tab-close { opacity: .85; }
+.panel-quick-tab-close:hover { color: #fff; background: rgba(255, 120, 120, .3); }
 .panel-quick-tab:hover { color: #f3f7ff; background: rgba(185, 210, 255, .14); }
 /* 加号没有按钮框，只留符号本身。 */
 .panel-quick-tab-new { flex: 0 0 26px; max-width: 26px; padding: 0; border-color: transparent; background: transparent; color: #c5d7f6; }
@@ -750,13 +732,13 @@ body.panel-placement-right .panel-bubble::after { display: none; }
 .panel-working-dots i { width: 5px; height: 5px; border-radius: 50%; background: #7fd8ff; opacity: calc(.4 + .6 * var(--panel-bounce-p1, 1)); transform: translateY(calc(-3px * var(--panel-bounce-p1, 1))); }
 .panel-working-dots i:nth-child(2) { background: #a9b6ff; opacity: calc(.4 + .6 * var(--panel-bounce-p2, 1)); transform: translateY(calc(-3px * var(--panel-bounce-p2, 1))); }
 .panel-working-dots i:nth-child(3) { background: #c9b8ff; opacity: calc(.4 + .6 * var(--panel-bounce-p3, 1)); transform: translateY(calc(-3px * var(--panel-bounce-p3, 1))); }
-@keyframes panel-working-bounce { 0%, 100% { transform: translateY(0); opacity: .4; } 50% { transform: translateY(-3px); opacity: 1; } }
 .panel-working-text { color: #dbe8ff; }
 .panel-working-time { color: #90a8d4; font-variant-numeric: tabular-nums; }
 /* 子任务：每个 Task 子 agent 一个机器人头，点开是只读详情与它自己的步骤。 */
 .panel-subagent-icons { display: inline-flex; flex: none; align-items: center; gap: 3px; min-width: 0; margin-left: 1px; }
-.panel-subagent-icon { display: grid; place-items: center; flex: none; width: 20px; height: 20px; padding: 0; border: 1px solid rgba(190, 212, 255, .2); border-radius: 6px; color: #bfe4ff; background: rgba(127, 216, 255, .08); }
-.panel-subagent-icon svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.panel-subagent-icon { display: inline-flex; align-items: center; justify-content: center; gap: 5px; flex: none; width: auto; min-width: 26px; height: 26px; padding: 0 8px 0 5px; border: 1px solid rgba(190, 212, 255, .2); border-radius: 8px; color: #bfe4ff; background: rgba(127, 216, 255, .08); }
+.panel-subagent-icon svg { width: 17px; height: 17px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.panel-subagent-name { max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-2xs); line-height: 1; }
 .panel-subagent-icon .panel-subagent-eye { fill: currentColor; stroke: none; }
 .panel-subagent-icon.is-completed { color: #9fd8b6; border-color: rgba(159, 216, 182, .26); }
 .panel-subagent-icon.is-failed { color: #e8a7a7; border-color: rgba(232, 167, 167, .3); }
@@ -781,6 +763,9 @@ body.panel-placement-right .panel-bubble::after { display: none; }
 .panel-subagent-state.is-completed { color: #9fd8b6; }
 .panel-subagent-state.is-failed { color: #e8a7a7; }
 .panel-subagent-meta { margin: 0; min-width: 0; overflow: hidden; color: #94aad2; font-size: var(--text-xs); line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
+/* 工具链折叠开关：默认展开，点标题收起/展开。 */
+.panel-subagent-chain-toggle { display: flex; align-items: center; gap: 5px; align-self: flex-start; padding: 2px 0; border: 0; color: #9fb6df; background: transparent; font: inherit; font-size: var(--text-2xs); cursor: pointer; }
+.panel-subagent-chain-toggle:hover, .panel-subagent-chain-toggle:focus-visible { color: #e6f0ff; }
 .panel-subagent-timeline { display: grid; gap: 1px; max-height: 84px; margin: 1px 0 0; padding: 4px 0 0; overflow-x: hidden; overflow-y: auto; border-top: 1px solid rgba(190, 212, 255, .12); list-style: none; scrollbar-width: thin; }
 .panel-subagent-step { display: flex; align-items: baseline; gap: 6px; min-width: 0; color: #c6d5ef; font-size: var(--text-xs); line-height: 1.5; }
 .panel-subagent-step-mark { flex: none; width: 10px; color: #84cfff; text-align: center; }
@@ -949,6 +934,10 @@ body.panel-placement-right .panel-bubble::after { display: none; }
 .panel-plan-header { align-self: flex-start; flex: none; padding: 1px 7px; border-radius: 6px; color: #f2cd92; background: rgba(240, 196, 123, .13); font-size: var(--text-2xs); }
 .panel-plan-text { min-height: 0; overflow-y: auto; padding-right: 2px; scrollbar-width: thin; }
 .panel-plan-actions { flex: none; display: flex; justify-content: flex-end; gap: 7px; }
+.panel-plan-note { display: flex; flex-direction: column; gap: 4px; flex: none; }
+.panel-plan-note > span { color: #93aad4; font-size: var(--text-2xs); }
+.panel-plan-note textarea { width: 100%; min-height: 44px; resize: vertical; padding: 6px 8px; border: 1px solid rgba(190, 213, 253, .22); border-radius: 8px; color: #e6eeff; background: rgba(4, 12, 34, .44); font: var(--text-sm)/1.45 var(--font-ui); outline: none; }
+.panel-plan-note textarea:focus { border-color: rgba(190, 213, 253, .5); }
 .panel-plan-revise { padding: 4px 12px; border: 1px solid rgba(190, 213, 253, .28); border-radius: 8px; color: #b9cdf0; background: transparent; font-family: inherit; font-size: var(--text-xs) !important; }
 .panel-plan-revise:hover:not(:disabled) { background: rgba(172, 200, 251, .10); }
 .panel-plan-approve { padding: 4px 12px; border: 1px solid rgba(240, 196, 123, .7); border-radius: 8px; color: #172d58; background: #f2cd92; font-family: inherit; font-size: var(--text-xs) !important; font-weight: 600; }
@@ -975,7 +964,7 @@ body.panel-placement-right .panel-bubble::after { display: none; }
    停止按钮保留自己的按钮底。 */
 .panel-composer { position: relative; display: flex; flex: 1; flex-direction: column; gap: 5px; min-width: 0; min-height: 0; padding: 8px 0 0 2px; border: 0; border-top: 1px solid rgba(190, 213, 253, .22); background: transparent; animation: composer-appear .16s cubic-bezier(.22, .75, .25, 1) both; }
 .panel-composer.is-closing { pointer-events: none; animation: composer-dismiss .15s cubic-bezier(.55, 0, .85, .4) both; }
-.panel-composer-collapse { position: absolute; z-index: 2; top: 5px; right: 5px; display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 7px; color: #b8c9e9; background: transparent; }
+.panel-composer-collapse { position: absolute; z-index: 2; top: 5px; right: 0; display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 7px; color: #b8c9e9; background: transparent; }
 .panel-composer-collapse:hover { color: #fff; background: rgba(169, 195, 246, .16); }
 .panel-composer-collapse svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
 .panel-composer-suggestions { position: absolute; z-index: 12; left: 0; bottom: calc(100% + 8px); display: grid; gap: 2px; width: 100%; max-height: 210px; padding: 5px; overflow: auto; border: 1px solid rgba(190, 212, 255, .29); border-radius: 11px; background: rgba(23, 43, 87, .98); box-shadow: 0 6px 20px rgba(5, 14, 38, .22); scrollbar-width: thin; }
@@ -985,46 +974,13 @@ body.panel-placement-right .panel-bubble::after { display: none; }
 .panel-suggestion-item span { flex: none; max-width: 42%; overflow: hidden; font-size: var(--text-sm); text-overflow: ellipsis; white-space: nowrap; }
 .panel-suggestion-item small { flex: 1; min-width: 0; overflow: hidden; color: #adc1e5; font-size: var(--text-xs); text-overflow: ellipsis; white-space: nowrap; }
 .panel-composer-inputrow { position: relative; display: flex; flex: none; min-height: 0; padding-right: 23px; }
-/* 输入提示的左右两侧：左边键帽队列，中间两行提示，右边鼠标；整体往上收。 */
-.panel-composer-hintrow { display: flex; flex: none; align-items: center; justify-content: space-between; gap: 8px; min-height: 60px; margin: -4px 2px 0; }
-.panel-composer-hint { flex: none; width: 112px; color: #8fa2c4; font-size: var(--text-xs); line-height: 1.5; text-align: center; }
-.panel-composer-hintrow .panel-input-keys { gap: 2px; }
-.panel-composer-hintrow .panel-input-keys kbd { height: 22px; min-height: 22px; font-size: var(--text-sm); padding: 1px 7px; }
-.panel-composer-hintrow .panel-input-plus { width: 8px; font-size: var(--text-xs); }
-.panel-composer-hintrow .panel-mouse { width: 44px; height: 60px; }
-/* 正在执行时，提示框里实时显示键盘与手绘鼠标。 */
-.panel-input-activity { display: flex; flex: none; align-items: flex-end; justify-content: space-between; gap: 10px; min-height: 76px; padding-bottom: 4px; margin: 0 2px 6px; color: #8fa2c4; font-size: var(--text-md); user-select: none; }
-.panel-input-keys { display: flex; flex-direction: column; justify-content: flex-end; gap: 5px; height: auto; min-width: 0; align-items: flex-start; overflow: visible; }
-.panel-input-keys kbd { display: flex; flex: none; align-items: center; height: 28px; font: inherit; font-weight: 600; font-size: var(--text-lg); line-height: 1.2; padding: 3px 10px; max-width: 100%; overflow: hidden; border: 1px solid rgba(140, 180, 255, .22); border-radius: 7px; background: rgba(140, 180, 255, .10); color: #cfe1ff; text-overflow: ellipsis; white-space: nowrap; }
-.panel-input-idle { opacity: .45; font-size: var(--text-lg); }
-.panel-input-row { display: flex; align-items: center; gap: 4px; max-width: 100%; transform-origin: left center; }
-.panel-input-row.is-fade-1 kbd { color: rgba(207, 225, 255, .42); }
-.panel-input-row.is-fade-1 .panel-input-plus { opacity: .3; }
-.panel-input-row.is-fade-2 kbd { color: rgba(207, 225, 255, .72); }
-.panel-input-row.is-fade-2 .panel-input-plus { opacity: .55; }
-.panel-input-plus { flex: none; width: 10px; opacity: .55; font-size: var(--text-md); font-weight: 600; text-align: center; }
-.panel-input-row.is-new { animation: panel-key-pop .26s ease-out; }
-.panel-mouse { --panel-mouse-face: rgba(58, 138, 250, .46); width: 56px; height: 76px; flex: none; overflow: visible; }
-.panel-mouse-body { fill: rgba(8, 24, 58, .55); stroke: rgba(150, 200, 255, .6); stroke-width: 1.6; }
-.panel-mouse-button { fill: var(--panel-mouse-face); stroke: rgba(150, 200, 255, .34); stroke-width: 1; transition: fill .12s ease, stroke .12s ease, filter .12s ease; }
-.panel-mouse-button.is-down { fill: rgba(120, 190, 255, .66); stroke: #e0f4ff; filter: drop-shadow(0 0 5px rgba(120, 190, 255, .9)); }
-.panel-mouse-middle-fill { fill: var(--panel-mouse-face); }
-.panel-mouse-midline { stroke: rgba(150, 200, 255, .34); stroke-width: 1.2; }
-.panel-mouse-middle-group.is-down { animation: panel-mouse-flash .38s ease-in-out infinite alternate; }
-.panel-mouse-middle-group.is-down .panel-mouse-middle-fill { fill: rgba(120, 190, 255, .5); }
-.panel-mouse-chevron { fill: none; stroke: rgba(160, 210, 255, .6); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: stroke .12s ease, filter .12s ease; }
-.panel-mouse-chevron.is-active { stroke: #eaf8ff; filter: drop-shadow(0 0 5px rgba(140, 210, 255, .95)); animation: panel-mouse-arrow .4s ease-in-out infinite alternate; }
-.panel-mouse.is-drag .panel-mouse-middle-fill { fill: rgba(243, 195, 111, .45); }
-@keyframes panel-key-pop { from { opacity: .35; } to { opacity: 1; } }
-@keyframes panel-mouse-arrow { from { opacity: .4; } to { opacity: 1; } }
-@keyframes panel-mouse-flash { from { opacity: .45; } to { opacity: 1; } }
 .panel-composer textarea { width: 100%; flex: none; min-width: 0; min-height: 0; max-height: 155px; padding: 2px 2px 2px 0; resize: none; overflow-y: auto; border: 0; outline: none; color: #f3f6ff; background: transparent; font-size: var(--text-md); line-height: 1.45; scrollbar-color: rgba(171, 201, 250, .62) transparent; scrollbar-width: auto; }
 .panel-composer textarea::-webkit-scrollbar { width: 8px; }
 .panel-composer textarea::-webkit-scrollbar-thumb { border-radius: 8px; background: rgba(171, 201, 250, .58); }
 .panel-composer textarea::-webkit-scrollbar-thumb:hover { background: rgba(198, 220, 255, .78); }
 .panel-composer textarea::placeholder { color: #99acd5; }
-.panel-send { display: grid; place-items: center; flex: none; width: 29px; height: 29px; padding: 0; border: 0; border-radius: 8px; }
-.panel-composer-toolbar { display: flex; align-items: center; gap: 6px; flex: none; min-height: 29px; }
+.panel-send { position: relative; z-index: 7; display: grid; place-items: center; flex: none; width: 29px; height: 29px; padding: 0; border: 0; border-radius: 8px; }
+.panel-composer-toolbar { position: relative; z-index: 6; display: flex; align-items: center; gap: 6px; flex: none; min-height: 29px; margin: 0 0 -2px -3px; }
 /* 审批模式：输入框左下角的图标按钮，只显示图标。四档各有一个图标和
    一种低饱和颜色；只有完全访问和自我进化额外带一点边框，其余保持中性。 */
 .panel-approval-wrap { position: relative; display: flex; flex: none; }
@@ -1115,7 +1071,6 @@ body.panel-placement-right .panel-bubble::after { display: none; }
 .panel-model-menu button:hover:not(:disabled), .panel-model-menu button[aria-checked="true"] { background: rgba(181, 205, 255, .14); }
 .panel-model-menu button:disabled { color: #95a5c4; cursor: not-allowed; }
 .panel-popover-heading { padding: 2px 8px 5px; color: #a8bee6; font-size: var(--text-sm); font-weight: 600; letter-spacing: .03em; text-align: center; }
-.panel-popover-context { margin-top: 7px; padding-top: 7px; border-top: 1px solid rgba(194, 215, 255, .16); }
 /* The plan of an ExitPlanMode call reads like a document, not a tool log. */
 .panel-tool-plan { color: #e6eeff; }
 /* 模式菜单：目标 / 计划 / 联网搜索三项都带图标，顺序固定，放在模型列表之前。 */
@@ -1144,13 +1099,6 @@ body.panel-placement-right .panel-bubble::after { display: none; }
 .panel-goal-banner-condition:hover { color: #fff; }
 .panel-goal-banner-condition:focus-visible { outline: 2px solid rgba(224, 179, 106, .6); outline-offset: 2px; border-radius: 4px; }
 .panel-goal-banner.is-expanded .panel-goal-banner-condition { white-space: normal; overflow: visible; text-overflow: clip; }
-.panel-goal-banner-meta { flex: none; color: #93aad4; font-size: var(--text-xs); }
-.panel-goal-banner-evolve { flex: none; padding: 1px 6px; border-radius: 999px; color: #9de6d3; background: rgba(127, 199, 184, .12); font-size: var(--text-2xs); }
-.panel-goal-banner-budget { flex: none; color: #93aad4; font-size: var(--text-xs); }
-.panel-goal-banner-reason { flex: 1 1 100%; min-width: 0; overflow: hidden; color: #c9a87a; font-size: var(--text-xs); text-overflow: ellipsis; white-space: nowrap; }
-.panel-goal-banner-pause { flex: 1 1 auto; min-width: 0; overflow: hidden; color: #e0b48a; font-size: var(--text-xs); text-overflow: ellipsis; white-space: nowrap; }
-.panel-goal-resume { flex: none; padding: 2px 8px; border: 1px solid rgba(224, 180, 138, .34); border-radius: 7px; color: #efd3b4; background: rgba(224, 180, 138, .1); font-size: var(--text-xs); }
-.panel-goal-resume:hover { background: rgba(224, 180, 138, .2); }
 .panel-goal-stop { display: grid; place-items: center; flex: none; width: 22px; height: 22px; padding: 0; border: 1px solid rgba(190, 212, 255, .22); border-radius: 7px; color: #dce8ff; background: rgba(160, 191, 251, .12); }
 .panel-goal-stop:hover { background: rgba(160, 191, 251, .22); }
 /* Thinking depth sits on the toolbar, one tap away; the depth slider itself
@@ -1194,7 +1142,7 @@ body.panel-placement-right .panel-bubble::after { display: none; }
 .panel-compact-button:hover:not(:disabled) { color: #fff; background: rgba(160, 191, 251, .26); }
 .panel-compact-button:disabled { opacity: .5; cursor: not-allowed; }
 /* The context ring opens its own panel above itself (usage detail + compact). */
-.panel-context-wrap { position: relative; display: flex; flex: none; margin-left: auto; }
+.panel-context-wrap { position: relative; z-index: 7; display: flex; flex: none; margin-left: auto; }
 .panel-context-meter { display: grid; place-items: center; flex: none; width: 29px; height: 29px; padding: 0; border: 0; border-radius: 9px; color: #a9c7fa; background: transparent; cursor: pointer; }
 .panel-context-meter:hover { background: rgba(155, 191, 253, .16); }
 .panel-context-meter:focus-visible { outline: 2px solid #b4d1ff; outline-offset: 0; }
