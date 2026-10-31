@@ -109,10 +109,10 @@ describe('TurnProcess', () => {
 
   it('folds clusters and mid-turn sentences into one closed row that still holds the process', () => {
     const segments = segmentTurn([thought('t1', 0, 12), tool('x1', 'Bash', 12), midNote, thought('t2', 40, 52)])
-    const html = render(<TurnProcess segments={segments} renderEntry={entry}
+    const html = render(<TurnProcess segments={segments} renderEntry={entry} renderUser={entry}
       renderNote={(item) => <p className="note-row">{item.text}</p>} />)
     expect(html).toContain('is-turn-process')
-    // Closed by default — the reader sees the outcome, not the process.
+    // 对话结束后思维链自动收起——读者先看到结果。
     expect(html).not.toMatch(/<details[^>]*\sopen/)
     // The row states the whole stretch: the settled state word plus the
     // operation count; no clock on the bar.

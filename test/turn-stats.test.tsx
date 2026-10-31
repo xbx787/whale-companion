@@ -228,8 +228,9 @@ describe('TurnStats', () => {
     expect(off).toContain('panel-turn-formula-mult is-off-peak')
     expect(off).toContain('<i class="panel-turn-tier is-off-peak">谷</i>')
     expect(off).not.toContain('is-peak')
-    // 缓存命中率：1.62M 命中 ÷（160K 未命中 + 1.62M 命中）≈ 91%。
-    expect(off).toContain('缓存命中率 91%')
+    // 缓存命中率：1.62M 命中 ÷（160K 未命中 + 1.62M 命中）≈ 91%。标签与数值分列两端。
+    expect(off).toContain('缓存命中率')
+    expect(off).toContain('91%')
     // 峰时：同一对色里的柔和红。
     expect(peak).toContain('panel-turn-formula-mult is-peak')
     expect(peak).toContain('<i class="panel-turn-tier is-peak">峰</i>')

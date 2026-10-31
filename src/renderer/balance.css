@@ -1,129 +1,99 @@
 @import './design-tokens.css';
 
-/* 余额卡：尺寸与人物可见区域对齐——高度等于人物高度，右侧三角离角色约
-   12px。窗口本身是透明的，卡片右侧留 8px 给指出来的小三角。 */
+/* 余额卡：三段式——品牌行、金额行、时段与操作行。紧凑、留白均匀，
+   不铺大色块；峰谷只用小圆点和文字颜色区分。 */
 .balance-peek {
   position: absolute;
   z-index: 12;
   left: 10px;
   bottom: 192px;
   display: grid;
-  grid-template-rows: 24px minmax(0, 1fr) 22px;
-  row-gap: 3px;
-  width: 240px;
-  height: 134px;
-  padding: 8px 10px 7px;
-  border: 1px solid rgba(160, 192, 248, .30);
+  grid-template-rows: 22px minmax(0, 1fr) 24px;
+  row-gap: 6px;
+  width: 248px;
+  height: 124px;
+  padding: 10px 12px;
+  border: 1px solid rgba(160, 192, 248, .18);
   border-radius: 16px;
-  color: #edf3ff;
+  color: #eef4ff;
   background:
-    radial-gradient(110% 90% at 0% 0%, rgba(104, 148, 232, .22), transparent 62%),
-    linear-gradient(160deg, rgba(32, 57, 108, .97), rgba(15, 31, 68, .97) 70%, rgba(11, 25, 58, .97));
-  /* No outer shadow: it used to bleed above and below the right-hand pointer
-     and read as a second, unwanted edge. Keep only the top inner highlight. */
-  box-shadow: inset 0 1px rgba(232, 242, 255, .10);
+    radial-gradient(120% 100% at 8% 0%, rgba(96, 140, 224, .18), transparent 60%),
+    linear-gradient(168deg, rgba(26, 46, 88, .97), rgba(12, 25, 56, .98));
+  box-shadow: inset 0 1px rgba(236, 244, 255, .08);
   font-family: var(--font-ui);
   font-size: var(--text-sm);
-  /* Every avatar size uses the same medium metrics; the window is 10px taller
-     than the medium card so the larger type and buttons have room. */
-  --text-balance-title: 12.5px;
-  --text-balance-amount: 36px;
-  --text-balance-detail: 10px;
+  /* 余额卡不再写死字号：全部从 design-tokens 派生，跟界面尺寸一起缩放。 */
+  --text-balance-title: var(--text-md);
+  --text-balance-amount: calc(var(--text-xl) * 34 / 27);
+  --text-balance-detail: var(--text-xs);
 }
 
-/* 只在有提示时多一行；正常状态三行，金额区占据剩下的高度。 */
-.balance-peek.has-notice { grid-template-rows: 24px minmax(0, 1fr) 22px 11px; }
+/* 有提示时多一行；总高度不变，金额区让出一点空间。 */
+.balance-peek.has-notice { grid-template-rows: 22px minmax(0, 1fr) 24px 12px; }
 
-/* 卡片右侧中部的小三角，指向人物。 */
+/* 右侧指向人物的小三角。 */
 .balance-peek::after {
   content: "";
   position: absolute;
-  top: calc(50% - 6px);
-  right: -6px;
-  width: 11px;
-  height: 11px;
-  border-right: 1px solid rgba(160, 192, 248, .30);
-  border-top: 1px solid rgba(160, 192, 248, .30);
-  background: #152b58;
+  top: calc(50% - 5px);
+  right: -5px;
+  width: 10px;
+  height: 10px;
+  border-right: 1px solid rgba(160, 192, 248, .18);
+  border-top: 1px solid rgba(160, 192, 248, .18);
+  background: #142a55;
   transform: rotate(45deg);
   pointer-events: none;
 }
 
-.balance-header, .balance-heading, .balance-actions, .balance-amounts, .balance-amount, .balance-period, .balance-foot {
-  display: flex;
-  align-items: center;
-}
-
-.balance-header { justify-content: space-between; gap: 8px; min-width: 0; }
-.balance-heading { gap: 6px; min-width: 0; }
-/* 品牌点：低饱和的蓝绿，和大数字一起构成卡片唯一的高光。 */
-.balance-heading::before {
-  content: "";
-  flex: none;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: linear-gradient(145deg, #9fd6d0, #5f9fe0);
-  box-shadow: 0 0 8px rgba(120, 190, 230, .45);
-}
-.balance-heading strong { color: #f2f7ff; font-size: var(--text-balance-title); font-weight: 650; letter-spacing: .02em; }
-.balance-heading small { color: #9fb6df; font-size: var(--text-balance-detail); }
-.balance-updated { margin-left: 2px; color: #8199c3; font-size: var(--text-balance-detail); }
-
-.balance-actions { gap: 2px; flex: none; }
+.balance-top, .balance-amounts, .balance-bottom, .balance-period, .balance-links { display: flex; align-items: center; }
+.balance-top { gap: 7px; min-width: 0; }
+.balance-brand { display: inline-flex; align-items: center; gap: 6px; color: #f3f7ff; font-size: var(--text-balance-title); font-weight: 600; letter-spacing: .01em; }
+.balance-brand i { width: 6px; height: 6px; border-radius: 50%; background: linear-gradient(145deg, #a7dbd4, #68a8e8); box-shadow: 0 0 7px rgba(120, 190, 230, .5); }
+.balance-updated { color: #8199c3; font-size: var(--text-balance-detail); font-variant-numeric: tabular-nums; }
+.balance-actions { display: flex; gap: 1px; margin-left: auto; }
 .balance-actions button {
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border: 0;
-  border-radius: 7px;
-  color: #aebfe2;
-  background: transparent;
-  font: var(--glyph-sm)/1 var(--font-ui);
-  cursor: pointer;
+  display: grid; place-items: center; width: 22px; height: 22px; padding: 0;
+  border: 0; border-radius: 6px; color: #9db3d8; background: transparent;
+  font: var(--glyph-sm)/1 var(--font-ui); cursor: pointer;
   transition: background .15s ease, color .15s ease;
 }
-.balance-actions button:hover, .balance-actions button:focus-visible { color: #fff; background: rgba(184, 210, 255, .16); }
-.balance-actions button:disabled { opacity: .45; cursor: default; }
+.balance-actions button:hover, .balance-actions button:focus-visible { color: #fff; background: rgba(184, 210, 255, .14); }
+.balance-actions button:disabled { opacity: .4; cursor: default; }
 
-.balance-amounts { justify-content: center; gap: 12px; min-width: 0; overflow: hidden; }
-.balance-amount { align-items: baseline; gap: 3px; min-width: 0; white-space: nowrap; }
+.balance-amounts { gap: 10px; justify-content: center; min-width: 0; overflow: hidden; }
+.balance-amount { display: flex; align-items: baseline; gap: 2px; min-width: 0; white-space: nowrap; }
+.balance-symbol { margin-left: 2px; color: #8ea8d4; font-size: var(--text-lg); font-weight: 500; }
 .balance-amount strong {
-  overflow: hidden;
-  color: #f8fbff;
-  font-family: var(--font-numeric);
-  font-size: var(--text-balance-amount);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -.04em;
-  line-height: 1.05;
-  text-overflow: ellipsis;
+  overflow: hidden; color: #fbfdff;
+  font-family: var(--font-ui); font-size: var(--text-balance-amount); font-weight: 600;
+  font-variant-numeric: tabular-nums; letter-spacing: -.03em; line-height: 1; text-overflow: ellipsis;
 }
-.balance-amount small { margin-left: 1px; color: #92aad6; font-size: var(--text-balance-detail); letter-spacing: .04em; }
-.balance-amount + .balance-amount { flex-shrink: 1; padding-left: 12px; border-left: 1px solid rgba(186, 209, 250, .16); }
-.balance-amount + .balance-amount strong { font-size: var(--text-lg); letter-spacing: -.02em; }
+.balance-amount + .balance-amount { padding-left: 10px; border-left: 1px solid rgba(186, 209, 250, .14); }
+.balance-amount + .balance-amount strong { font-size: var(--text-lg); }
 .balance-placeholder { color: #a9bee4; font-size: var(--text-balance-title); }
 
-/* 峰谷时段：一枚小胶囊，切换时间靠右，和金额区之间用留白分开。 */
+.balance-bottom { justify-content: space-between; gap: 8px; min-width: 0; }
 .balance-period {
-  gap: 8px;
-  min-width: 0;
-  padding: 3px 8px;
-  border: 1px solid rgba(176, 203, 250, .12);
-  border-radius: 9px;
-  color: #d6e4ff;
-  background: rgba(168, 198, 250, .07);
-  font-size: var(--text-balance-detail);
-  white-space: nowrap;
+  gap: 5px; min-width: 0; padding: 2px 8px 2px 7px;
+  border: 1px solid rgba(176, 203, 250, .10); border-radius: 999px;
+  background: rgba(168, 198, 250, .06); font-size: var(--text-balance-detail); white-space: nowrap;
 }
-.balance-period-badge { flex: none; display: inline-flex; align-items: center; gap: 5px; font-weight: 600; }
-.balance-period-badge::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: currentColor; box-shadow: 0 0 6px currentColor; }
-.balance-period-peak { color: #f0c68c; }
-.balance-period-off_peak { color: #8fc0f5; }
+.balance-period i { flex: none; width: 5px; height: 5px; border-radius: 50%; background: currentColor; box-shadow: 0 0 5px currentColor; }
+.balance-period em { margin-left: 2px; color: #8ba3cd; font-style: normal; overflow: hidden; text-overflow: ellipsis; }
+.balance-period-peak { color: #f6aeb5; }
+.balance-period-off_peak { color: #9bd8ad; }
 .balance-period-unknown { color: #adbfdd; }
-.balance-next { margin-left: auto; overflow: hidden; color: #8ba3cd; text-overflow: ellipsis; }
 
-.balance-foot { gap: 6px; min-width: 0; color: #e2a6ad; font-size: var(--text-balance-detail); white-space: nowrap; }
-.balance-foot span { overflow: hidden; text-overflow: ellipsis; }
+.balance-links { flex: none; gap: 4px; }
+.balance-links button {
+  padding: 2px 8px; border: 1px solid rgba(176, 203, 250, .14); border-radius: 7px;
+  color: #a9c2ea; background: transparent; font: inherit; font-size: var(--text-balance-detail);
+  cursor: pointer; transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.balance-links button:hover, .balance-links button:focus-visible {
+  color: #fff; border-color: rgba(196, 219, 255, .34); background: rgba(184, 210, 255, .14);
+}
+
+.balance-foot { min-width: 0; color: #e2a6ad; font-size: var(--text-balance-detail); white-space: nowrap; }
+.balance-foot span { display: block; overflow: hidden; text-overflow: ellipsis; }

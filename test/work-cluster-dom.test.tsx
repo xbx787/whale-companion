@@ -57,7 +57,7 @@ describe('folding a work cluster by hand', () => {
     expect(details().open).toBe(false)
   })
 
-  it('still folds itself when the stretch ends', async () => {
+  it('folds itself when the stretch ends', async () => {
     await mount(true)
     await mount(false)
     expect(details().open).toBe(false)

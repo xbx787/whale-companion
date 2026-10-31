@@ -1,7 +1,7 @@
 import { useEffect, useRef, type MouseEvent } from 'react';
-import type { ClaudeWorkflowOption, ConversationSummary } from '../shared/contracts';
+import type { AppCommandOption, ConversationSummary } from '../shared/contracts';
 import { sessionMentionToken } from '../shared/session-mentions';
-import { LIBRARY_LABELS, libraryMentionToken, type LibraryItem } from '../shared/libraries';
+import type { LibraryItem } from '../shared/libraries';
 
 export interface ComposerTrigger {
   kind: 'file' | 'workflow' | 'skill';
@@ -24,22 +24,24 @@ export function detectComposerTrigger(text: string, caret: number): ComposerTrig
   // The SDK accepts commands and skills only at the start of a submitted
   // message. Keep an already completed token out of the picker when the caret
   // sits just before its separating space.
-  const workflow = /^(\s*)([/$])([^\s/$]*)$/.exec(before);
+  const workflow = /^([/$])([^\s/$]*)$/.exec(before);
   if (workflow && !/^\s/u.test(after)) {
-    return { kind: workflow[2] === '$' ? 'skill' : 'workflow', query: workflow[3], start: workflow[1].length, end: position };
+    return { kind: workflow[1] === '$' ? 'skill' : 'workflow', query: workflow[2], start: 0, end: position };
   }
-  const file = /(^|[\s([{])@([^\s@{}"']*)$/.exec(before);
+  // Mentions are commands only when they open the message; an @ later in the
+  // text stays ordinary text and never opens the picker.
+  const file = /^@([^\s@{}"']*)$/.exec(before);
   // The canonical @{path}, @"path" and markdown mention forms are already
   // complete tokens, including when the caret is placed just after their @.
-  if (file && !/^\s/u.test(after) && !(file[2] === '' && /^[{"\[]/u.test(after))) {
-    return { kind: 'file', query: file[2], start: before.length - file[2].length - 1, end: position };
+  if (file && !/^\s/u.test(after) && !(file[1] === '' && /^[{"\[]/u.test(after))) {
+    return { kind: 'file', query: file[1], start: 0, end: position };
   }
   return null;
 }
 
 /** The picker keeps /commands and $skills distinct, while the main process
  * still resolves either submitted token through the native Claude workflow. */
-export function workflowSuggestionItems(options: readonly ClaudeWorkflowOption[], trigger: ComposerTrigger): ComposerSuggestion[] {
+export function workflowSuggestionItems(options: readonly AppCommandOption[], trigger: ComposerTrigger): ComposerSuggestion[] {
   if (trigger.kind === 'file') return [];
   const kind = trigger.kind === 'skill' ? 'skill' : 'command';
   const prefix = kind === 'skill' ? '$' : '/';
@@ -69,9 +71,9 @@ export function librarySuggestionItems(items: readonly LibraryItem[], query: str
     .slice(0, Math.max(0, limit))
     .map((item) => ({
       id: `library:${item.kind}:${item.id}`,
-      label: libraryMentionToken(item),
-      detail: `${LIBRARY_LABELS[item.kind]}库 · ${item.source}`,
-      insertText: libraryMentionToken(item),
+      label: `@${item.kind}:${item.name}`,
+      detail: item.description,
+      insertText: `@${item.kind}:${item.name}`,
     }));
 }
 
@@ -145,6 +147,6 @@ export function ComposerSuggestions({ kind, query, items, selectedIndex, loading
       className="panel-suggestion-item"
       onMouseDown={keepEditorFocus}
       onClick={() => onSelect(item)}
-    ><span>{item.label}</span><small>{item.detail}</small></button>)}
+    ><span>{item.label}</span>{item.detail && <small>{item.detail}</small>}</button>)}
   </div>;
 }

@@ -31,6 +31,16 @@ function localReference(value) {
  * must stay within its directory, including after following filesystem links.
  * No referenced file is read until both lexical and realpath checks pass.
  */
+/** asar 虚拟文件系统可能不支持 realpath；失败时退回归一化路径，
+ *  边界检查仍然成立，只是不再跟随符号链接。 */
+function realpathOrResolve(value) {
+  try {
+    return fs.realpathSync(value)
+  } catch {
+    return path.resolve(value)
+  }
+}
+
 export function validateModelPackage(modelPath) {
   const errors = []
   const files = []
@@ -40,8 +50,8 @@ export function validateModelPackage(modelPath) {
   try {
     const stat = fs.statSync(modelPath)
     if (!stat.isFile() || stat.size === 0) throw new Error('must be a nonempty regular file')
-    root = fs.realpathSync(path.dirname(modelPath))
-    if (!isInside(root, fs.realpathSync(modelPath))) throw new Error('model entry escapes its package directory')
+    root = realpathOrResolve(path.dirname(modelPath))
+    if (!isInside(root, realpathOrResolve(modelPath))) throw new Error('model entry escapes its package directory')
     model = JSON.parse(fs.readFileSync(modelPath, 'utf8').replace(/^\uFEFF/u, ''))
   } catch (error) {
     fail('model3', path.basename(modelPath), error instanceof Error ? error.message : String(error))
@@ -65,7 +75,7 @@ export function validateModelPackage(modelPath) {
       return
     }
     try {
-      const realTarget = fs.realpathSync(target)
+      const realTarget = realpathOrResolve(target)
       if (!isInside(root, realTarget)) {
         fail(field, value, 'resolved path escapes the model package')
         return

@@ -16,11 +16,19 @@ export interface SelfTestCheck {
   detail?: string
 }
 
+export interface SelfTestEnv {
+  packaged: boolean
+  electron: string
+  /** 从窗口就绪等到结果写出的耗时。 */
+  elapsedMs: number
+}
+
 export interface SelfTestResult {
   version: string
   at: string
   ok: boolean
   checks: SelfTestCheck[]
+  env?: SelfTestEnv
 }
 
 export interface SelfTestInput {
@@ -30,6 +38,7 @@ export interface SelfTestInput {
   rendererRoot: string
   windowsReady: boolean
   settingsReady: boolean
+  env?: SelfTestEnv
 }
 
 function describe(error: unknown): string {
@@ -113,7 +122,8 @@ export function runSelfTest(input: SelfTestInput): SelfTestResult {
     version: input.version,
     at: new Date().toISOString(),
     ok: checks.every((item) => item.ok),
-    checks
+    checks,
+    ...(input.env ? { env: input.env } : {})
   }
   const output = path.join(input.dataRoot, 'self-test', 'latest.json')
   mkdirSync(path.dirname(output), { recursive: true })

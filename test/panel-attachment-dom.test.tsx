@@ -43,7 +43,7 @@ describe('附件选择入口', () => {
         if (prop === 'getDraft') return () => Promise.resolve('')
         if (prop === 'getContextUsage') return () => Promise.resolve({ status: 'unavailable' })
         if (prop === 'readAvatar') return () => Promise.resolve(null)
-        if (prop === 'listClaudeWorkflows') return () => Promise.resolve([])
+        if (prop === 'listAppCommands') return () => Promise.resolve([])
         if (prop === 'searchWorkspaceFiles') return () => Promise.resolve([])
         return () => Promise.resolve(true)
       }

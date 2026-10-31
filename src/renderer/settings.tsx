@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import type { AgentCapabilities, ConversationSettings, GrowthProposal, ModelProfile } from '../shared/contracts'
+import type { PluginSummary, AgentCapabilities, ConversationSettings, ModelProfile } from '../shared/contracts'
 import { LIBRARY_KINDS, LIBRARY_LABELS, LIBRARY_MARKET_LABELS, type LibraryItem, type LibraryKind, type LibrarySnapshot } from '../shared/libraries'
 import { PERSONA_PRESETS } from '../shared/personas'
 import { personaAvatarUrl } from './avatar-art'
 import { PROVIDER_CATALOG } from '../shared/provider-catalog'
 import { DEFAULT_SKILL_MARKET_SOURCES, SKILL_MARKET_SOURCES } from '../shared/skill-market'
 import { publicErrorText } from '../shared/error-copy'
-import type { GrowthOverview, SettingsAPI } from '../preload/settings'
+import type { SettingsAPI } from '../preload/settings'
 import type { MemoryItem } from '../main/memory-service'
 import { SettingsVoiceSection } from './settings-voice'
+import { AVATAR_SIZE_OPTIONS, dateLabel, errorMessage, initialSettingsTab, marketLink, SETTINGS_TABS, UI_SIZE_OPTIONS, type ModelFormState, type SettingsTab } from './settings-constants'
 import './settings.css'
 import './voice.css'
 
@@ -19,72 +20,16 @@ declare global {
   }
 }
 
-function errorMessage(cause: unknown): string {
-  return publicErrorText(cause instanceof Error ? cause.message : String(cause))
-}
-
-/** The model form's local draft; a catalog pick fills the fields, a custom
- *  pick leaves them to the user. */
-interface ModelFormState {
-  id: string | null
-  providerId: string
-  modelId: string
-  name: string
-  baseUrl: string
-  apiKey: string
-  smallModel: string
-  extraEnv: string
-  removeExtraEnv: boolean
-  advanced: boolean
-  /** 端点返回的模型 id；搜索框过滤它，点一下就填进模型 ID。 */
-  discovered: string[]
-  modelSearch: string
-}
-
-const BASE_SETTINGS_TABS = [
-  { id: 'conversation', label: '对话' },
-  { id: 'appearance', label: '外观' },
-  { id: 'libraries', label: '库' },
-  { id: 'models', label: '模型' },
-  { id: 'voice', label: '语音' },
-  { id: 'memory', label: '记忆' },
-  { id: 'identity', label: '称呼' },
-  { id: 'avatar', label: '人设' }
-] as const
-type SettingsTab = typeof BASE_SETTINGS_TABS[number]['id'] | 'growth'
-/** Growth experiments stay a local development tool; the packaged build
- *  ships the stable tab set only. */
-const SETTINGS_TABS: ReadonlyArray<{ id: SettingsTab; label: string }> = [
-  ...BASE_SETTINGS_TABS,
-  ...(import.meta.env.MODE === 'development' ? [{ id: 'growth' as const, label: '成长' }] : [])
-]
-
-/** 界面尺寸档：小是原来的样子，中、大各上调一档。 */
-const UI_SIZE_OPTIONS: ReadonlyArray<{ id: ConversationSettings['uiSize']; label: string }> = [
-  { id: 'small', label: '小' },
-  { id: 'medium', label: '中' },
-  { id: 'large', label: '大' }
-]
-
-/** 人物大小档：小 = 现在，中 = 之前的尺寸，大 = 再上一档。 */
-const AVATAR_SIZE_OPTIONS: ReadonlyArray<{ id: ConversationSettings['avatarSize']; label: string }> = [
-  { id: 'small', label: '小' },
-  { id: 'medium', label: '中' },
-  { id: 'large', label: '大' }
-]
-
-const GROWTH_STATUS_LABEL: Record<GrowthProposal['status'], string> = {
-  proposed: '待同意实验', running: '实验中', ready: '待审阅', failed: '实验失败',
-  stale: '源码已变化', adopted: '已在本机采纳', published: '已发布 GitHub', discarded: '已丢弃'
-}
-
-function dateLabel(value: string): string {
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN', { hour12: false })
-}
-
 export function SettingsPage() {
   const [settings, setSettings] = useState<ConversationSettings | null>(null)
+  const [allowedKinds, setAllowedKinds] = useState<string[]>([])
+  const [plugins, setPlugins] = useState<PluginSummary[]>([])
+  useEffect(() => {
+    const api = window.pet as (typeof window.pet & { listAlwaysAllowed?: () => Promise<string[]> }) | undefined;
+    Promise.resolve(api?.listAlwaysAllowed?.() ?? []).then(setAllowedKinds).catch(() => undefined);
+    const pluginApi = window.pet as (typeof window.pet & { listPlugins?: () => Promise<PluginSummary[]> }) | undefined;
+    Promise.resolve(pluginApi?.listPlugins?.() ?? []).then(setPlugins).catch(() => undefined);
+  }, [])
   const [tabsDraft, setTabsDraft] = useState('5')
   const [goalIterationsDraft, setGoalIterationsDraft] = useState('30')
   const [goalMinutesDraft, setGoalMinutesDraft] = useState('180')
@@ -107,15 +52,7 @@ export function SettingsPage() {
   const [memoryBusyId, setMemoryBusyId] = useState<string | null>(null)
   const [memoryEditId, setMemoryEditId] = useState<string | null>(null)
   const [memoryDraft, setMemoryDraft] = useState('')
-  const [growth, setGrowth] = useState<GrowthOverview | null>(null)
-  const [growthBusyId, setGrowthBusyId] = useState<string | null>(null)
-  const [growthSelectedId, setGrowthSelectedId] = useState<string | null>(null)
-  const [growthNotesDraft, setGrowthNotesDraft] = useState('')
-  const [growthFormOpen, setGrowthFormOpen] = useState(false)
-  const [growthTitle, setGrowthTitle] = useState('')
-  const [growthObjective, setGrowthObjective] = useState('')
-  const [growthEvidence, setGrowthEvidence] = useState('')
-  const [tab, setTab] = useState<SettingsTab>('conversation')
+  const [tab, setTab] = useState<SettingsTab>(initialSettingsTab)
   const [workspace, setWorkspace] = useState<{ path: string; saved: boolean } | null>(null)
   const [workspacePending, setWorkspacePending] = useState<string | null>(null)
   const [workspaceBusy, setWorkspaceBusy] = useState(false)
@@ -131,6 +68,15 @@ export function SettingsPage() {
   const [libraryBusyId, setLibraryBusyId] = useState<string | null>(null)
   const [libraryHealthBusyId, setLibraryHealthBusyId] = useState<string | null>(null)
   const [libraryHealth, setLibraryHealth] = useState<Record<string, { ok: boolean; message: string }>>({})
+
+  const [librarySection, setLibrarySection] = useState<'installed' | 'market'>('installed')
+
+  useEffect(() => {
+    // 窗口已经开着时，左栏再点「浏览市场」走这里切页签。
+    return window.whaleSettings.onOpenTab?.((next) => {
+      if (SETTINGS_TABS.some((entry) => entry.id === next)) setTab(next as SettingsTab)
+    })
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -190,7 +136,7 @@ export function SettingsPage() {
   }, [tab])
 
   useEffect(() => {
-    if (tab !== 'libraries') return
+    if (tab !== 'libraries' || librarySection !== 'market') return
     let active = true
     setMarketBusy(true)
     setMarketError('')
@@ -205,33 +151,13 @@ export function SettingsPage() {
       if (active) setMarketBusy(false)
     })
     return () => { active = false }
-  }, [tab, libraryKind, settings?.skillMarketSources?.join(',')])
+  }, [tab, libraryKind, librarySection, settings?.skillMarketSources?.join(',')])
 
-  useEffect(() => {
-    // 成长实验不在设置里暴露：面板入口已移除，这段轮询永远不会启动。
-    // 数据仍由主进程写进本地 data/growth/（见 GrowthStore 的 proposals.md）。
-    if ((tab as string) !== 'growth') return
-    let active = true
-    const refresh = (): void => {
-      void window.whaleSettings.growthStatus().then((current) => {
-        if (active) setGrowth(current)
-      }).catch((cause: unknown) => {
-        if (active) setNotice({ text: errorMessage(cause), error: true })
-      })
-    }
-    refresh()
-    const timer = window.setInterval(refresh, 5_000)
-    return () => { active = false; window.clearInterval(timer) }
-  }, [tab])
 
   const libraryQueryText = libraryQuery.trim().toLocaleLowerCase()
   const installedLibraries = libraries.items.filter((item) => item.kind === libraryKind && (!libraryQueryText ||
     [item.name, item.description, item.source, item.launch?.command, item.launch?.url]
       .filter(Boolean).join(' ').toLocaleLowerCase().includes(libraryQueryText)))
-  const selectedGrowth = growth?.proposals.find((item) => item.id === growthSelectedId && item.status !== 'discarded') ?? growth?.proposals.find((item) => item.status !== 'discarded') ?? null
-  useEffect(() => {
-    setGrowthNotesDraft(selectedGrowth?.releaseNotes ?? '')
-  }, [selectedGrowth?.id, selectedGrowth?.releaseNotes])
 
   async function searchLibraryMarket(): Promise<void> {
     if (marketBusy) return
@@ -349,6 +275,32 @@ export function SettingsPage() {
     }
   }
 
+  async function installPlugin(id: string): Promise<void> {
+    if (busy) return
+    setBusy(true)
+    try {
+      await window.pet.installPlugin(id)
+      setNotice({ text: '已安装插件', error: false })
+    } catch (error) {
+      setNotice({ text: error instanceof Error ? error.message : String(error), error: true })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function revokeAllowed(kind?: string): Promise<void> {
+    if (busy) return
+    setBusy(true)
+    try {
+      await window.pet.clearAlwaysAllowed(kind)
+      setAllowedKinds(await window.pet.listAlwaysAllowed())
+    } catch (error) {
+      setNotice({ text: error instanceof Error ? error.message : String(error), error: true })
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function update(patch: Partial<ConversationSettings>): Promise<void> {
     if (busy) return
     setBusy(true)
@@ -442,44 +394,6 @@ export function SettingsPage() {
       setNotice({ text: errorMessage(cause), error: true })
     } finally {
       setMemoryBusyId(null)
-    }
-  }
-
-  async function growthAction(id: string, action: () => Promise<GrowthProposal>, success: string): Promise<void> {
-    if (growthBusyId) return
-    setGrowthBusyId(id)
-    setNotice(null)
-    try {
-      const result = await action()
-      setGrowth((current) => current ? {
-        ...current, proposals: current.proposals.map((item) => item.id === id ? result : item)
-      } : current)
-      if (result.status === 'failed') setNotice({ text: result.error ?? '实验未通过检查。', error: true })
-      else setNotice({ text: success, error: false })
-    } catch (cause) {
-      setNotice({ text: errorMessage(cause), error: true })
-    } finally {
-      setGrowthBusyId(null)
-    }
-  }
-
-  async function proposeGrowth(): Promise<void> {
-    if (growthBusyId || !growthTitle.trim() || !growthObjective.trim() || !growthEvidence.trim()) return
-    setGrowthBusyId('new')
-    setNotice(null)
-    try {
-      const item = await window.whaleSettings.growthPropose(growthTitle, growthObjective, growthEvidence)
-      setGrowth((current) => current ? { ...current, proposals: [item, ...current.proposals.filter((old) => old.id !== item.id)] } : current)
-      setGrowthSelectedId(item.id)
-      setGrowthFormOpen(false)
-      setGrowthTitle('')
-      setGrowthObjective('')
-      setGrowthEvidence('')
-      setNotice({ text: '改进建议已记录，实验需单独同意', error: false })
-    } catch (cause) {
-      setNotice({ text: errorMessage(cause), error: true })
-    } finally {
-      setGrowthBusyId(null)
     }
   }
 
@@ -663,6 +577,27 @@ export function SettingsPage() {
     </nav>
     <main>
       {tab === 'conversation' && <section className="settings-section" role="tabpanel" id="settings-panel-conversation" aria-labelledby="settings-tab-conversation">
+        <div className="settings-row">
+          <div className="settings-copy"><label>始终允许的工具</label><p>在这些工具上选过「始终允许」，之后同类调用不再询问。可以单独撤销或全部清空。</p></div>
+          <div className="settings-allowed-list">
+            {allowedKinds.length === 0 ? <span className="settings-allowed-empty">暂无</span> : allowedKinds.map((kind) => (
+              <span key={kind} className="settings-allowed-item">{kind}
+                <button type="button" disabled={busy} onClick={() => { void revokeAllowed(kind) }}>撤销</button>
+              </span>
+            ))}
+            {allowedKinds.length > 0 && <button type="button" disabled={busy} onClick={() => { void revokeAllowed() }}>全部清空</button>}
+          </div>
+        </div>
+        <div className="settings-row">
+          <div className="settings-copy"><label>本地插件</label><p>放在数据目录 plugins 下的插件包。安装会把其中的连接器注册进 MCP 库、技能写进技能目录。</p></div>
+          <div className="settings-allowed-list">
+            {plugins.length === 0 ? <span className="settings-allowed-empty">暂无插件</span> : plugins.map((plugin) => (
+              <span key={plugin.id} className="settings-allowed-item">{plugin.name} {plugin.version}
+                <button type="button" disabled={busy} onClick={() => { void installPlugin(plugin.id) }}>安装</button>
+              </span>
+            ))}
+          </div>
+        </div>
         <div className="settings-row settings-workspace-row">
           <div className="settings-copy">
             <label>工作目录</label>
@@ -795,6 +730,15 @@ export function SettingsPage() {
           </div>
         </div>
         <div className="settings-row">
+          <div className="settings-copy"><label>窗口透明度</label><p>0 表示关闭透明效果，窗口完全不透明，能减少透明合成的开销。</p></div>
+          <div className="settings-opacity">
+            <input type="range" min={0} max={100} step={5} aria-label="窗口透明度"
+              value={settings?.windowOpacity ?? 100} disabled={!settings || busy}
+              onChange={(event) => { void update({ windowOpacity: Number(event.target.value) }) }} />
+            <span>{settings?.windowOpacity ?? 100}%</span>
+          </div>
+        </div>
+        <div className="settings-row">
           <div className="settings-copy"><label>面板位置</label><p>聊天面板贴在人物的哪一侧，默认上方。左/右时面板与人物并排，不再随人物在屏幕上下半自动翻转。</p></div>
           <div className="settings-size-picker" role="radiogroup" aria-label="面板位置">
             {([['top', '上方'], ['bottom', '下方'], ['left', '左侧'], ['right', '右侧']] as const).map(([value, label]) => {
@@ -851,6 +795,15 @@ export function SettingsPage() {
           })}
         </div>
         <div className="settings-library-pane">
+          <div className="settings-library-segments" role="tablist" aria-label="已安装与市场">
+            <button type="button" role="tab" aria-label="已安装" aria-selected={librarySection === 'installed'}
+              className={librarySection === 'installed' ? 'is-active' : ''}
+              onClick={() => setLibrarySection('installed')}>已安装<small>{libraries.items.length}</small></button>
+            <button type="button" role="tab" aria-label="市场" aria-selected={librarySection === 'market'}
+              className={librarySection === 'market' ? 'is-active' : ''}
+              onClick={() => setLibrarySection('market')}>市场</button>
+          </div>
+          {librarySection === 'installed' && <>
           <div className="settings-library-heading">
             <h2>{LIBRARY_LABELS[libraryKind]}库</h2>
             <p>应用安装的条目用 @ 添加；本地已有的条目由 Claude 配置直接加载。</p>
@@ -859,29 +812,18 @@ export function SettingsPage() {
                 onChange={(event) => setLibraryQuery(event.target.value)} />
             </label>
           </div>
-          {libraryKind === 'skill' && <div className="settings-skill-sources" aria-label="技能市场来源">
-            <span>技能市场来源</span>
-            {SKILL_MARKET_SOURCES.map((source) => {
-              const enabled = (settings?.skillMarketSources ?? DEFAULT_SKILL_MARKET_SOURCES).includes(source.id)
-              return <button key={source.id} type="button" role="switch" aria-checked={enabled}
-                className={`settings-skill-source${enabled ? ' is-on' : ''}`}
-                title={source.description}
-                disabled={!settings || busy}
-                onClick={() => toggleSkillSource(source.id, !enabled)}>
-                {source.name}
-              </button>
-            })}
-          </div>}
           {installedLibraries.length === 0
-            ? <p className="settings-library-empty">还没有添加{LIBRARY_LABELS[libraryKind]}。到下面的{LIBRARY_MARKET_LABELS[libraryKind]}找一个。</p>
+            ? <p className="settings-library-empty">还没有添加{LIBRARY_LABELS[libraryKind]}。到「市场」里找一个。</p>
             : <div className="settings-library-list">
-                {installedLibraries.map((item) => (
+                {installedLibraries.map((item) => {
+                  const link = marketLink(item)
+                  return (
                   <div className="settings-library-item" key={item.id}>
                     <div className="settings-library-copy">
                       <label>{item.name}{item.version && <span className="settings-library-version">v{item.version}</span>}{item.external && <span className="settings-library-version">本地已有</span>}{item.disabled && <span className="settings-library-version">已停用</span>}</label>
-                      {item.description && <p>{item.description}</p>}
-                      <small className="settings-library-source">来源：{item.source}</small>
+                      {item.description && <p title={item.description}>{item.description}</p>}
                       {item.license && <small>许可证：{item.license}</small>}
+                      {link && <button type="button" className="settings-library-link" onClick={() => { void window.whaleSettings.openExternal?.(link.url) }}>{link.label}</button>}
                       {libraryHealth[item.id] && <small className={libraryHealth[item.id].ok ? 'settings-library-health is-ok' : 'settings-library-health is-error'} role="status">{libraryHealth[item.id].message}</small>}
                     </div>
                     {item.external
@@ -897,9 +839,11 @@ export function SettingsPage() {
                           </button>
                         </div>}
                   </div>
-                ))}
+                  )
+                })}
               </div>}
-          <div className="settings-library-market">
+          </>}
+          {librarySection === 'market' && <div className="settings-library-market">
             <div className="settings-library-market-head">
               <h2>{LIBRARY_MARKET_LABELS[libraryKind]}</h2>
               <form onSubmit={(event) => { event.preventDefault(); void searchLibraryMarket() }}>
@@ -909,6 +853,20 @@ export function SettingsPage() {
                 <button type="submit" disabled={marketBusy}>{marketBusy ? '查询中…' : '搜索'}</button>
               </form>
             </div>
+            <p className="settings-library-market-hint">预置 MCP Registry、Anthropic Skills、Superpowers、Awesome Skills 与 Claude 插件目录；仓库链接直达 GitHub。</p>
+            {libraryKind === 'skill' && <div className="settings-skill-sources" aria-label="技能市场来源">
+              <span>技能市场来源</span>
+              {SKILL_MARKET_SOURCES.map((source) => {
+                const enabled = (settings?.skillMarketSources ?? DEFAULT_SKILL_MARKET_SOURCES).includes(source.id)
+                return <button key={source.id} type="button" role="switch" aria-checked={enabled}
+                  className={`settings-skill-source${enabled ? ' is-on' : ''}`}
+                  title={source.description}
+                  disabled={!settings || busy}
+                  onClick={() => toggleSkillSource(source.id, !enabled)}>
+                  {source.name}
+                </button>
+              })}
+            </div>}
             {marketError && <p className="settings-library-error" role="alert">{marketError}</p>}
             {marketBusy && marketItems.length === 0 && <p className="settings-library-empty">正在连接{LIBRARY_MARKET_LABELS[libraryKind]}…</p>}
             {!marketBusy && !marketError && marketItems.length === 0 && marketLoadedFor === libraryKind &&
@@ -916,11 +874,13 @@ export function SettingsPage() {
             <div className="settings-library-list">
               {marketItems.map((item) => {
                 const installed = libraries.items.some((entry) => entry.id === item.id)
+                const link = marketLink(item)
                 return <div className="settings-library-item" key={item.id}>
                   <div className="settings-library-copy">
                     <label>{item.name}{item.version && <span className="settings-library-version">v{item.version}</span>}</label>
                     {item.description && <p>{item.description}</p>}
-                    <small>许可证：{item.license || '以来源仓库为准'}</small>
+                    <small className="settings-library-source">来源：{item.source}，许可证：{item.license || '以来源仓库为准'}</small>
+                    {link && <button type="button" className="settings-library-link" onClick={() => { void window.whaleSettings.openExternal?.(link.url) }}>{link.label}</button>}
                   </div>
                   <button type="button" disabled={installed || libraryBusyId !== null} onClick={() => { void installLibraryItem(item) }}>
                     {installed ? '已添加' : libraryBusyId === item.id ? '添加中…' : '添加'}
@@ -928,7 +888,7 @@ export function SettingsPage() {
                 </div>
               })}
             </div>
-          </div>
+          </div>}
         </div>
       </section>}
       {tab === 'models' && <section className="settings-section" role="tabpanel" id="settings-panel-models" aria-labelledby="settings-tab-models">
@@ -1028,69 +988,6 @@ export function SettingsPage() {
             </div>
           </>}
         </article>)}
-      </section>}
-      {tab === 'growth' && <section className="settings-section settings-growth-section" role="tabpanel" id="settings-panel-growth" aria-labelledby="settings-tab-growth">
-        <div className="settings-growth-intro">
-          <strong>先提出，再实验，最后由你采纳。</strong>
-          <p>小鲸会根据重复失败留下改进建议。实验改动和检查结果在此审阅；GitHub 发布是独立操作。</p>
-          {growth && !growth.available && <p className="settings-growth-unavailable" role="status">{growth.reason ?? '本机源码实验当前不可用。'}便携版仍可正常聊天和使用记忆。</p>}
-        </div>
-        <div className="settings-growth-list-head">
-          <span>改进建议 {growth ? `(${growth.proposals.filter((item) => item.status !== 'discarded').length})` : ''}</span>
-          <button type="button" aria-expanded={growthFormOpen} onClick={() => setGrowthFormOpen(!growthFormOpen)}>{growthFormOpen ? '收起' : '记录建议'}</button>
-        </div>
-        {growthFormOpen && <form className="settings-growth-form" onSubmit={(event) => { event.preventDefault(); void proposeGrowth() }}>
-          <label>标题<input maxLength={80} value={growthTitle} disabled={Boolean(growthBusyId)} onChange={(event) => setGrowthTitle(event.target.value)} placeholder="简短说明要改进什么" /></label>
-          <label>目标<textarea maxLength={2000} rows={2} value={growthObjective} disabled={Boolean(growthBusyId)} onChange={(event) => setGrowthObjective(event.target.value)} placeholder="具体希望小鲸做到什么" /></label>
-          <label>依据<textarea maxLength={2000} rows={2} value={growthEvidence} disabled={Boolean(growthBusyId)} onChange={(event) => setGrowthEvidence(event.target.value)} placeholder="出现了什么可复现的问题" /></label>
-          <button type="submit" disabled={Boolean(growthBusyId) || !growthTitle.trim() || !growthObjective.trim() || !growthEvidence.trim()}>保存建议</button>
-        </form>}
-        {!growth && <p className="settings-empty" role="status">正在读取建议…</p>}
-        {growth?.proposals.filter((item) => item.status !== 'discarded').length === 0 && <p className="settings-empty">暂时没有改进建议。小鲸发现有依据的重复失败后会记录在这里。</p>}
-        {(growth?.proposals ?? []).filter((item) => item.status !== 'discarded').length > 0 && <div className="settings-growth-layout">
-          <div className="settings-growth-proposals" aria-label="改进建议列表">
-            {growth?.proposals.filter((item) => item.status !== 'discarded').map((item) => <button key={item.id} type="button"
-              className={`settings-growth-proposal${selectedGrowth?.id === item.id ? ' is-active' : ''}`}
-              aria-current={selectedGrowth?.id === item.id ? 'true' : undefined}
-              onClick={() => setGrowthSelectedId(item.id)}>
-              <span className="settings-growth-proposal-title">{item.title}</span>
-              <span className={`settings-growth-state status-${item.status}`}>{GROWTH_STATUS_LABEL[item.status]}</span>
-            </button>)}
-          </div>
-          {selectedGrowth && <article className="settings-growth-detail">
-            <div className="settings-growth-detail-heading"><h2>{selectedGrowth.title}</h2><time dateTime={selectedGrowth.createdAt}>{dateLabel(selectedGrowth.createdAt)}</time></div>
-            <p className="settings-growth-detail-label">改进目标</p><p>{selectedGrowth.objective}</p>
-            <p className="settings-growth-detail-label">发现依据</p><p>{selectedGrowth.evidence}</p>
-            {selectedGrowth.error && <p className="settings-growth-error" role="alert">{selectedGrowth.error}</p>}
-            {selectedGrowth.checks && <div className="settings-growth-checks" aria-label="宿主检查结果">
-              {selectedGrowth.checks.map((check) => <details key={check.name}>
-                <summary><span className={check.ok ? 'check-ok' : 'check-failed'}>{check.ok ? '✓' : '×'}</span> {check.name}</summary>
-                <pre>{check.output || '没有输出'}</pre>
-              </details>)}
-            </div>}
-            {selectedGrowth.diff && <details className="settings-growth-diff"><summary>查看源码差异</summary><pre>{selectedGrowth.diff}</pre></details>}
-            {selectedGrowth.releaseNotes !== undefined && <div className="settings-growth-notes">
-              <label htmlFor="growth-release-notes">版本说明草稿</label>
-              <textarea id="growth-release-notes" rows={5} maxLength={8000} value={growthNotesDraft}
-                disabled={selectedGrowth.status !== 'ready' || Boolean(growthBusyId)} onChange={(event) => setGrowthNotesDraft(event.target.value)} />
-              {selectedGrowth.status === 'ready' && <button type="button" disabled={Boolean(growthBusyId) || !growthNotesDraft.trim() || growthNotesDraft.trim() === selectedGrowth.releaseNotes}
-                onClick={() => { void growthAction(selectedGrowth.id, () => window.whaleSettings.growthUpdateNotes(selectedGrowth.id, growthNotesDraft), '版本说明已保存') }}>保存版本说明</button>}
-            </div>}
-            <div className="settings-growth-actions">
-              {(selectedGrowth.status === 'proposed' || selectedGrowth.status === 'failed') && <button type="button" disabled={!growth?.available || Boolean(growthBusyId)}
-                onClick={() => { void growthAction(selectedGrowth.id, () => window.whaleSettings.growthExperiment(selectedGrowth.id), '实验已完成，请审阅差异与检查结果') }}>
-                {growthBusyId === selectedGrowth.id ? '实验中…' : '同意实验'}
-              </button>}
-              {selectedGrowth.status === 'ready' && <button type="button" disabled={Boolean(growthBusyId) || !selectedGrowth.checks?.every((check) => check.ok) || growthNotesDraft.trim() !== selectedGrowth.releaseNotes}
-                onClick={() => { void growthAction(selectedGrowth.id, () => window.whaleSettings.growthAdopt(selectedGrowth.id), '已生成本机版本，其他会话空闲后启用') }}>采纳并安装本机版本</button>}
-              {selectedGrowth.status === 'adopted' && <button type="button" disabled={Boolean(growthBusyId)}
-                onClick={() => { void growthAction(selectedGrowth.id, () => window.whaleSettings.growthPublish(selectedGrowth.id), 'GitHub Release 已发布') }}>发布 GitHub</button>}
-              {!['adopted', 'published', 'discarded', 'running'].includes(selectedGrowth.status) && <button type="button" className="is-danger" disabled={Boolean(growthBusyId)}
-                onClick={() => { void growthAction(selectedGrowth.id, () => window.whaleSettings.growthDiscard(selectedGrowth.id), '建议已丢弃') }}>丢弃建议</button>}
-            </div>
-            {selectedGrowth.version && <p className="settings-growth-version">本机版本 v{selectedGrowth.version}</p>}
-          </article>}
-        </div>}
       </section>}
       {tab === 'identity' && <section className="settings-section" role="tabpanel" id="settings-panel-identity" aria-labelledby="settings-tab-identity">
         <div className="settings-row">

@@ -1,3 +1,5 @@
+import { errorText } from './error-text'
+import { yamlQuote } from './dsh-web-policy'
 /** Minimal stdio JSON-RPC client for a DSH `sdk-minimal` runtime.
  *
  *  DSH is developer preview; its wire format is newline-delimited JSON-RPC.
@@ -35,9 +37,6 @@ export interface DshRuntimeSettings {
   mcpBridge?: DshMcpBridgeSettings
 }
 
-function yamlQuote(value: string): string {
-  return `'${value.replace(/'/g, "''")}'`
-}
 
 /** The sdk-minimal bundle only ships a shell, `read_image`, and
  *  `working_directory`; the app's own tools need an explicit MCP client row.
@@ -94,10 +93,6 @@ interface PendingRequest {
   timer: ReturnType<typeof setTimeout>
 }
 
-function errorText(value: unknown): string {
-  if (value && typeof value === 'object' && 'message' in value) return String((value as { message: unknown }).message)
-  return String(value)
-}
 
 export class DshRuntime {
   private child: ChildProcessWithoutNullStreams | undefined

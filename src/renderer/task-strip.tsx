@@ -1,5 +1,6 @@
-import { memo, useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { AgentTask } from './agent-tasks'
+import { RunningDots } from './running-dots'
 
 /** One compact fraction, done over total — "17/17" reads at a glance. What is
  *  running lives in the icon state and the list, not in more words here. */
@@ -8,7 +9,7 @@ export function taskCounts(tasks: readonly AgentTask[]): string[] {
   return [`${done}/${tasks.length}`]
 }
 
-const marks: Record<AgentTask['status'], string> = { pending: '○', in_progress: '…', completed: '✓' }
+const marks: Record<AgentTask['status'], ReactNode> = { pending: '○', in_progress: <RunningDots />, completed: '✓' }
 
 /** Numbered (or bulleted) steps from an approved plan, used as the strip's
  *  fallback until the model creates real TaskCreate entries. */

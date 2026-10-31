@@ -1,3 +1,4 @@
+import { errorText } from './error-text'
 /** Minimal ACP (Agent Client Protocol) client for a DSH `acp` profile.
  *
  *  The `sdk-minimal` profile exposes only three tools and no permission or
@@ -47,7 +48,7 @@ export interface DshAcpSettings {
   /** DSH sandbox preset: read-only / workspace-write / danger-full-access. */
   permissionMode?: 'read-only' | 'workspace-write' | 'danger-full-access'
   /** Declarations re-sent on every new/resumed session. */
-  mcpServers?: () => DshAcpMcpServer[]
+  mcpServers?: () => DshAcpMcpServer[] | Promise<DshAcpMcpServer[]>
 }
 
 export interface DshAcpNotification {
@@ -110,10 +111,6 @@ export function toAcpMcpServer(name: string, raw: unknown): DshAcpMcpServer | nu
   return { name, command, args, env }
 }
 
-function errorText(value: unknown): string {
-  if (value && typeof value === 'object' && 'message' in value) return String((value as { message: unknown }).message)
-  return String(value)
-}
 
 /** 只有子进程自己退出才算“可以透明重连”的故障；协议/参数错误不重试。 */
 function isAcpExit(error: unknown): boolean {
@@ -144,6 +141,11 @@ export class DshAcpRuntime {
   private imagePrompts = false
 
   constructor(private readonly settings: DshAcpSettings) {}
+
+  /** 当前内核进程的 PID；命令级的进程树匹配以它为根。 */
+  pid(): number | undefined {
+    return this.child?.pid
+  }
 
   /** Increments whenever a fresh process has completed its handshake. */
   get generation(): number { return this.runGeneration }
@@ -314,9 +316,9 @@ export class DshAcpRuntime {
     })
   }
 
-  private mcpServers(): DshAcpMcpServer[] {
+  private async mcpServers(): Promise<DshAcpMcpServer[]> {
     try {
-      return this.settings.mcpServers?.() ?? []
+      return (await this.settings.mcpServers?.()) ?? []
     } catch {
       return []
     }
@@ -325,7 +327,7 @@ export class DshAcpRuntime {
   async newSession(cwd: string): Promise<DshAcpSession> {
     return await this.request('session/new', {
       cwd,
-      mcpServers: this.mcpServers()
+      mcpServers: await this.mcpServers()
     }, 120_000) as DshAcpSession
   }
 
@@ -333,7 +335,7 @@ export class DshAcpRuntime {
     return await this.request('session/resume', {
       sessionId,
       cwd,
-      mcpServers: this.mcpServers()
+      mcpServers: await this.mcpServers()
     }, 120_000) as DshAcpSession
   }
 
@@ -397,6 +399,18 @@ export class DshAcpRuntime {
   /** 把一批回答交给我们补的 `session/answer`；问题已关闭时返回 false。 */
   async answer(sessionId: string, callId: string, answers: unknown[], timeoutMs = 60_000): Promise<boolean> {
     const result = await this.request('session/answer', { sessionId, callId, answers }, timeoutMs) as { accepted?: boolean }
+    return result?.accepted === true
+  }
+
+  /** 停止一个子代理（DSH 的 subagents.interrupt）。 */
+  async interruptSubagent(sessionId: string, childSessionId: string, timeoutMs = 30_000): Promise<boolean> {
+    const result = await this.request('session/subagent_interrupt', { sessionId, childSessionId }, timeoutMs) as { accepted?: boolean }
+    return result?.accepted === true
+  }
+
+  /** 给一个可续聊的子代理发消息（DSH 的 subagents.prompt）。 */
+  async promptSubagent(sessionId: string, childSessionId: string, text: string, delivery: 'queue' | 'steer' = 'queue', timeoutMs = 30_000): Promise<boolean> {
+    const result = await this.request('session/subagent_prompt', { sessionId, childSessionId, text, delivery }, timeoutMs) as { accepted?: boolean }
     return result?.accepted === true
   }
 

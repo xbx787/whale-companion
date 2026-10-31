@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { TaskStatus } from '../shared/contracts'
 import { formatDuration } from './duration'
 import { toolLabel } from '../shared/tool-labels'
@@ -31,7 +31,7 @@ export function workingPhrase(input: { sending: boolean; thinking: boolean; stat
   }
 }
 
-export function WorkingIndicator({ sending, thinking, status, tool, compacting, compactingAuto, startedAt }: {
+export function WorkingIndicator({ sending, thinking, status, tool, compacting, compactingAuto, startedAt, avatar }: {
   sending: boolean
   thinking: boolean
   status: TaskStatus
@@ -39,6 +39,8 @@ export function WorkingIndicator({ sending, thinking, status, tool, compacting, 
   compacting?: boolean
   compactingAuto?: boolean
   startedAt?: string
+  /** 响应中的小鲸头像：有回复就要有脸，不能只剩三个点和一句话。 */
+  avatar?: ReactNode
 }) {
   const phrase = workingPhrase({ sending, thinking, status, tool, compacting, compactingAuto })
   const mountedAt = useRef(Date.now())
@@ -54,6 +56,7 @@ export function WorkingIndicator({ sending, thinking, status, tool, compacting, 
   const since = Number.isFinite(parsed) ? parsed : mountedAt.current
   const elapsed = Math.max(0, Math.floor((now - since) / 1000))
   return <div className="panel-working" role="status" aria-live="polite" aria-label={`${phrase}${elapsed >= 1 ? `，已进行 ${elapsed} 秒` : ''}`}>
+    {avatar}
     <span className="panel-working-dots" aria-hidden="true"><i /><i /><i /></span>
     <span className="panel-working-text">{phrase}</span>
     {elapsed >= 1 && <span className="panel-working-time">{formatDuration(elapsed)}</span>}

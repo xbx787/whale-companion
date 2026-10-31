@@ -165,7 +165,17 @@ export function segmentTurn(items: TimelineEntry[]): TurnSegment[] {
       segments.push({ kind: 'user', entry })
     } else {
       flush()
-      segments.push({ kind: 'note', entry })
+      // 同一轮里连续的助手文本是同一条回复的流式分段，合成一段再渲染；
+      // 否则界面会把一句话拆成两个独立的块。
+      const last = segments[segments.length - 1]
+      if (last?.kind === 'note' && last.entry.kind === 'assistant' && entry.kind === 'assistant') {
+        segments[segments.length - 1] = {
+          kind: 'note',
+          entry: { ...last.entry, text: `${last.entry.text}\n\n${entry.text}` }
+        }
+      } else {
+        segments.push({ kind: 'note', entry })
+      }
     }
   }
   flush()

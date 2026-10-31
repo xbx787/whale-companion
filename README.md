@@ -84,9 +84,12 @@ npm.cmd run dev
 
 智能体内核采用 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)，小鲸通过 ACP 承载对话、思考、工具调用、子代理和会话续接。默认模型与账户服务来自 DeepSeek。
 
+桌面操作（截屏、点击、输入、窗口与 UIA）来自 [CursorTouch/Windows-MCP](https://github.com/CursorTouch/Windows-MCP)。感谢 CursorTouch 和它的贡献者把这套 Windows 自动化能力开源出来。小鲸把它的工具收敛成宿主内置的 `win_*` 工具，底层仍运行同一个后端；蓝色截屏标注框、键鼠横幅和方向动画是本项目的本地补丁。
+
 ## 第三方组件与许可
 
-- **DeepSeek Harness（DSH）**：© DeepSeek，按 MIT 许可证使用。发布包携带裁剪后的 DSH 运行时；小鲸通过配置和可复现补丁接入 ACP，不包含 DSH Web 界面。
+- **DeepSeek Harness（DSH）**：© DeepSeek，按 MIT 许可证使用，项目地址 [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness)。发布包携带裁剪后的 DSH 运行时；小鲸通过配置和可复现补丁接入 ACP，不包含 DSH Web 界面。
+- **Windows-MCP**：© CursorTouch，项目地址 [CursorTouch/Windows-MCP](https://github.com/CursorTouch/Windows-MCP)，按项目自带许可使用。小鲸把它作为宿主内置 `win_*` 工具转发，桌面控制的后端实现归原项目所有。
 - **模型端点**：默认使用用户自行配置的 DeepSeek API，也可配置应用支持的其他端点。每位使用者需使用自己的密钥；本项目不代付、不转售或中介模型用量。本项目与 DeepSeek 无隶属或背书关系。
 - **旧版兼容代码**：仓库及构建产物仍保留部分历史 Claude Agent SDK 适配器和成长实验兼容代码，用于迁移与回归；当前对话内核不加载 Claude Code，发布包不携带或启动 `claude.exe`。旧会话记录里的 `claude_code` 模式名会在加载时自动迁移为 `dsh`，新记录只写 `dsh`。
 - **角色素材**：角色立绘来自公开角色页，权利归原作者或权利方所有，仅作个人桌面使用；公开分发前请确认授权或替换为原创素材。

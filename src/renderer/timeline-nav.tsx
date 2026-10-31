@@ -209,7 +209,7 @@ export function TimelineNav({ marks, onJump, windowSize = NAV_WINDOW_WIDE, baseW
         return <span key={mark.id} className="panel-nav-row">
           <i
             aria-hidden="true"
-            className={navMarkClass(expanded, index === active)}
+            className={`${navMarkClass(expanded, index === active)}${ordinal === marks.length ? ' is-latest' : ''}`}
             style={scale !== 1 ? ({ '--nav-scale': String(scale) } as CSSProperties) : undefined}
             onMouseEnter={expanded ? () => setActive(index) : undefined}
           />

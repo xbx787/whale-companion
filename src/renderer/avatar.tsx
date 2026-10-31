@@ -23,18 +23,17 @@ import { playIdleFidget } from './avatar-idle';
 import { startAvatarBehaviorScheduler, type AvatarBehaviorActions } from './avatar-behavior';
 import { cancelPoseSwap, nextPose, playPoseSwap, preloadPoses } from './avatar-poses';
 import { FACE_HOLD_MS, FAILED_FACE_HOLD_MS, isFreshUserEntry, lastUserEntryId, resolveAvatarPresentation, SEND_FACE_HOLD_MS, taskDot } from './avatar-face';
-import { orderConversationTabs } from './panel-tabs';
+import { orderConversationTabs, quickTabLimit } from './panel-tabs';
+import { orderStatusDots } from './status-dots';
 import { cancelAhogeFlick, playAhogeFlick } from './avatar-ahoge';
 import './avatar.css';
 
 /** 右上角圆角弧：固定五个槽位，半径 50，从正上方顺时针转 4° 起，每 12° 一个点。
  *  对话不足五个时，空槽画空心点，位置不随对话数变化。 */
-const STATUS_ARC_RADIUS = 50;
-const STATUS_ARC_STEP_DEG = 12;
+const STATUS_ARC_RADIUS = 52;const STATUS_ARC_STEP_DEG = 12;
 const STATUS_ARC_START_DEG = -78;
-const STATUS_ARC_CENTER_LIFT = 1.5;
-const STATUS_ARC_ROTATION_DEG = 5;
-const STATUS_ARC_SLOTS = 5;
+const STATUS_ARC_CENTER_LIFT = 3.5;
+const STATUS_ARC_ROTATION_DEG = 12;
 
 interface PointerSession {
   id: number;
@@ -185,9 +184,19 @@ function Avatar() {
     snapshot?.conversationLibrary?.settings.tabOrder ?? []
   );
   const currentConversationId = snapshot?.conversationLibrary?.activeConversationId ?? snapshot?.conversationId;
-  // 弧半径跟人物大小同比缩放；对话超过 5 个时顺时针继续加槽，最多 10 个。
+  // 点数 = 未归档会话数；其中只有顶部真正打开成标签的那些点带颜色，其余空心。
+  const hiddenTabIds = snapshot?.conversationLibrary?.settings.hiddenTabIds ?? [];
+  const openTabIds = new Set(
+    statusConversations
+      .filter((item) => !hiddenTabIds.includes(item.id))
+      .slice(0, quickTabLimit(snapshot?.conversationLibrary?.settings.visibleConversationTabs))
+      .map((item) => item.id)
+  );
   const statusRadius = STATUS_ARC_RADIUS * avatarDisplaySize(1, 1, avatarSize).width / 116.5;
-  const statusSlots = Math.max(STATUS_ARC_SLOTS, Math.min(10, statusConversations.length));
+  const statusSlots = statusConversations.length;
+  // 打开成标签的会话按顶部标签顺序排在前面，未打开的会话全部沉到最后。
+  // 这样新拉出来的标签不会插在空心点中间，拿走一个也不会让顺序重排。
+  const dotConversations = orderStatusDots(statusConversations, openTabIds);
   const [unseenFinished, setUnseenFinished] = useState<ReadonlySet<string>>(() => new Set());
   const previousStatuses = useRef(new Map<string, string>());
   useEffect(() => {
@@ -630,17 +639,17 @@ function Avatar() {
               '--avatar-dot-right': `${arcRight.toFixed(2)}px`,
               '--avatar-dot-top': `${arcTop.toFixed(2)}px`
             } as CSSProperties;
-            const item = statusConversations[index];
-            // 空槽：五个位置始终占满，对话不足五个时用空心点补齐。
-            if (!item) return <i key={`empty-${index}`} className="avatar-status-dot is-empty" style={style} />;
+            const item = dotConversations[index];
+            // 没打开成标签的会话留一个空心点，点数仍按未归档数排。
+            if (!item || !openTabIds.has(item.id)) return <i key={`empty-${index}`} className="avatar-status-dot is-empty" style={style} />;
             // 完成/失败/取消都保留颜色；未读只影响是否闪，不再把绿/红藏成蓝色。
             const unread = unseenFinished.has(item.id);
             const state = item.taskStatus === 'cancelled'
               ? { tone: 'cancelled', pulse: false }
               : item.taskStatus === 'done'
-                ? { tone: 'done', pulse: unread }
+                ? { tone: 'done', pulse: false }
                 : item.taskStatus === 'failed'
-                  ? { tone: 'failed', pulse: unread }
+                  ? { tone: 'failed', pulse: false }
                   : taskDot(item.taskStatus);
             return <i key={item.id}
               className={`avatar-status-dot${state ? ` is-${state.tone}` : ''}${state?.pulse ? ' is-pulsing' : ''}${item.id === currentConversationId ? ' is-current' : ''}`}

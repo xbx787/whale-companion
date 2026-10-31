@@ -8,14 +8,14 @@ import type { ToolPermissionRequest } from '../shared/contracts'
  */
 export function ToolApprovalPanel({ request, onDecide }: {
   request: ToolPermissionRequest
-  onDecide: (allow: boolean) => Promise<boolean>
+  onDecide: (decision: 'once' | 'always' | 'deny') => Promise<boolean>
 }) {
   const [busy, setBusy] = useState(false)
 
-  async function decide(allow: boolean): Promise<void> {
+  async function decide(decision: 'once' | 'always' | 'deny'): Promise<void> {
     if (busy) return
     setBusy(true)
-    if (!await onDecide(allow)) setBusy(false)
+    if (!await onDecide(decision)) setBusy(false)
   }
 
   return <div className="panel-permission" aria-label="等待允许的工具调用">
@@ -28,8 +28,9 @@ export function ToolApprovalPanel({ request, onDecide }: {
       </details>}
     </section>
     <div className="panel-permission-actions">
-      <button type="button" className="panel-permission-deny" disabled={busy} onClick={() => { void decide(false) }}>拒绝</button>
-      <button type="button" className="panel-permission-allow" disabled={busy} onClick={() => { void decide(true) }}>{busy ? '发送中…' : '允许'}</button>
+      <button type="button" className="panel-permission-deny" disabled={busy} onClick={() => { void decide('deny') }}>拒绝</button>
+      <button type="button" className="panel-permission-always" disabled={busy} onClick={() => { void decide('always') }}>始终允许</button>
+      <button type="button" className="panel-permission-allow" disabled={busy} onClick={() => { void decide('once') }}>{busy ? '发送中…' : '允许一次'}</button>
     </div>
   </div>
 }

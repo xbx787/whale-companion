@@ -50,13 +50,6 @@ function bridge(overrides: Partial<SettingsAPI> = {}): SettingsAPI {
     memoryList: async () => [], memorySetEnabled: async (enabled) => enabled,
     memoryUpdate: async (id, text) => ({ id, text, sourceConversationId: 'conversation-1', sourceAt: '2026-10-12T10:00:00.000Z', createdAt: '2026-10-12T10:00:00.000Z', updatedAt: '2026-10-12T10:00:00.000Z' }),
     memoryDelete: async () => {},
-    growthStatus: async () => ({ available: true, proposals: [] }),
-    growthPropose: async () => { throw new Error('unused') },
-    growthExperiment: async () => { throw new Error('unused') },
-    growthAdopt: async () => { throw new Error('unused') },
-    growthPublish: async () => { throw new Error('unused') },
-    growthDiscard: async () => { throw new Error('unused') },
-    growthUpdateNotes: async () => { throw new Error('unused') },
     ...overrides
   }
 }

@@ -15,8 +15,11 @@ import { randomBytes } from 'node:crypto'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import type { ConversationBridge } from './conversation-tools'
 import type { EvolveBridge } from './evolve-tools'
+import type { AskAnswers, AskQuestion } from '../shared/contracts'
+import { parseAskQuestions } from './ask-questions'
 import { deepseekFetch, deepseekSearch } from './deepseek-tools'
 import { appendMemoryNote } from './memory-document'
+import { WinMcpClient } from './win-mcp-client'
 
 export interface PetMcpToolResult {
   content: Array<{ type: 'text'; text: string }>
@@ -83,15 +86,52 @@ export const PET_MCP_TOOLS: PetMcpToolDefinition[] = [
     }
   },
   {
-    name: 'request_approval',
-    description: '在角色旁弹出一个小批准卡（绿勾批准、红叉拒绝），用于打包、重启、自我更新这类必须先征得用户同意的操作。返回 approved:true/false；超时返回 approved:null。',
+    name: 'ask_user',
+    description: '在对话里弹出提问卡（小型对话窗口），让用户选择或填写答案。用于让用户批准计划、选择方案。返回 answers；用户跳过或超时返回 null。',
     inputSchema: {
       type: 'object',
       properties: {
-        title: { type: 'string', description: '一句话说明要批准什么' },
-        detail: { type: 'string', description: '补充说明，最多 300 字' }
+        questions: {
+          type: 'array',
+          minItems: 1,
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string', description: '问题 id；不填用问题文本' },
+              question: { type: 'string', description: '问题文本' },
+              header: { type: 'string', description: '简短标题' },
+              multiSelect: { type: 'boolean', description: '是否多选' },
+              options: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    label: { type: 'string', description: '选项文字' },
+                    description: { type: 'string', description: '选项说明' }
+                  },
+                  required: ['label'],
+                  additionalProperties: false
+                }
+              }
+            },
+            required: ['question'],
+            additionalProperties: false
+          }
+        }
       },
-      required: ['title'],
+      required: ['questions'],
+      additionalProperties: false
+    }
+  },
+  {
+    name: 'submit_plan',
+    description: '计划模式下把完整计划提交给用户批准。用户批准后自动退出计划模式，你再开始执行；被退回时保持计划模式，按用户的修改意见调整后重新提交。只在计划模式下使用。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        plan: { type: 'string', description: '完整的计划文本（Markdown），写清步骤、涉及文件、验证方式' }
+      },
+      required: ['plan'],
       additionalProperties: false
     }
   },
@@ -148,12 +188,27 @@ export interface ApprovalBridge {
   request(title: string, detail?: string): Promise<boolean | null>
 }
 
+/** 宿主侧提问：和内核的 AskUserQuestion 共用面板上的同一张提问卡。 */
+export interface AskBridge {
+  ask(questions: AskQuestion[]): Promise<AskAnswers | null>
+}
+
+/** 宿主侧计划提交：计划模式下把计划交给面板批准，批准后退出计划模式。 */
+export interface PlanBridge {
+  submit(plan: string): Promise<boolean>
+}
+
 export class PetMcpBridge {
   private server: Server | undefined
   private startPromise: Promise<{ url: string; token: string }> | undefined
   private conversationBridge: ConversationBridge | undefined
+  /** 会话间发消息限流：同一发送方一分钟内最多 10 条，双方合计 20 条（10 轮）。 */
+  private readonly sendHistory = new Map<string, number[]>()
   private evolveBridge: EvolveBridge | undefined
   private approvalBridge: ApprovalBridge | undefined
+  private askBridge: AskBridge | undefined
+  private planBridge: PlanBridge | undefined
+  private winClient: WinMcpClient | undefined
   private deepseekKey: string | undefined
   /** 联网搜索开关：关闭时搜索/抓取工具不再声明，调用也会被拒绝。 */
   webSearchEnabled = true
@@ -169,6 +224,43 @@ export class PetMcpBridge {
     return { url: `http://127.0.0.1:${address.port}`, token: this.token }
   }
 
+  /** 静态宿主工具 + windows-mcp 后端的全部工具（加 win_ 前缀）。 */
+  async toolList(): Promise<PetMcpToolDefinition[]> {
+    // 联网搜索关闭时搜索/抓取工具不出现在列表里，模型不会先试一次再被拒。
+    const staticTools = PET_MCP_TOOLS.filter((tool) =>
+      !tool.name.startsWith('win_') && (this.webSearchEnabled || !tool.name.startsWith('deepseek_')))
+    const client = this.winClient
+    if (!client) return staticTools
+    // 后端是懒启动的：以前只把 client 塞进来却没 start()，工具列表因此永远
+    // 拿不到 win_*，调用就报 unknown。这里先确保后端起来。
+    await client.start().catch(() => undefined)
+    try {
+      const tools = await client.listTools()
+      return [
+        ...staticTools,
+        ...tools.map((tool) => ({
+          name: `win_${tool.name.toLowerCase()}`,
+          description: `${tool.description}${tool.description ? ' ' : ''}（宿主内置，转发到 windows-mcp）`,
+          inputSchema: tool.inputSchema
+        }))
+      ]
+    } catch (error) {
+      // 后端没起来时至少保留宿主工具，不要让整张工具表消失。
+      // 失败原因写进临时文件：打包版没有终端，否则永远看不到为什么没有 win_*。
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const fs = require('node:fs') as typeof import('node:fs')
+        fs.appendFileSync(
+          `${require('node:os').tmpdir()}\\whale-win-mcp.log`,
+          `${new Date().toISOString()} ${error instanceof Error ? `${error.name}: ${error.message}` : String(error)}\n`
+        )
+      } catch {
+        /* 记录日志失败不能影响工具表 */
+      }
+      return staticTools
+    }
+  }
+
   setConversationBridge(bridge?: ConversationBridge): void {
     this.conversationBridge = bridge
   }
@@ -179,6 +271,18 @@ export class PetMcpBridge {
 
   setApprovalBridge(bridge?: ApprovalBridge): void {
     this.approvalBridge = bridge
+  }
+
+  setAskBridge(bridge?: AskBridge): void {
+    this.askBridge = bridge
+  }
+
+  setPlanBridge(bridge?: PlanBridge): void {
+    this.planBridge = bridge
+  }
+
+  setWindowsMcpClient(client?: WinMcpClient): void {
+    this.winClient = client
   }
 
   setDeepSeekApiKey(key?: string): void {
@@ -231,7 +335,26 @@ export class PetMcpBridge {
       })
       response.end(payload)
     }
-    if (request.method !== 'POST' || request.url !== '/call') {
+    // 标准 MCP over HTTP（Streamable HTTP 的 JSON 响应形态）。DSH 直接连这里，
+    // 每个会话不用再拉一个 Electron 进程当 stdio 桥，省下每会话约 108MB。
+    // token 放在路径里：ACP 的 http 型 MCP 不支持自定义请求头。
+    const mcpPath = /^\/mcp\/([^/]+)$/.exec(request.url ?? '')
+    if (mcpPath) {
+      if (mcpPath[1] !== this.token) {
+        reply(401, { error: 'unauthorized' })
+        return
+      }
+      if (request.method !== 'POST') {
+        response.writeHead(405, { allow: 'POST', 'content-type': 'application/json; charset=utf-8' })
+        response.end(JSON.stringify({ error: 'method not allowed' }))
+        return
+      }
+      const raw = await this.readBody(request, reply)
+      if (raw === null) return
+      await this.handleMcp(raw, reply)
+      return
+    }
+    if (request.method !== 'POST' || (request.url !== '/call' && request.url !== '/tools')) {
       reply(404, { error: 'not found' })
       return
     }
@@ -239,20 +362,15 @@ export class PetMcpBridge {
       reply(401, { error: 'unauthorized' })
       return
     }
-    let size = 0
-    const chunks: Buffer[] = []
-    for await (const chunk of request) {
-      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
-      size += buffer.length
-      if (size > MAX_BODY_BYTES) {
-        reply(413, { error: 'body too large' })
-        return
-      }
-      chunks.push(buffer)
+    if (request.url === '/tools') {
+      reply(200, { tools: await this.toolList() })
+      return
     }
+    const raw = await this.readBody(request, reply)
+    if (raw === null) return
     let body: { tool?: unknown; args?: unknown }
     try {
-      body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as { tool?: unknown; args?: unknown }
+      body = JSON.parse(raw) as { tool?: unknown; args?: unknown }
     } catch {
       reply(400, { error: 'invalid json' })
       return
@@ -276,12 +394,127 @@ export class PetMcpBridge {
     }
   }
 
+  /** 读完请求体；超限时已经回好 413，返回 null 让调用方直接结束。 */
+  private async readBody(
+    request: IncomingMessage,
+    reply: (status: number, body: unknown) => void
+  ): Promise<string | null> {
+    let size = 0
+    const chunks: Buffer[] = []
+    for await (const chunk of request) {
+      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+      size += buffer.length
+      if (size > MAX_BODY_BYTES) {
+        reply(413, { error: 'body too large' })
+        return null
+      }
+      chunks.push(buffer)
+    }
+    return Buffer.concat(chunks).toString('utf8')
+  }
+
+  /** 一条 JSON-RPC 消息。无状态：每次 POST 独立，不维护 session。 */
+  private async handleMcp(raw: string, reply: (status: number, body: unknown) => void): Promise<void> {
+    let message: { id?: unknown; method?: unknown; params?: unknown }
+    try {
+      message = JSON.parse(raw) as typeof message
+    } catch {
+      reply(400, { jsonrpc: '2.0', id: null, error: { code: -32700, message: 'parse error' } })
+      return
+    }
+    const id = message.id
+    const method = typeof message.method === 'string' ? message.method : ''
+    const params = message.params && typeof message.params === 'object' && !Array.isArray(message.params)
+      ? message.params as Record<string, unknown>
+      : {}
+    const result = (value: unknown): void => {
+      reply(200, { jsonrpc: '2.0', id, result: value })
+    }
+    const protocolError = (code: number, messageText: string): void => {
+      reply(200, { jsonrpc: '2.0', id, error: { code, message: messageText } })
+    }
+    if (method === 'initialize') {
+      result({
+        protocolVersion: typeof params.protocolVersion === 'string' ? params.protocolVersion : '2025-06-18',
+        capabilities: { tools: {} },
+        serverInfo: { name: 'pet', version: '1.0.0' }
+      })
+      return
+    }
+    if (method.startsWith('notifications/')) {
+      reply(202, {})
+      return
+    }
+    if (method === 'ping') {
+      result({})
+      return
+    }
+    if (method === 'tools/list') {
+      result({ tools: await this.toolList() })
+      return
+    }
+    if (method === 'tools/call') {
+      const name = text(params.name)
+      if (!name) {
+        protocolError(-32602, 'missing tool name')
+        return
+      }
+      const args = params.arguments && typeof params.arguments === 'object' && !Array.isArray(params.arguments)
+        ? params.arguments as Record<string, unknown>
+        : {}
+      if (!this.webSearchEnabled && name.startsWith('deepseek_')) {
+        result(fail('联网搜索已关闭。不要尝试搜索或抓取，直接基于已有信息回答。'))
+        return
+      }
+      try {
+        result(await this.call(name, args))
+      } catch (error) {
+        result(fail(error instanceof Error ? error.message : '工具调用失败。'))
+      }
+      return
+    }
+    if (method === 'resources/list') {
+      result({ resources: [] })
+      return
+    }
+    if (method === 'prompts/list') {
+      result({ prompts: [] })
+      return
+    }
+    protocolError(-32601, `未实现的方法：${method}`)
+  }
+
   private async call(tool: string, args: Record<string, unknown>): Promise<PetMcpToolResult> {
     if (tool === 'request_approval') {
-      const title = text(args.title).trim()
-      if (!title) return fail('批准事项不能为空。')
-      if (!this.approvalBridge) return fail('批准通道尚未就绪。')
-      const approved = await this.approvalBridge.request(title, text(args.detail).trim() || undefined)
+      // 勾叉卡已停用：需要确认时直接在对话里问，或走面板的提问窗口。
+      return fail('批准卡已停用，请直接在对话里说明需要用户确认什么。')
+    }
+    if (tool === 'ask_user') {
+      if (!this.askBridge) return fail('提问通道尚未就绪。')
+      const questions = parseAskQuestions(args)
+      if (!questions.length) return fail('问题不能为空。')
+      const answers = await this.askBridge.ask(questions)
+      return ok({ answers })
+    }
+    if (tool.startsWith('win_')) {
+      const client = this.winClient
+      if (!client) return fail('Windows 工具后端尚未就绪。')
+      try {
+        await client.start().catch(() => undefined)
+        const tools = await client.listTools()
+        const wanted = tool.slice(4)
+        const match = tools.find((item) => item.name.toLowerCase() === wanted)
+        if (!match) return fail(`未知的 Windows 工具：${tool}`)
+        return ok(await client.callTool(match.name, args))
+      } catch (error) {
+        return fail(error instanceof Error ? error.message : 'Windows 工具调用失败。')
+      }
+    }
+    if (tool === 'submit_plan') {
+      if (!this.planBridge) return fail('计划通道尚未就绪。')
+      const plan = text(args.plan).trim()
+      if (!plan) return fail('计划不能为空。')
+      const approved = await this.planBridge.submit(plan)
       return ok({ approved })
     }
     if (tool === 'conversations_list') {
@@ -299,6 +532,15 @@ export class PetMcpBridge {
       if (!target) return fail('缺少目标对话。')
       if (!message) return fail('消息不能为空。')
       if (message.length > 8_000) return fail('消息超过 8000 字，请缩短。')
+      // 一分钟窗口内每个发送方最多 10 条；双方各自受限，合计就是 20 条（10 轮）。
+      const now = Date.now()
+      const recent = (this.sendHistory.get(target) ?? []).filter((time) => now - time < 60_000)
+      if (recent.length >= 10) {
+        this.sendHistory.set(target, recent)
+        return fail('达到限额：一分钟内与该对话已互发 20 条（10 轮），请稍后再试。')
+      }
+      recent.push(now)
+      this.sendHistory.set(target, recent)
       const delivered = await this.conversationBridge.send(target, message)
       return ok({ delivered: true, conversationId: delivered.id, title: delivered.title })
     }

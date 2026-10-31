@@ -1,13 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { AgentCapabilities, ConversationSettings, GrowthProposal, ModelProfile, VoiceJobProgress, VoiceSettingsPatch, VoiceSettingsPublic } from '../shared/contracts'
+import type { AgentCapabilities, ConversationSettings, ModelProfile, VoiceJobProgress, VoiceSettingsPatch, VoiceSettingsPublic } from '../shared/contracts'
 import type { LibraryItem, LibraryKind, LibrarySnapshot } from '../shared/libraries'
 import type { MemoryItem } from '../main/memory-service'
-
-export interface GrowthOverview {
-  available: boolean
-  reason?: string
-  proposals: GrowthProposal[]
-}
 
 export interface SettingsAPI {
   get(): Promise<ConversationSettings>
@@ -63,17 +57,14 @@ export interface SettingsAPI {
   setLibraryEnabled?(id: string, enabled: boolean): Promise<LibrarySnapshot>
   /** 检查命令、HTTP 服务或安装目录是否还在。 */
   probeLibrary?(id: string): Promise<{ ok: boolean; message: string }>
+  /** 用系统浏览器打开市场条目的仓库或主页。 */
+  openExternal?(url: string): Promise<void>
+  /** 左栏「浏览市场」打开的是已存在的设置窗口时，用它把页签切过去。 */
+  onOpenTab?(callback: (tab: string) => void): () => void
   memoryList(): Promise<MemoryItem[]>
   memorySetEnabled(enabled: boolean): Promise<boolean>
   memoryUpdate(id: string, text: string): Promise<MemoryItem>
   memoryDelete(id: string): Promise<void>
-  growthStatus(): Promise<GrowthOverview>
-  growthPropose(title: string, objective: string, evidence: string): Promise<GrowthProposal>
-  growthExperiment(id: string): Promise<GrowthProposal>
-  growthAdopt(id: string): Promise<GrowthProposal>
-  growthPublish(id: string): Promise<GrowthProposal>
-  growthDiscard(id: string): Promise<GrowthProposal>
-  growthUpdateNotes(id: string, notes: string): Promise<GrowthProposal>
 }
 
 const api: SettingsAPI = {
@@ -112,17 +103,16 @@ const api: SettingsAPI = {
   removeLibrary: (id) => ipcRenderer.invoke('pet:libraries:remove', id),
   setLibraryEnabled: (id, enabled) => ipcRenderer.invoke('pet:libraries:set-enabled', id, enabled),
   probeLibrary: (id) => ipcRenderer.invoke('pet:libraries:health', id),
+  openExternal: (url) => ipcRenderer.invoke('pet:open-external', url),
+  onOpenTab: (callback) => {
+    const listener = (_event: Electron.IpcRendererEvent, tab: string): void => callback(tab)
+    ipcRenderer.on('pet:settings-tab', listener)
+    return () => { ipcRenderer.removeListener('pet:settings-tab', listener) }
+  },
   memoryList: () => ipcRenderer.invoke('pet:memory:list'),
   memorySetEnabled: (enabled) => ipcRenderer.invoke('pet:memory:set-enabled', enabled),
   memoryUpdate: (id, text) => ipcRenderer.invoke('pet:memory:update', id, text),
   memoryDelete: (id) => ipcRenderer.invoke('pet:memory:delete', id),
-  growthStatus: () => ipcRenderer.invoke('pet:growth:status'),
-  growthPropose: (title, objective, evidence) => ipcRenderer.invoke('pet:growth:propose', title, objective, evidence),
-  growthExperiment: (id) => ipcRenderer.invoke('pet:growth:experiment', id),
-  growthAdopt: (id) => ipcRenderer.invoke('pet:growth:adopt', id),
-  growthPublish: (id) => ipcRenderer.invoke('pet:growth:publish', id),
-  growthDiscard: (id) => ipcRenderer.invoke('pet:growth:discard', id),
-  growthUpdateNotes: (id, notes) => ipcRenderer.invoke('pet:growth:update-notes', id, notes),
   close: () => ipcRenderer.invoke('pet:settings:close'),
   quit: () => ipcRenderer.invoke('pet:settings:quit'),
   restart: () => ipcRenderer.invoke('pet:settings:restart')

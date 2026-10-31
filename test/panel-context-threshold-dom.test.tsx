@@ -57,7 +57,7 @@ describe('the auto-compaction threshold row', () => {
         if (prop === 'getDraft') return () => Promise.resolve('')
         if (prop === 'getContextUsage') return () => Promise.resolve(snapshot.contextUsage)
         if (prop === 'readAvatar') return () => Promise.resolve(null)
-        if (prop === 'listClaudeWorkflows') return () => Promise.resolve([])
+        if (prop === 'listAppCommands') return () => Promise.resolve([])
         if (prop === 'searchWorkspaceFiles') return () => Promise.resolve([])
         return () => Promise.resolve(undefined)
       }
@@ -98,16 +98,21 @@ describe('the auto-compaction threshold row', () => {
     expect(row.getAttribute('aria-valuenow')).toBe('80')
   })
 
-  it('nudges by one point with the wheel and the arrow keys, within 50–90', async () => {
+  it('nudges five points per notch and commits once after the wheel stops', async () => {
     const row = await openMenu()
     await act(async () => {
       row.dispatchEvent(new WheelEvent('wheel', { deltaY: -100, bubbles: true, cancelable: true }))
     })
-    expect(calls).toEqual([81])
+    // 滚动时只改预览，防抖结束才提交。
+    expect(calls).toEqual([])
+    expect(row.textContent).toContain('85%')
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 260)) })
+    expect(calls).toEqual([85])
     await act(async () => {
       row.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }))
     })
-    expect(calls).toEqual([81, 79])
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 260)) })
+    expect(calls).toEqual([85, 80])
 
     settings.autoCompactPercent = 90
     await act(async () => { root.unmount() })
@@ -116,7 +121,8 @@ describe('the auto-compaction threshold row', () => {
     await act(async () => {
       boundary.dispatchEvent(new WheelEvent('wheel', { deltaY: -100, bubbles: true, cancelable: true }))
     })
-    expect(calls).toEqual([81, 79])
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 260)) })
+    expect(calls).toEqual([85, 80])
     settings.autoCompactPercent = 80
   })
 })

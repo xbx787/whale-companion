@@ -49,7 +49,7 @@ describe('renderer font system', () => {
     for (const token of [
       '--text-2xs', '--text-xs', '--text-sm', '--text-md', '--text-lg', '--text-xl',
       '--glyph-sm', '--glyph-md', '--glyph-lg',
-      '--font-ui', '--font-mono', '--font-numeric'
+      '--font-ui', '--font-mono'
     ]) expect(tokens, token).toContain(`${token}:`)
     expect(tokens).toContain('html[data-ui-size="medium"]')
     expect(tokens).toContain('html[data-ui-size="large"]')

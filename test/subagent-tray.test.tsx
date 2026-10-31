@@ -15,6 +15,7 @@ afterEach(async () => {
   container?.remove()
   root = undefined
   container = undefined
+  window.sessionStorage.clear()
   vi.useRealTimers()
 })
 
@@ -121,15 +122,13 @@ describe('SubagentTray', () => {
       .map((button) => button.textContent)).toEqual(['停止'])
   })
 
-  it('keeps a finished subagent briefly, then lets its head go', async () => {
+  it('keeps a finished subagent on the row in green', async () => {
     vi.useFakeTimers()
     await render([makeTask('t1', '快结束了')])
     expect(container!.querySelectorAll('.panel-subagent-icon')).toHaveLength(1)
     await render([makeTask('t1', '快结束了', { status: 'completed', endedAt: new Date().toISOString() })])
     expect(container!.querySelector('.panel-subagent-icon')?.className).toContain('is-completed')
-    await act(async () => vi.advanceTimersByTime(5_000))
+    await act(async () => vi.advanceTimersByTime(30_000))
     expect(container!.querySelectorAll('.panel-subagent-icon')).toHaveLength(1)
-    await act(async () => vi.advanceTimersByTime(1_500))
-    expect(container!.querySelectorAll('.panel-subagent-icon')).toHaveLength(0)
   })
 })

@@ -1,5 +1,5 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Notification, screen, shell, Tray } from 'electron'
-import { existsSync, mkdirSync, promises as fsp, readdirSync, writeFileSync } from 'node:fs'
+import { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeImage, Notification, screen, shell, Tray } from 'electron'
+import { appendFileSync, existsSync, mkdirSync, promises as fsp, readdirSync, writeFileSync } from 'node:fs'
 import { execFile, spawn } from 'node:child_process'
 import { homedir } from 'node:os'
 import path from 'node:path'
@@ -8,7 +8,6 @@ import { SideChatController, activeSideChatParentId } from './side-chat'
 import { isAskAnswers } from './ask-questions'
 import { ConversationController, type LibraryLaunchResolver } from './conversation-controller'
 import { MemoryService, type MemoryProvider } from './memory-service'
-import { GrowthExperiments } from './growth-experiments'
 import { ConversationStore, isModelProfile, MAX_BATCH_CONVERSATIONS } from './conversation-store'
 import { electronSecretCodec, publicSettings, publicSnapshot, SecretProtectionUnavailableError } from './secret-storage'
 import { DEEPSEEK_ANTHROPIC_BASE_URL, DEEPSEEK_DEFAULT_MODEL } from './deepseek-endpoint'
@@ -28,6 +27,26 @@ import { DshAcpRuntime, toAcpMcpServer, type DshAcpMcpServer } from './dsh-acp-r
 import { DshAcpAgentClient } from './dsh-acp-agent'
 import { PetMcpBridge } from './pet-mcp-server'
 import { WinMcpClient } from './win-mcp-client'
+import { registerSettingsIpc } from './ipc-settings'
+import { registerLibrariesIpc } from './ipc-libraries'
+import { registerOnboardingIpc } from './ipc-onboarding'
+import { registerPermissionsIpc } from './ipc-permissions'
+import { registerModelsIpc } from './ipc-models'
+import { registerBalanceIpc } from './ipc-balance'
+import { registerConversationSettingsIpc } from './ipc-conversation-settings'
+import { registerWindowDragIpc } from './ipc-window-drag'
+import { registerPanelIpc } from './ipc-panel'
+import { registerSideIpc } from './ipc-side'
+import { registerConversationControlIpc } from './ipc-conversation-control'
+import { registerConversationsIpc } from './ipc-conversations'
+import { registerShellIpc } from './ipc-shell'
+import { registerMiscIpc } from './ipc-misc'
+import { registerWindowStateIpc } from './ipc-window-state'
+import {
+  AVATAR_BOTTOM_SLACK, AVATAR_RIGHT_SLACK, AVATAR_VISIBLE_BOX, AVATAR_WINDOW_WIDTH, AVATAR_WINDOW_HEIGHT,
+  BALANCE_CARD_WIDTH, BALANCE_POINTER, BALANCE_INSET_Y, BALANCE_WINDOW_HEIGHT, BALANCE_LIFT, BALANCE_GAP
+} from './window-metrics'
+import { WpsMcpService } from './wps-mcp-service'
 import { deepSeekBaseUrl, deepSeekModel, deepSeekProfile, ONBOARDING_PAGES, readOnboardingMarker, shouldOfferOnboarding, writeOnboardingMarker, type OnboardingPage } from './onboarding'
 import { normalizeApiKey } from '../shared/onboarding'
 import { DeepSeekClient } from './deepseek'
@@ -43,6 +62,7 @@ import { VoiceService } from './voice-service'
 import { registerVoiceIpc } from './voice-ipc'
 import { InboxWatcher } from './inbox-watcher'
 import { isLibraryItem, isLibraryKind } from '../shared/libraries'
+import { scanPlugins, toLibraryItems } from './plugin-market'
 import { generateConversationTitle } from './title-generation'
 import { attachmentPreviewPath, prepareDroppedFile, readImagePreview, searchWorkspaceFiles, stagePastedAttachment, validAttachmentList, verifyDroppedFilePath } from './local-context'
 import { findSourceProjectRoot, isUsableWorkspace, isWritableWorkspace, readSavedWorkspace, resolveAgentWorkspace, writeSavedWorkspace } from './workspace-root'
@@ -99,29 +119,6 @@ let bubblePanelSize: { width: number; height: number } | undefined
 let currentUiSize: UiSize = 'small'
 /** 人物大小档：决定人物脚底到窗口底的透明余量，拖动时用来算底部允许量。 */
 let currentAvatarSize: AvatarSize = 'small'
-const AVATAR_BOTTOM_SLACK: Record<AvatarSize, number> = { small: 60, medium: 48.5, large: 36 }
-/** 人物右缘到头像窗口右缘的透明余量（88px 锚点 − 可见宽度/2，再加 2px
- *  动画缓冲）。允许窗口向右伸出这么多，人物才能拖到屏幕最右边。 */
-const AVATAR_RIGHT_SLACK: Record<AvatarSize, number> = { small: 37, medium: 32, large: 27 }
-/** 人物可见区域在头像窗口里的位置：与 .avatar-portrait 的 top 6px 对齐，
- *  长边缩放到 AVATAR_CONTENT_SIZES，宽度按原图 1016/1218 的比例。 */
-const AVATAR_VISIBLE_BOX: Record<AvatarSize, { width: number; height: number; top: number }> = {
-  small: { width: 106.7, height: 128, top: 6 },
-  medium: { width: 116.4, height: 140, top: 6 },
-  large: { width: 126.8, height: 152, top: 6 }
-}
-/** 余额卡宽度；窗口再向右留 8px 给指向人物的小三角。 */
-const BALANCE_CARD_WIDTH = 240
-const BALANCE_POINTER = 8
-/** 卡片比人物可见高度再矮一截，上下各留 8px，避免看过去比人物长。 */
-const BALANCE_INSET_Y = 16
-/** Medium card (124) plus the requested 10px lower edge. All avatar sizes
- *  share this height so the type and buttons stay identical. */
-const BALANCE_WINDOW_HEIGHT = 124
-/** 人物图片的视觉重心比几何中心偏上，卡片跟着上提一点才看着齐。 */
-const BALANCE_LIFT = 6
-/** 三角尖到角色左缘的呼吸间距。 */
-const BALANCE_GAP = 4
 /** 渲染器上报的可见人物矩形，按右/下偏移保存——窗口缩放时命中形状跟着
  *  右下角走，不会在拖动过程中错位。 */
 let avatarBox: { right: number; bottom: number; width: number; height: number } | undefined
@@ -133,9 +130,6 @@ let rendererAvatarState: import('../shared/contracts').AvatarState | undefined
 // Keep the avatar's window origin and width stable while its cards open/close.
 // The unused area stays transparent and outside the shaped hit regions.
 const stageSize = { width: STAGE_WIDTH, height: STAGE_HEIGHT }
-/** 头像窗口只包住角色和状态点；不再跟随整个舞台矩形。 */
-const AVATAR_WINDOW_WIDTH = 200
-const AVATAR_WINDOW_HEIGHT = 220
 /** 逻辑舞台：面板按它计算位置，头像窗口贴着它的右下角。 */
 let stageBounds: Electron.Rectangle | undefined
 /** 面板相对人物的位置：用户选的，默认上方。不再按屏幕上下半自动翻。 */
@@ -165,7 +159,7 @@ function avatarRegion(size: { width: number; height: number }): Electron.Rectang
 function avatarShape(size: { width: number; height: number }): Electron.Rectangle[] {
   return [
     avatarRegion(size),
-    { x: Math.max(0, size.width - 104), y: 0, width: Math.min(104, size.width), height: 96 }
+    { x: Math.max(0, size.width - 104), y: 0, width: Math.min(104, size.width), height: 104 }
   ]
 }
 
@@ -209,12 +203,39 @@ function bubbleRegion(layout: BubbleLayout, size: { width: number; height: numbe
   }
 }
 
+/** 从命中矩形里减掉一块，返回剩下的矩形（最多四块）。 */
+function subtractRect(rect: Electron.Rectangle, cut: Electron.Rectangle): Electron.Rectangle[] {
+  const left = Math.max(rect.x, cut.x)
+  const top = Math.max(rect.y, cut.y)
+  const right = Math.min(rect.x + rect.width, cut.x + cut.width)
+  const bottom = Math.min(rect.y + rect.height, cut.y + cut.height)
+  if (right <= left || bottom <= top) return [rect]
+  const parts: Electron.Rectangle[] = []
+  if (top > rect.y) parts.push({ x: rect.x, y: rect.y, width: rect.width, height: top - rect.y })
+  if (bottom < rect.y + rect.height) parts.push({ x: rect.x, y: bottom, width: rect.width, height: rect.y + rect.height - bottom })
+  if (left > rect.x) parts.push({ x: rect.x, y: top, width: left - rect.x, height: bottom - top })
+  if (right < rect.x + rect.width) parts.push({ x: right, y: top, width: rect.x + rect.width - right, height: bottom - top })
+  return parts
+}
+
 function applyPointerShape(): void {
   const win = avatarWindow
   if (!win || win.isDestroyed() || process.platform !== 'win32') return
   // 头像窗口只有 200×220，命中形状取窗口局部坐标；面板窗口本身就是一个
   // 贴合面板的矩形，不需要再裁剪。
-  win.setShape(avatarShape(win.getBounds()))
+  const bounds = win.getBounds()
+  let shapes = avatarShape(bounds)
+  // 面板打开时，从命中形状里裁掉与面板重叠的部分。头像窗口永远置顶，形状
+  // 里那片透明区会把面板底部按钮的点击先吃掉；裁剪后角色不再压住面板，
+  // 层级不变，按钮的整个盒都能点。
+  const panel = panelWindow && !panelWindow.isDestroyed() && panelWindow.isVisible()
+    ? panelWindow.getBounds()
+    : null
+  if (panel) {
+    const cut = { x: panel.x - bounds.x, y: panel.y - bounds.y, width: panel.width, height: panel.height }
+    shapes = shapes.flatMap((rect) => subtractRect(rect, cut))
+  }
+  win.setShape(shapes.length ? shapes : [{ x: 0, y: 0, width: 1, height: 1 }])
 }
 
 /** 左上角缩放手柄的独立置顶小窗：面板不置顶，画在面板里会被别的窗口盖住。
@@ -222,6 +243,14 @@ function applyPointerShape(): void {
 
 /** 面板窗口只包住面板矩形（逻辑舞台里的 bubbleRegion）。左/右贴边时直接
  *  相对头像窗口定位，不再走“舞台”的上下布局。 */
+/** 窗口不透明度：0 视为关闭透明（完全不透明），省掉透明合成的持续开销。 */
+let currentWindowOpacity = 1
+
+function opacityFor(value?: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 1
+  const percent = Math.min(100, Math.max(0, Math.round(value)))
+  return percent <= 0 ? 1 : percent / 100
+}
 function syncPanelBounds(): void {
   const stage = stageBounds
   const panel = panelWindow
@@ -439,6 +468,15 @@ let relaunchExecPath: string | undefined
 let restartPoll: NodeJS.Timeout | undefined
 const memory = new MemoryService(dataRoot, { onError: (error) => console.warn(error.message) })
 
+/** 重启/换版的链路留痕：入口、目标 exe、看门狗各自写一行。 */
+function logRestart(message: string): void {
+  try {
+    appendFileSync(path.join(dataRoot, 'restart.log'), `${new Date().toISOString()} ${message}\n`)
+  } catch {
+    // 日志写不进去不影响重启本身。
+  }
+}
+
 /** 独立看门狗：旧进程退出后，如果目标 exe 没在跑，就由它把新版本拉起来。 */
 function spawnRestartWatchdog(targetExe: string): void {
   try {
@@ -447,6 +485,8 @@ function spawnRestartWatchdog(targetExe: string): void {
     writeFileSync(script, [
       'param([string]$TargetExe,[int]$OldPid,[string]$Log)',
       '$ErrorActionPreference = "SilentlyContinue"',
+      // 从 Electron 宿主继承来的这个变量会让 exe 按 Node 模式跑，参数直接判非法、秒退。
+      'Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue',
       'function L($m){ "$(Get-Date -Format o) $m" | Add-Content -LiteralPath $Log }',
       'L "watchdog old=$OldPid target=$TargetExe"',
       'for($i=0;$i -lt 90;$i++){ if(-not (Get-Process -Id $OldPid -ErrorAction SilentlyContinue)){ break }; Start-Sleep -Milliseconds 500 }',
@@ -544,14 +584,12 @@ async function backgroundProvider(): Promise<MemoryProvider | null> {
   return key ? { baseUrl: DEEPSEEK_ANTHROPIC_BASE_URL, apiKey: key, model: DEEPSEEK_DEFAULT_MODEL, smallModel: 'deepseek-flash' } : null
 }
 
-const growth = new GrowthExperiments({
-  projectRoot: dataProjectRoot, dataRoot,
-  provider: backgroundProvider
-})
 /** Every Nth publish re-sends the whole history, so a renderer that somehow
  *  missed a delta cannot stay desynced; between those only changed entries
  *  travel (see AgentRuntime.takeTimelineDelta). */
 const FULL_TIMELINE_EVERY = 64
+/** 全量快照最多带多少条历史；更早的走 timelinePage 按需拉。 */
+const FULL_TIMELINE_WINDOW = 500
 let publishesSinceFullTimeline = FULL_TIMELINE_EVERY
 let lastPublishedSideParent: string | null | undefined
 
@@ -571,9 +609,18 @@ function flushSnapshot(): void {
   const runtime = controller.displayedRuntime()
   const delta = runtime?.takeTimelineDelta()
   const full = !delta || delta.reset || publishesSinceFullTimeline <= 0
+  // 总条数每帧都带：增量更新时渲染层也要知道窗口前面还有多少没加载。
+  snapshot.timelineTotal = runtime ? runtime.timelineLength() : snapshot.timeline.length
   if (!full) {
     snapshot.timeline = delta!.entries
     snapshot.timelinePartial = true
+  } else {
+    // 全量只发尾部一段：大会话的整段历史不再每 64 次发布就重传一遍。
+    // 渲染层滚到顶时按 timelineTotal 的差额走 timelinePage 往前补。
+    const all = snapshot.timeline
+    if (all.length > FULL_TIMELINE_WINDOW) {
+      snapshot.timeline = all.slice(-FULL_TIMELINE_WINDOW)
+    }
   }
   publishesSinceFullTimeline = full ? FULL_TIMELINE_EVERY : publishesSinceFullTimeline - 1
   avatarWindow.webContents.send('pet:snapshot', snapshot)
@@ -705,6 +752,16 @@ const mcpBridgeScript = (() => {
 // One runtime (and one engine connection) per conversation that actually
 // runs; the controller creates them on demand through this factory.
 const winMcpClient = new WinMcpClient()
+// WPS 工具共享一个懒启动的 HTTP 实例；所有会话不再各拉一个 stdio 进程。
+const wpsMcpService = new WpsMcpService(() => {
+  const override = process.env.DESKTOP_PET_WPS_MCP?.trim()
+  const candidates = [
+    override,
+    app.isPackaged ? path.join(process.resourcesPath, 'wps-mcp-server.cjs') : '',
+    path.join(projectRoot, 'scripts', 'wps-mcp-server.cjs')
+  ].filter((value): value is string => Boolean(value))
+  return candidates.find((value) => existsSync(value)) ?? null
+})
 const createRuntime = (conversationId: string, onChange: () => void, persistSession = true, enableEvolve = true): AgentRuntime => {
   const key = deepseekKey ?? apiKey ?? ''
   const dshModel = useDshKernel() && dshBin
@@ -765,10 +822,19 @@ const createRuntime = (conversationId: string, onChange: () => void, persistSess
           cwd: agentWorkspace,
           systemPrompt: 'You are XiaoJing, a helpful desktop companion. Reply in the user language.',
           env: { DEEPSEEK_API_KEY: key },
-          mcpServers: () => {
+          mcpServers: async () => {
             const servers: DshAcpMcpServer[] = []
             const endpoint = bridge.endpoint
-            if (mcpBridgeScript && endpoint) {
+            // 优先直连主进程的 HTTP MCP：会话不再各拉一个 stdio 桥进程。
+            // PET_MCP_HTTP=0 可回退到旧 stdio 桥，便于出问题时快速降级。
+            if (endpoint && process.env.PET_MCP_HTTP !== '0') {
+              servers.push({
+                name: 'pet',
+                type: 'http',
+                url: `${endpoint.url}/mcp/${endpoint.token}`,
+                headers: []
+              })
+            } else if (mcpBridgeScript && endpoint) {
               servers.push({
                 name: 'pet',
                 command: process.execPath,
@@ -782,8 +848,23 @@ const createRuntime = (conversationId: string, onChange: () => void, persistSess
                 ]
               })
             }
-            // Windows 工具已由宿主内置转发（win_*），这里不再把用户的
-            // windows-mcp 作为独立 MCP 服务器交给 DSH，避免模型看到两套。
+            const sharedWps = await wpsMcpService.start().catch(() => null)
+            if (sharedWps) {
+              servers.push({ name: 'wps', type: 'http', url: sharedWps.url, headers: [] })
+            } else {
+              const wpsScript = [
+                app.isPackaged ? path.join(process.resourcesPath, 'wps-mcp-server.cjs') : '',
+                path.join(projectRoot, 'scripts', 'wps-mcp-server.cjs')
+              ].find((value) => value && existsSync(value));
+              if (wpsScript) {
+                servers.push({
+                  name: 'wps',
+                  command: process.execPath,
+                  args: [wpsScript],
+                  env: [{ name: 'ELECTRON_RUN_AS_NODE', value: '1' }]
+                });
+              }
+            }
             for (const [name, raw] of Object.entries(dshLibraries.mcp)) {
               // Windows 工具已内置；库里的同名 MCP 不再交给 DSH。
               if (/windows[-_]?mcp/iu.test(name)) continue
@@ -800,7 +881,7 @@ const createRuntime = (conversationId: string, onChange: () => void, persistSess
     new NoteStore(projectRoot),
     apiKey ? new DeepSeekClient(apiKey) : undefined,
     onChange,
-    dshModel,
+    dshModel as never,
     agentWorkspace,
     enableEvolve ? evolveHooksFor(conversationId) : undefined
   )
@@ -820,7 +901,7 @@ controller = new ConversationController(
     : undefined,
   resolveLibraries
 )
-/** Post-turn reflection — fact extraction and growth observation — is side
+/** Post-turn reflection — fact extraction — is side
  *  work: it reads the finished turn and writes memory, and nothing in the
  *  next message waits on it. A serial chain keeps it ordered and off the
  *  drain's critical path, so memory becomes visible one turn later instead
@@ -837,12 +918,6 @@ controller.setTurnHooks({
   afterSuccessfulTurn: (turn) => {
     schedulePostTurn(async () => {
       await memory.observeTurn({ ...turn, success: true, provider: await backgroundProvider() })
-      const before = new Set((await growth.list()).map((item) => item.id))
-      await growth.observeTurn(turn.conversationId, turn.timeline)
-      const added = (await growth.list()).filter((item) => !before.has(item.id))
-      if (added.length && Notification.isSupported()) {
-        new Notification({ title: '小鲸发现一个改进机会', body: '可在设置的“成长”页查看依据，再决定是否实验。' }).show()
-      }
     })
     return Promise.resolve()
   }
@@ -958,14 +1033,20 @@ function createAvatarWindow(): BrowserWindow {
   const work = screen.getPrimaryDisplay().workArea
   const width = AVATAR_WINDOW_WIDTH
   const height = AVATAR_WINDOW_HEIGHT
-  const x = work.x + work.width - width - 24
-  const y = work.y + work.height - height - 24
-  stageBounds = {
-    x: work.x + work.width - STAGE_WIDTH - 24,
-    y: work.y + work.height - STAGE_HEIGHT - 24,
-    width: STAGE_WIDTH,
-    height: STAGE_HEIGHT
-  }
+  // 预览实例固定到左下角：面板向上展开有空间，也不会和右下角的正式版叠在一起。
+  const previewLeft = process.env.DESKTOP_PET_PREVIEW_LEFT === '1'
+  const x = previewLeft ? work.x + 24 : work.x + work.width - width - 24
+  const y = previewLeft
+    ? work.y + work.height - height - 24
+    : work.y + work.height - height - 24
+  stageBounds = previewLeft
+    ? { x: work.x + 24, y: work.y + work.height - STAGE_HEIGHT - 24, width: STAGE_WIDTH, height: STAGE_HEIGHT }
+    : {
+      x: work.x + work.width - STAGE_WIDTH - 24,
+      y: work.y + work.height - STAGE_HEIGHT - 24,
+      width: STAGE_WIDTH,
+      height: STAGE_HEIGHT
+    }
   const win = new BrowserWindow({
     x,
     y,
@@ -1175,7 +1256,7 @@ function createBalanceWindow(): BrowserWindow {
   return win
 }
 
-function createSettingsWindow(): BrowserWindow {
+function createSettingsWindow(initialTab?: string): BrowserWindow {
   const win = new BrowserWindow({
     title: '小鲸 设置',
     // 标题栏画在页面里（.settings-header），窗口不带系统边框。
@@ -1200,7 +1281,10 @@ function createSettingsWindow(): BrowserWindow {
   win.once('ready-to-show', () => { if (!win.isDestroyed()) win.show() })
   win.on('closed', () => { if (settingsWindow === win) settingsWindow = undefined })
   const base = process.env.ELECTRON_RENDERER_URL
-  if (base) void win.loadURL(`${base}/settings.html`)
+  // 左栏的「浏览市场」直接打开库页：首次用 query 传目标分区，已打开的窗口走 IPC 事件。
+  const query = initialTab ? `?tab=${encodeURIComponent(initialTab)}` : ''
+  if (base) void win.loadURL(`${base}/settings.html${query}`)
+  else if (initialTab) void win.loadFile(path.join(__dirname, '../renderer/settings.html'), { query: { tab: initialTab } })
   else void win.loadFile(path.join(__dirname, '../renderer/settings.html'))
   sendUiSizeWhenLoaded(win)
   win.webContents.on('will-navigate', (event) => event.preventDefault())
@@ -1261,28 +1345,15 @@ async function resumeEvolveTask(): Promise<void> {
 
     const refreshed = evolveStore.load()
     if (!refreshed || refreshed.status !== 'active') return
-    if (refreshed.goalCondition) {
-      await controller?.sendMessage(`/goal ${refreshed.goalCondition}`, [], 'queue', id)
-    }
     const next = refreshed.steps.find((item) => item.kind === 'prompt' && item.status === 'pending')
-    if (next) evolveStore.updateStep(next.id, { status: 'done' })
-    if (notes.length || next || refreshed.goalCondition) {
-      // 详细上下文仍走隐藏系统消息，避免把旧轮和新轮搅在一起；
-      // 真正开新轮的是用户消息「继续执行目标」，它带新头像、分隔上下两段。
-      const details: string[] = []
-      if (notes.length) details.push(notes.join('\n\n'))
-      if (refreshed.goalCondition) details.push(`目标条件：${refreshed.goalCondition}`)
-      if (next) details.push(`下一步：${next.text}`)
-      const version = app.getVersion()
-      const lastEntry = controller?.getSnapshot().timeline.at(-1)
-      const alreadyContinued = lastEntry?.kind === 'user' && /^(?:已重启，)?继续执行目标/u.test(lastEntry.text)
-      if (!alreadyContinued) {
-        // 一条隐藏上下文的用户条目：界面只画分割线，模型拿到命令结果和下一步。
-        const prompt = ['已重启，继续执行目标', `（应用已按计划重启到 ${version}，继续上次的任务。）`, ...details]
-          .join('\n\n').slice(0, 8_000)
-        await controller?.sendMessage(prompt, [], 'queue', id, true)
-      }
-    } else {
+    if (next) {
+      evolveStore.updateStep(next.id, { status: 'done' })
+      // 重启后只发一条普通消息：prompt 原文。不拼「已重启，继续执行目标」，
+      // 也不走目标模式；自检就是这一条消息，模型收到后直接去查结果。
+      await controller?.sendMessage(next.text, [], 'queue', id)
+    }
+    // 不再自动恢复 /goal：目标模式由主人自己开，重启只负责把待办消息发出来。
+    if (!notes.length && !next && !refreshed.goalCondition) {
       evolveStore.setStatus('done', '没有待继续的步骤。')
     }
   } catch (error) {
@@ -1320,6 +1391,8 @@ function showPanel(): void {
       // 旧 bounds 的那一帧，看起来像先后弹出两个窗口。
       panelWindow.setOpacity(0)
       panelWindow.show()
+      // show 之后窗口才 isVisible，命中形状这时才能按面板矩形裁掉重叠区。
+      applyPointerShape()
       setTimeout(() => {
         if (!panelOpen || !panelWindow || panelWindow.isDestroyed()) return
         panelWindow.setOpacity(1)
@@ -1332,12 +1405,13 @@ function showPanel(): void {
   }
 }
 
-function openSettings(): void {
-  if (!settingsWindow || settingsWindow.isDestroyed()) settingsWindow = createSettingsWindow()
+function openSettings(tab?: string): void {
+  if (!settingsWindow || settingsWindow.isDestroyed()) settingsWindow = createSettingsWindow(tab)
   else {
     if (settingsWindow.isMinimized()) settingsWindow.restore()
     settingsWindow.show()
     settingsWindow.focus()
+    if (tab) settingsWindow.webContents.send('pet:settings-tab', tab)
   }
 }
 
@@ -1582,7 +1656,7 @@ function createTray(): void {
   if (icon.isEmpty()) throw new Error(`通知区域图标资源不可用：${asset}`)
   contextMenu = Menu.buildFromTemplate([
     { label: '配置向导', click: openOnboarding },
-    { label: '选项', click: openSettings },
+    { label: '选项', click: () => { openSettings() } },
     { type: 'separator' },
     { label: '隐藏', click: hideAvatar },
     { type: 'separator' },
@@ -1637,7 +1711,7 @@ function promoteTrayIcon(): void {
 function hidePanel(): void {
   if (!panelOpen) return
   panelOpen = false
-  panelWindow?.setOpacity(1)
+  panelWindow?.setOpacity(currentWindowOpacity)
   panelWindow?.hide()
   // 面板隐藏后置顶角标也要收起来，否则会孤零零留在桌面上。
   avatarWindow?.webContents.send('pet:panel-open', false)
@@ -1862,6 +1936,7 @@ let adoptedRestartTimer: NodeJS.Timeout | undefined
 /** 切到指定版本并退出；告别动作播完再走。relaunch 放到 before-quit 的最后
  *  一步，等对话写完、子进程收干净再拉起，避免和新旧实例的单例锁抢跑。 */
 async function adoptVersion(executable: string): Promise<void> {
+  logRestart(`adopt ${executable} pid=${process.pid}`)
   await playAvatarFarewell()
   pointShortcutsAt(executable)
   spawnRestartWatchdog(executable)
@@ -1928,9 +2003,210 @@ async function readAvatarDataUrl(kind: 'user' | 'assistant'): Promise<string | n
   }
 }
 
+/** 设置窗口发来的请求只认设置窗口自己；设置相关的 IPC 在 ipc-settings.ts。 */
+const settingsTrusted = (event: Electron.IpcMainInvokeEvent): boolean => event.sender.id === settingsWindow?.webContents.id
+/** 头像窗口、面板窗口和设置窗口都能改模型配置；余额窗口只认自己。 */
+const modelTrusted = (event: Electron.IpcMainInvokeEvent): boolean => trusted(event) || settingsTrusted(event)
+const balanceTrusted = (event: Electron.IpcMainInvokeEvent): boolean => event.sender.id === balanceWindow?.webContents.id
+
+/** 设置 IPC 的依赖：可变状态用 getter，函数直接传引用。 */
+function buildSettingsIpcDeps() {
+  return {
+    settingsTrusted,
+    activeController,
+    memory,
+    conversationSettingsPatch,
+    discardSidesWithoutLiveParents,
+    broadcastUiSize,
+    opacityFor,
+    get currentWindowOpacity() { return currentWindowOpacity },
+    set currentWindowOpacity(value: typeof currentWindowOpacity) { currentWindowOpacity = value },
+    get panelWindow() { return panelWindow },
+    get avatarWindow() { return avatarWindow },
+    get currentAvatarSize() { return currentAvatarSize },
+    set currentAvatarSize(value: typeof currentAvatarSize) { currentAvatarSize = value },
+    get panelPlacement() { return panelPlacement },
+    set panelPlacement(value: typeof panelPlacement) { panelPlacement = value },
+    get settingsWindow() { return settingsWindow },
+    get agentWorkspace() { return agentWorkspace },
+    dataRoot,
+    readSavedWorkspace,
+    pickWorkspaceDirectory,
+    migrateAgentWorkspace,
+    syncStageBounds,
+    syncBalancePosition,
+    publishSnapshot,
+    requestRestart,
+  }
+}
+export type SettingsIpcDeps = ReturnType<typeof buildSettingsIpcDeps>
+
+/** 头像窗口和面板窗口发来的请求都算受信；库、插件、记忆的 IPC 在 ipc-libraries.ts。 */
+const trusted = (event: Electron.IpcMainInvokeEvent): boolean =>
+  event.sender.id === avatarWindow?.webContents.id || event.sender.id === panelWindow?.webContents.id
+
+/** 库、插件、记忆 IPC 的依赖。 */
+function buildLibrariesIpcDeps() {
+  return {
+    settingsTrusted,
+    trusted,
+    libraryStore,
+    activeController,
+    dataRoot,
+    memory,
+  }
+}
+export type LibrariesIpcDeps = ReturnType<typeof buildLibrariesIpcDeps>
+
+/** 引导窗口发来的请求只认引导窗口自己；引导相关 IPC 在 ipc-onboarding.ts。 */
+const onboardingTrusted = (event: Electron.IpcMainInvokeEvent): boolean => event.sender.id === onboardingWindow?.webContents.id
+
+/** 引导 IPC 的依赖。 */
+function buildOnboardingIpcDeps() {
+  return {
+    onboardingTrusted,
+    activeController,
+    dataRoot,
+    probeAnthropicEndpoint,
+    pickWorkspaceDirectory,
+    migrateAgentWorkspace,
+    get agentWorkspace() { return agentWorkspace },
+    get onboardingWindow() { return onboardingWindow },
+  }
+}
+export type OnboardingIpcDeps = ReturnType<typeof buildOnboardingIpcDeps>
+
+/** 权限 IPC 的依赖。 */
+function buildPermissionsIpcDeps() {
+  return { trusted, activeController }
+}
+export type PermissionsIpcDeps = ReturnType<typeof buildPermissionsIpcDeps>
+
+/** 模型配置与显示开关 IPC 的依赖。 */
+function buildModelsIpcDeps() {
+  return {
+    modelTrusted,
+    trusted,
+    activeController,
+    checkProviderHealth,
+    probeAnthropicEndpoint,
+    storeAvatar,
+  }
+}
+export type ModelsIpcDeps = ReturnType<typeof buildModelsIpcDeps>
+
+/** 余额、外部链接和文件预览 IPC 的依赖。 */
+function buildBalanceIpcDeps() {
+  return {
+    trusted,
+    balanceTrusted,
+    settingsTrusted,
+    setBalanceOpen,
+    get balanceOpen() { return balanceOpen },
+    activeController,
+    deepseekKey,
+  }
+}
+export type BalanceIpcDeps = ReturnType<typeof buildBalanceIpcDeps>
+
+/** 会话设置开关 IPC 的依赖。 */
+function buildConversationSettingsIpcDeps() {
+  return { trusted, activeController }
+}
+export type ConversationSettingsIpcDeps = ReturnType<typeof buildConversationSettingsIpcDeps>
+
+/** 窗口拖动 IPC 的依赖。 */
+function buildWindowDragIpcDeps() {
+  return {
+    trusted,
+    isScreenPoint,
+    get avatarWindow() { return avatarWindow },
+    get panelWindow() { return panelWindow },
+    get dragOrigin() { return dragOrigin },
+    set dragOrigin(value: typeof dragOrigin) { dragOrigin = value },
+    get avatarDragging() { return avatarDragging },
+    set avatarDragging(value: typeof avatarDragging) { avatarDragging = value },
+    get currentAvatarSize() { return currentAvatarSize },
+    syncBalancePosition,
+    syncStageBounds,
+  }
+}
+export type WindowDragIpcDeps = ReturnType<typeof buildWindowDragIpcDeps>
+
+/** 面板显隐 IPC 的依赖。 */
+function buildPanelIpcDeps() {
+  return {
+    trusted,
+    showPanel,
+    hidePanel,
+    get panelOpen() { return panelOpen },
+    get panelPlacement() { return panelPlacement },
+    get panelDirection() { return panelDirection },
+    syncStageBounds,
+  }
+}
+export type PanelIpcDeps = ReturnType<typeof buildPanelIpcDeps>
+
+/** 头像、窗口打开和右键菜单 IPC 的依赖。 */
+function buildShellIpcDeps() {
+  return {
+    trusted,
+    modelTrusted,
+    readAvatarDataUrl,
+    openSettings,
+    openOnboarding,
+    get avatarWindow() { return avatarWindow },
+    get contextMenu() { return contextMenu },
+  }
+}
+export type ShellIpcDeps = ReturnType<typeof buildShellIpcDeps>
+
+/** 附件、快照、角色状态、语音日志和退出 IPC 的依赖。 */
+function buildMiscIpcDeps() {
+  return {
+    trusted,
+    dataRoot,
+    snapshotWithSideStatuses,
+    activeController,
+    publishSnapshot,
+    get rendererAvatarState() { return rendererAvatarState },
+    set rendererAvatarState(value: typeof rendererAvatarState) { rendererAvatarState = value },
+  }
+}
+export type MiscIpcDeps = ReturnType<typeof buildMiscIpcDeps>
+
+/** 气泡布局、可见框和面板尺寸 IPC 的依赖。 */
+function buildWindowStateIpcDeps() {
+  return {
+    trusted,
+    get bubbleLayout() { return bubbleLayout },
+    set bubbleLayout(value: typeof bubbleLayout) { bubbleLayout = value },
+    get compactBubbleHeight() { return compactBubbleHeight },
+    set compactBubbleHeight(value: typeof compactBubbleHeight) { compactBubbleHeight = value },
+    get stageBounds() { return stageBounds },
+    get panelDirection() { return panelDirection },
+    stageSize,
+    bubbleRegion,
+    syncPanelBounds,
+    applyPointerShape,
+    get shapeShrinkTimer() { return shapeShrinkTimer },
+    set shapeShrinkTimer(value: typeof shapeShrinkTimer) { shapeShrinkTimer = value },
+    get panelOpen() { return panelOpen },
+    setBubbleExpanded,
+    get avatarWindow() { return avatarWindow },
+    get avatarBox() { return avatarBox },
+    set avatarBox(value: typeof avatarBox) { avatarBox = value },
+    syncStageBounds,
+    get bubblePanelSize() { return bubblePanelSize },
+    set bubblePanelSize(value: typeof bubblePanelSize) { bubblePanelSize = value },
+    panelMinWidth: PANEL_MIN_WIDTH,
+    panelMinHeight: PANEL_MIN_HEIGHT,
+    schedulePanelSizeSave,
+  }
+}
+export type WindowStateIpcDeps = ReturnType<typeof buildWindowStateIpcDeps>
+
 function registerIpc(): void {
-  const trusted = (event: Electron.IpcMainInvokeEvent): boolean =>
-    event.sender.id === avatarWindow?.webContents.id || event.sender.id === panelWindow?.webContents.id
   const resolveAttachments = async (items: UserAttachment[]): Promise<UserAttachment[]> => {
     const resolved = await Promise.all(items.map(async (item) => {
       if (!item.path) return item
@@ -1945,742 +2221,19 @@ function registerIpc(): void {
   // The settings window manages model profiles and avatars too — the data
   // lives beside its own settings — so those channels accept either window.
   // Everything else stays avatar-only on purpose.
-  const modelTrusted = (event: Electron.IpcMainInvokeEvent): boolean => trusted(event) || settingsTrusted(event)
-  const balanceTrusted = (event: Electron.IpcMainInvokeEvent): boolean => event.sender.id === balanceWindow?.webContents.id
-  const settingsTrusted = (event: Electron.IpcMainInvokeEvent): boolean => event.sender.id === settingsWindow?.webContents.id
-  // Growth experiments are a local development tool. The packaged build has
-  // no tab for them and rejects their channels too.
-  const growthTrusted = (event: Electron.IpcMainInvokeEvent): boolean => !app.isPackaged && settingsTrusted(event)
-  const onboardingTrusted = (event: Electron.IpcMainInvokeEvent): boolean => event.sender.id === onboardingWindow?.webContents.id
-  ipcMain.handle('pet:settings:get', async (event) => {
-    if (!settingsTrusted(event)) throw new Error('无效的界面请求。')
-    return publicSettings((await activeController().getLibraryState()).settings)
-  })
-  ipcMain.handle('pet:settings:update', (event, patch: unknown) => {
-    if (!settingsTrusted(event)) throw new Error('无效的界面请求。')
-    return activeController().updateSettings(conversationSettingsPatch(patch)).then((settings) => {
-      memory.setEnabled(settings.memoryEnabled)
-      discardSidesWithoutLiveParents()
-      // 界面尺寸等显示设置也要立刻传给头像窗口里的小面板，不必等下一个事件。
-      broadcastUiSize(settings.uiSize)
-      currentAvatarSize = settings.avatarSize
-      // 面板贴哪一侧改了：立刻按新位置重排，不必等下一次打开。
-      const nextPlacement = settings.panelPlacement ?? 'top'
-      if (nextPlacement !== panelPlacement) {
-        panelPlacement = nextPlacement
-        syncStageBounds()
-      }
-      // 人物大小变了，余额卡的高度和位置要跟着重新对齐。
-      syncBalancePosition()
-      publishSnapshot()
-      return publicSettings(settings)
-    })
-  })
-  ipcMain.handle('pet:settings:workspace', (event) => {
-    if (!settingsTrusted(event)) throw new Error('无效的界面请求。')
-    return { path: agentWorkspace, saved: readSavedWorkspace(dataRoot) !== null }
-  })
-  ipcMain.handle('pet:settings:pick-workspace', async (event) => {
-    if (!settingsTrusted(event)) throw new Error('无效的界面请求。')
-    return pickWorkspaceDirectory(settingsWindow, agentWorkspace)
-  })
-  ipcMain.handle('pet:settings:migrate-workspace', async (event, next: unknown) => {
-    if (!settingsTrusted(event)) throw new Error('无效的界面请求。')
-    if (typeof next !== 'string') throw new Error('工作目录无效。')
-    return { path: await migrateAgentWorkspace(next) }
-  })
-  ipcMain.handle('pet:settings:version', (event) => {
-    if (!settingsTrusted(event)) throw new Error('无效的界面请求。')
-    return app.getVersion()
-  })
-  ipcMain.handle('pet:settings:capabilities', (event) => {
-    if (!settingsTrusted(event)) throw new Error('无效的界面请求。')
-    return activeController().getCapabilities()
-  })
-  ipcMain.handle('pet:settings:close', (event) => {
-    if (!settingsTrusted(event)) return
-    settingsWindow?.close()
-  })
-  ipcMain.handle('pet:settings:quit', (event) => {
-    if (!settingsTrusted(event)) return
-    app.quit()
-  })
-  ipcMain.handle('pet:settings:restart', async (event) => {
-    if (!settingsTrusted(event)) return false
-    return (await requestRestart()) === 'waiting'
-  })
-  ipcMain.handle('pet:libraries:list', async (event) => {
-    if (!settingsTrusted(event)) throw new Error('无效的界面请求。')
-    return libraryStore.snapshot()
-  })
-  ipcMain.handle('pet:libraries:installed', async (event) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    return libraryStore.list()
-  })
-  ipcMain.handle('pet:libraries:search', async (event, kind: unknown, query: unknown) => {
-    if (!settingsTrusted(event) || !isLibraryKind(kind)) throw new Error('市场请求无效。')
-    if (typeof query !== 'string') throw new Error('搜索词无效。')
-    const settings = (await activeController().getLibraryState()).settings
-    return searchMarket(kind, query, settings.skillMarketSources)
-  })
-  ipcMain.handle('pet:libraries:install', async (event, raw: unknown) => {
-    if (!settingsTrusted(event) || !isLibraryItem(raw)) throw new Error('库条目无效。')
-    await libraryStore.install(raw)
-    return libraryStore.snapshot()
-  })
-  ipcMain.handle('pet:libraries:adopt', async (event, id: unknown) => {
-    if (!settingsTrusted(event) || typeof id !== 'string') throw new Error('库条目无效。')
-    const found = (await libraryStore.list()).find((item) => item.id === id && item.external === true)
-    if (!found) throw new Error('只有环境中的条目可以导入。')
-    await libraryStore.adopt(found)
-    return libraryStore.snapshot()
-  })
-  ipcMain.handle('pet:libraries:remove', async (event, id: unknown) => {
-    if (!settingsTrusted(event) || typeof id !== 'string') throw new Error('库条目无效。')
-    await libraryStore.remove(id)
-    return libraryStore.snapshot()
-  })
-  ipcMain.handle('pet:libraries:set-enabled', async (event, id: unknown, enabled: unknown) => {
-    if (!settingsTrusted(event) || typeof id !== 'string' || typeof enabled !== 'boolean') throw new Error('库条目无效。')
-    await libraryStore.setEnabled(id, enabled)
-    return libraryStore.snapshot()
-  })
-  ipcMain.handle('pet:libraries:health', async (event, id: unknown) => {
-    if (!settingsTrusted(event) || typeof id !== 'string') throw new Error('库条目无效。')
-    const item = (await libraryStore.list()).find((entry) => entry.id === id)
-    if (!item) throw new Error('找不到这个库条目。')
-    return probeLibrary(item)
-  })
-  ipcMain.handle('pet:memory:list', (event) => {
-    if (!settingsTrusted(event)) throw new Error('无效的界面请求。')
-    return memory.list()
-  })
-  ipcMain.handle('pet:memory:set-enabled', async (event, enabled: unknown) => {
-    if (!settingsTrusted(event) || typeof enabled !== 'boolean') throw new Error('记忆开关无效。')
-    const settings = await activeController().updateSettings({ memoryEnabled: enabled })
-    memory.setEnabled(settings.memoryEnabled)
-    return settings.memoryEnabled
-  })
-  ipcMain.handle('pet:memory:update', (event, id: unknown, value: unknown) => {
-    if (!settingsTrusted(event) || typeof id !== 'string' || typeof value !== 'string') throw new Error('记忆修改请求无效。')
-    return memory.update(id, value)
-  })
-  ipcMain.handle('pet:memory:delete', (event, id: unknown) => {
-    if (!settingsTrusted(event) || typeof id !== 'string') throw new Error('记忆删除请求无效。')
-    return memory.delete(id)
-  })
-  ipcMain.handle('pet:growth:status', async (event) => {
-    if (!growthTrusted(event)) throw new Error('成长模式仅在开发版可用。')
-    return { ...await growth.availability(), proposals: await growth.list() }
-  })
-  ipcMain.handle('pet:growth:propose', (event, title: unknown, objective: unknown, evidence: unknown) => {
-    if (!growthTrusted(event) || typeof title !== 'string' || typeof objective !== 'string' || typeof evidence !== 'string') throw new Error('改进提案无效。')
-    return growth.propose(title, objective, evidence)
-  })
-  ipcMain.handle('pet:growth:experiment', (event, id: unknown) => {
-    if (!growthTrusted(event) || typeof id !== 'string') throw new Error('实验编号无效。')
-    return growth.experiment(id)
-  })
-  ipcMain.handle('pet:growth:update-notes', (event, id: unknown, notes: unknown) => {
-    if (!growthTrusted(event) || typeof id !== 'string' || typeof notes !== 'string') throw new Error('版本说明无效。')
-    return growth.updateReleaseNotes(id, notes)
-  })
-  ipcMain.handle('pet:growth:adopt', async (event, id: unknown) => {
-    if (!growthTrusted(event) || typeof id !== 'string') throw new Error('采纳请求无效。')
-    if (!activeController().allConversationsIdle() || sideChat.isBusy()) throw new Error('请等其他会话和临时会话完成或停止后再采纳。')
-    const adopted = await growth.adopt(id)
-    if (adopted.version) restartWhenIdle(adopted.version)
-    return adopted
-  })
-  ipcMain.handle('pet:growth:publish', (event, id: unknown) => {
-    if (!growthTrusted(event) || typeof id !== 'string') throw new Error('发布请求无效。')
-    return growth.publish(id)
-  })
-  ipcMain.handle('pet:growth:discard', (event, id: unknown) => {
-    if (!growthTrusted(event) || typeof id !== 'string') throw new Error('丢弃请求无效。')
-    return growth.discard(id)
-  })
-  ipcMain.handle('pet:prepare-dropped-file', async (event, filePath: unknown) => {
-    if (!trusted(event) || typeof filePath !== 'string') throw new Error('拖入文件无效。')
-    return prepareDroppedFile(filePath)
-  })
-  ipcMain.handle('pet:prepare-pasted-file', async (event, request: unknown) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    if (!request || typeof request !== 'object') throw new Error('粘贴内容无效。')
-    const { name, data } = request as { name?: unknown; data?: unknown }
-    if (typeof name !== 'string' || !name.trim() || name.length > 260 || typeof data !== 'string') throw new Error('粘贴内容无效。')
-    return stagePastedAttachment(path.join(dataRoot, 'attachments'), name.trim(), data)
-  })
-  ipcMain.handle('pet:read-image-preview', async (event, filePath: unknown) => {
-    if (!trusted(event) || typeof filePath !== 'string' || filePath.length > 32_000) throw new Error('预览请求无效。')
-    const target = attachmentPreviewPath(path.join(dataRoot, 'attachments'), filePath)
-    return target ? readImagePreview(target) : null
-  })
-  ipcMain.handle('pet:get-snapshot', (event) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    return snapshotWithSideStatuses()
-  })
-  ipcMain.handle('pet:side:get', (event) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    return sideChat.getSnapshot()
-  })
-  ipcMain.handle('pet:side:open', (event) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    return sideChat.open()
-  })
-  ipcMain.handle('pet:side:set-expanded', (event, sessionId: unknown, expanded: unknown) => {
-    if (!trusted(event) || typeof sessionId !== 'string' || typeof expanded !== 'boolean') throw new Error('临时会话状态无效。')
-    return sideChat.setExpanded(sessionId, expanded)
-  })
-  ipcMain.handle('pet:side:discard', (event, sessionId: unknown) => {
-    if (!trusted(event) || typeof sessionId !== 'string') throw new Error('临时会话编号无效。')
-    return sideChat.discard(sessionId)
-  })
-  ipcMain.handle('pet:side:send', async (event, sessionId: unknown, text: unknown, attachments: unknown, strategy: unknown) => {
-    if (!trusted(event) || typeof sessionId !== 'string' || typeof text !== 'string' ||
-        !validAttachmentList(attachments ?? []) ||
-        (strategy !== undefined && strategy !== 'queue' && strategy !== 'steer')) throw new Error('临时会话消息无效。')
-    const resolved = await resolveAttachments((attachments ?? []) as UserAttachment[])
-    await sideChat.send(sessionId, text, resolved, strategy as 'queue' | 'steer' | undefined)
-  })
-  ipcMain.handle('pet:side:stop', (event, sessionId: unknown) => {
-    if (!trusted(event) || typeof sessionId !== 'string') throw new Error('临时会话编号无效。')
-    sideChat.stop(sessionId)
-  })
-  ipcMain.handle('pet:side:interrupt', (event, sessionId: unknown) => {
-    if (!trusted(event) || typeof sessionId !== 'string') throw new Error('临时会话编号无效。')
-    return sideChat.interrupt(sessionId)
-  })
-  ipcMain.handle('pet:side:remove-queued', (event, sessionId: unknown, messageId: unknown) => {
-    if (!trusted(event) || typeof sessionId !== 'string' || typeof messageId !== 'string') throw new Error('队列编号无效。')
-    sideChat.removeQueued(sessionId, messageId)
-  })
-  ipcMain.handle('pet:side:steer-queued', (event, sessionId: unknown, messageId: unknown) => {
-    if (!trusted(event) || typeof sessionId !== 'string' || typeof messageId !== 'string') throw new Error('队列编号无效。')
-    return sideChat.steerQueued(sessionId, messageId)
-  })
-  ipcMain.handle('pet:side:approve-action', (event, sessionId: unknown, id: unknown) => {
-    if (!trusted(event) || typeof sessionId !== 'string' || typeof id !== 'string') throw new Error('操作编号无效。')
-    return sideChat.approveAction(sessionId, id)
-  })
-  ipcMain.handle('pet:side:reject-action', (event, sessionId: unknown, id: unknown) => {
-    if (!trusted(event) || typeof sessionId !== 'string' || typeof id !== 'string') throw new Error('操作编号无效。')
-    sideChat.rejectAction(sessionId, id)
-  })
-  ipcMain.handle('pet:side:answer-question', (event, sessionId: unknown, id: unknown, answers: unknown) => {
-    if (!trusted(event) || typeof sessionId !== 'string' || typeof id !== 'string' || !isAskAnswers(answers)) throw new Error('答案格式无效。')
-    return sideChat.answerQuestion(sessionId, id, answers)
-  })
-  ipcMain.handle('pet:side:answer-plan', (event, sessionId: unknown, id: unknown, approved: unknown) => {
-    if (!trusted(event) || typeof sessionId !== 'string' || typeof id !== 'string' || typeof approved !== 'boolean') throw new Error('批准结果无效。')
-    return sideChat.answerPlan(sessionId, id, approved)
-  })
-  ipcMain.handle('pet:side:get-context-usage', (event, sessionId: unknown) => {
-    if (!trusted(event) || typeof sessionId !== 'string') throw new Error('临时会话编号无效。')
-    return sideChat.getContextUsage(sessionId)
-  })
-  ipcMain.handle('pet:side:compact', (event, sessionId: unknown) => {
-    if (!trusted(event) || typeof sessionId !== 'string') throw new Error('临时会话编号无效。')
-    return sideChat.compact(sessionId)
-  })
-  ipcMain.handle('pet:side:set-model-mode', (event, sessionId: unknown, mode: unknown) => {
-    const normalized = normalizeModelMode(mode)
-    if (!trusted(event) || typeof sessionId !== 'string' || !normalized) throw new Error('模型选项无效。')
-    sideChat.setModelMode(sessionId, normalized)
-  })
-  ipcMain.handle('pet:side:set-plan-mode', (event, sessionId: unknown, on: unknown) => {
-    if (!trusted(event) || typeof sessionId !== 'string' || typeof on !== 'boolean') throw new Error('计划模式设置无效。')
-    return sideChat.setPlanMode(sessionId, on)
-  })
-  ipcMain.handle('pet:send-message', async (event, text: unknown, attachments: unknown, strategy: unknown, conversationId: unknown) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    if (conversationId !== undefined && typeof conversationId !== 'string') throw new Error('会话编号无效。')
-    if (typeof text !== 'string') throw new Error('消息必须是文本。')
-    if (!validAttachmentList(attachments ?? [])) {
-      throw new Error('附件数据无效。')
-    }
-    if (strategy !== undefined && strategy !== 'queue' && strategy !== 'steer') throw new Error('发送方式无效。')
-    const slash = parseAppSlashCommand(text)
-    if (slash) {
-      if (slash.name === 'side' || slash.name === 'btw') {
-        const originId = activeController().displayedConversationId()
-        const originEpoch = activeController().displayedConversationEpoch()
-        if (conversationId !== undefined && conversationId !== originId) {
-          throw new Error('主会话已切换，请重新发送。')
-        }
-        const resolved = await resolveAttachments((attachments ?? []) as UserAttachment[])
-        if (activeController().displayedConversationId() !== originId ||
-            activeController().displayedConversationEpoch() !== originEpoch) throw new Error('主会话已切换，请重新发送。')
-        // An attachment alone is a valid first question. The controller
-        // validates before opening and rolls back a failed send atomically.
-        await sideChat.openWithMessage(slash.args, resolved)
-        return
-      }
-      if ((attachments as Array<unknown> | undefined)?.length) throw new Error('应用命令不能附带文件。')
-      if (slash.name !== 'new' && slash.args) throw new Error(`/${slash.name} 不接受额外参数。`)
-      if (slash.name === 'new') {
-        if (slash.args.length > 60 || /[\r\n]/u.test(slash.args)) throw new Error('新对话标题最多 60 字，且不能换行。')
-        await activeController().createConversation(slash.args || undefined)
-      } else if (slash.name === 'compact') {
-        await activeController().compactConversation()
-      } else {
-        avatarWindow?.webContents.send('pet:slash-ui', slash.name)
-      }
-      return
-    }
-    const resolved = await resolveAttachments((attachments ?? []) as UserAttachment[])
-    await activeController().sendMessage(text, resolved, strategy as 'queue' | 'steer' | undefined, conversationId as string | undefined)
-  })
-  ipcMain.handle('pet:create-conversation', async (event, title: unknown) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    if (title !== undefined && typeof title !== 'string') throw new Error('标题无效。')
-    await activeController().createConversation(title as string | undefined)
-  })
-  ipcMain.handle('pet:select-conversation', async (event, id: unknown) => {
-    if (!trusted(event) || typeof id !== 'string') throw new Error('会话编号无效。')
-    await activeController().selectConversation(id)
-  })
-  ipcMain.handle('pet:rename-conversation', async (event, id: unknown, title: unknown) => {
-    if (!trusted(event) || typeof id !== 'string' || typeof title !== 'string') throw new Error('会话标题无效。')
-    await activeController().renameConversation(id, title)
-  })
-  ipcMain.handle('pet:set-conversation-pinned', async (event, id: unknown, pinned: unknown) => {
-    if (!trusted(event) || typeof id !== 'string' || typeof pinned !== 'boolean') throw new Error('置顶请求无效。')
-    await activeController().setConversationPinned(id, pinned)
-  })
-  ipcMain.handle('pet:set-tab-order', async (event, ids: unknown) => {
-    if (!trusted(event) || !Array.isArray(ids) || ids.some((id) => typeof id !== 'string')) throw new Error('标签顺序无效。')
-    await activeController().setTabOrder(ids as string[])
-  })
-  ipcMain.handle('pet:set-hidden-tabs', async (event, ids: unknown) => {
-    if (!trusted(event) || !Array.isArray(ids) || ids.some((id) => typeof id !== 'string')) throw new Error('隐藏标签无效。')
-    await activeController().updateSettings({ hiddenTabIds: ids as string[] })
-  })
-  ipcMain.handle('pet:archive-conversation', async (event, id: unknown) => {
-    if (!trusted(event) || typeof id !== 'string') throw new Error('会话编号无效。')
-    await activeController().archiveConversation(id)
-    await sideChat.discardParent(id)
-  })
-  ipcMain.handle('pet:restore-conversation', async (event, id: unknown) => {
-    if (!trusted(event) || typeof id !== 'string') throw new Error('会话编号无效。')
-    await activeController().restoreConversation(id)
-  })
-  ipcMain.handle('pet:delete-conversation', async (event, id: unknown) => {
-    if (!trusted(event) || typeof id !== 'string') throw new Error('会话编号无效。')
-    await activeController().deleteConversation(id)
-    await sideChat.discardParent(id)
-  })
-  ipcMain.handle('pet:export-conversation', async (event, id: unknown) => {
-    if (!trusted(event) || typeof id !== 'string') throw new Error('会话编号无效。')
-    const payload = await activeController().exportConversation(id)
-    const safe = payload.conversation.title.replace(/[\\/:*?"<>|]/gu, '-').trim().slice(0, 60) || 'conversation'
-    const options: Electron.SaveDialogOptions = {
-      title: '导出会话',
-      defaultPath: `${safe}.dsh.json`,
-      filters: [{ name: 'DSH 会话', extensions: ['json'] }]
-    }
-    const parent = panelWindow && !panelWindow.isDestroyed() ? panelWindow : undefined
-    const result = parent ? await dialog.showSaveDialog(parent, options) : await dialog.showSaveDialog(options)
-    if (result.canceled || !result.filePath) return null
-    await fsp.writeFile(result.filePath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8')
-    return result.filePath
-  })
-  ipcMain.handle('pet:import-conversation', async (event) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    const options: Electron.OpenDialogOptions = {
-      title: '导入会话',
-      properties: ['openFile'],
-      filters: [{ name: 'DSH 会话', extensions: ['json'] }]
-    }
-    const parent = panelWindow && !panelWindow.isDestroyed() ? panelWindow : undefined
-    const result = parent ? await dialog.showOpenDialog(parent, options) : await dialog.showOpenDialog(options)
-    const file = result.canceled ? undefined : result.filePaths[0]
-    if (!file) return null
-    const stat = await fsp.stat(file)
-    if (stat.size > 64 * 1024 * 1024) throw new Error('会话文件超过 64 MB，无法导入。')
-    const parsed: unknown = JSON.parse(await fsp.readFile(file, 'utf8'))
-    return activeController().importConversation(parsed)
-  })
-  ipcMain.handle('pet:batch-manage-conversations', async (event, action: unknown, ids: unknown) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    if ((action !== 'archive' && action !== 'restore' && action !== 'delete' &&
-         action !== 'pin' && action !== 'unpin') ||
-        !Array.isArray(ids) || ids.length > MAX_BATCH_CONVERSATIONS ||
-        ids.some((id) => typeof id !== 'string' || !id.trim() || id.length > 128)) {
-      throw new Error('批量会话请求无效。')
-    }
-    const result = await activeController().batchManageConversations(action, ids as string[])
-    if (action === 'archive' || action === 'delete') {
-      await Promise.all(result.outcomes.filter((item) => item.status === 'updated')
-        .map((item) => sideChat.discardParent(item.id)))
-    }
-    return result
-  })
-  ipcMain.handle('pet:delete-turn', async (event, conversationId: unknown, userEntryId: unknown) => {
-    if (!trusted(event) || typeof conversationId !== 'string' || typeof userEntryId !== 'string') throw new Error('删除请求无效。')
-    await activeController().deleteTurn(conversationId, userEntryId)
-  })
-  ipcMain.handle('pet:get-context-usage', (event, conversationId: unknown) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    if (conversationId !== undefined && typeof conversationId !== 'string') throw new Error('会话编号无效。')
-    return activeController().getContextUsage(conversationId as string | undefined)
-  })
-  ipcMain.handle('pet:compact-conversation', (event, conversationId: unknown) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    if (conversationId !== undefined && typeof conversationId !== 'string') throw new Error('会话编号无效。')
-    return activeController().compactConversation(conversationId as string | undefined)
-  })
-  ipcMain.handle('pet:list-app-commands', async (event) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    await activeController().initialize()
-    return APP_SLASH_COMMANDS.map(({ name, description, kind, source }) => ({ name, description, kind, source }))
-  })
-  ipcMain.handle('pet:search-workspace-files', (event, query: unknown) => {
-    if (!trusted(event) || typeof query !== 'string' || query.length > 120) throw new Error('文件搜索条件无效。')
-    return searchWorkspaceFiles(agentWorkspace, query)
-  })
-  ipcMain.handle('pet:search-conversations', async (event, query: unknown, archived: unknown) => {
-    if (!trusted(event) || typeof query !== 'string' || query.length > 200 ||
-        (archived !== undefined && typeof archived !== 'boolean')) throw new Error('搜索条件无效。')
-    const matches = await activeController().listConversations({ query, archived: archived as boolean | undefined })
-    return sideChat.withSideStatuses(matches)
-  })
-  ipcMain.handle('pet:remove-queued-message', async (event, id: unknown) => {
-    if (!trusted(event) || typeof id !== 'string') throw new Error('队列编号无效。')
-    await activeController().removeQueued(id)
-  })
-  ipcMain.handle('pet:steer-queued-message', async (event, id: unknown) => {
-    if (!trusted(event) || typeof id !== 'string') throw new Error('队列编号无效。')
-    await activeController().steerQueued(id)
-  })
-  ipcMain.handle('pet:approve-action', (event, id: unknown, conversationId: unknown) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    if (typeof id !== 'string') throw new Error('操作编号无效。')
-    if (conversationId !== undefined && typeof conversationId !== 'string') throw new Error('会话编号无效。')
-    return activeController().approveAction(id, conversationId as string | undefined)
-  })
-  ipcMain.handle('pet:reject-action', (event, id: unknown, conversationId: unknown) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    if (typeof id !== 'string') throw new Error('操作编号无效。')
-    if (conversationId !== undefined && typeof conversationId !== 'string') throw new Error('会话编号无效。')
-    return activeController().rejectAction(id, conversationId as string | undefined)
-  })
-  ipcMain.handle('pet:answer-question', (event, id: unknown, answers: unknown, conversationId: unknown) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    if (typeof id !== 'string') throw new Error('问答编号无效。')
-    if (!isAskAnswers(answers)) throw new Error('答案格式无效。')
-    if (conversationId !== undefined && typeof conversationId !== 'string') throw new Error('会话编号无效。')
-    return activeController().answerQuestion(id, answers, conversationId as string | undefined)
-  })
-  ipcMain.handle('pet:answer-plan', (event, id: unknown, approved: unknown, conversationId: unknown) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    if (typeof id !== 'string') throw new Error('计划编号无效。')
-    if (typeof approved !== 'boolean') throw new Error('批准结果无效。')
-    if (conversationId !== undefined && typeof conversationId !== 'string') throw new Error('会话编号无效。')
-    return activeController().answerPlan(id, approved, conversationId as string | undefined)
-  })
-  ipcMain.handle('pet:save-draft', (event, conversationId: unknown, text: unknown) => {
-    if (!trusted(event) || typeof conversationId !== 'string' || typeof text !== 'string') throw new Error('草稿保存请求无效。')
-    return activeController().saveDraft(conversationId, text)
-  })
-  ipcMain.handle('pet:get-draft', (event, conversationId: unknown) => {
-    if (!trusted(event) || typeof conversationId !== 'string') throw new Error('会话编号无效。')
-    return activeController().getDraft(conversationId)
-  })
-  ipcMain.handle('pet:clear-goal', (event, conversationId: unknown) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    if (conversationId !== undefined && typeof conversationId !== 'string') throw new Error('会话编号无效。')
-    return activeController().clearGoal(conversationId as string | undefined)
-  })
-  ipcMain.handle('pet:stop', (event, conversationId: unknown) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    if (conversationId !== undefined && typeof conversationId !== 'string') throw new Error('会话编号无效。')
-    return activeController().stop(conversationId as string | undefined)
-  })
-  ipcMain.handle('pet:interrupt-turn', (event, conversationId: unknown) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    if (conversationId !== undefined && typeof conversationId !== 'string') throw new Error('会话编号无效。')
-    return activeController().interruptTurn(conversationId as string | undefined)
-  })
-  ipcMain.handle('pet:background-task', (event, toolUseId: unknown, conversationId: unknown) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    if (typeof toolUseId !== 'string' || !toolUseId) throw new Error('子代理编号无效。')
-    if (conversationId !== undefined && typeof conversationId !== 'string') throw new Error('会话编号无效。')
-    return activeController().backgroundTask(toolUseId, conversationId as string | undefined)
-  })
-  ipcMain.handle('pet:stop-task', (event, taskId: unknown, conversationId: unknown) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    if (typeof taskId !== 'string' || !taskId) throw new Error('子代理编号无效。')
-    if (conversationId !== undefined && typeof conversationId !== 'string') throw new Error('会话编号无效。')
-    return activeController().stopTask(taskId, conversationId as string | undefined)
-  })
-  ipcMain.handle('pet:message-subagent', (event, toolUseId: unknown, text: unknown, conversationId: unknown) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    if (typeof toolUseId !== 'string' || !toolUseId) throw new Error('子代理编号无效。')
-    if (typeof text !== 'string' || !text.trim()) throw new Error('消息不能为空。')
-    if (conversationId !== undefined && typeof conversationId !== 'string') throw new Error('会话编号无效。')
-    return activeController().messageSubagent(toolUseId, text, conversationId as string | undefined)
-  })
-  ipcMain.handle('pet:resume-queue', (event, conversationId: unknown) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    if (conversationId !== undefined && typeof conversationId !== 'string') throw new Error('会话编号无效。')
-    return activeController().resumeQueue(conversationId as string | undefined)
-  })
-  ipcMain.handle('pet:save-model-profile', (event, profile: unknown) => {
-    if (!modelTrusted(event)) throw new Error('无效的界面请求。')
-    if (!isModelProfile(profile)) throw new Error('模型配置格式无效。')
-    return activeController().saveModelProfile(profile)
-  })
-  ipcMain.handle('pet:delete-model-profile', (event, id: unknown) => {
-    if (!modelTrusted(event)) throw new Error('无效的界面请求。')
-    if (typeof id !== 'string') throw new Error('模型配置编号无效。')
-    return activeController().deleteModelProfile(id)
-  })
-  ipcMain.handle('pet:set-model-profile-enabled', (event, id: unknown, enabled: unknown) => {
-    if (!modelTrusted(event)) throw new Error('无效的界面请求。')
-    if (typeof id !== 'string' || typeof enabled !== 'boolean') throw new Error('模型配置格式无效。')
-    return activeController().setModelProfileEnabled(id, enabled)
-  })
-  ipcMain.handle('pet:discover-models', async (event, profile: unknown) => {
-    if (!modelTrusted(event)) throw new Error('无效的界面请求。')
-    if (!isModelProfile(profile)) throw new Error('模型配置格式无效。')
-    const saved = (await activeController().getLibraryState()).settings.modelProfiles.find((item) => item.id === profile.id)
-    const apiKey = profile.apiKey || (saved?.baseUrl === profile.baseUrl ? saved.apiKey : '')
-    if (!apiKey) throw new Error('请先输入 API Key。')
-    return discoverProviderModels({ baseUrl: profile.baseUrl, apiKey })
-  })
-  ipcMain.handle('pet:set-model-profile', async (event, id: unknown) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    if (id !== null && typeof id !== 'string') throw new Error('模型配置编号无效。')
-    const result = await activeController().setModelProfile(id)
-    // 切换后异步探测，不拖慢按钮；不可达时再弹明确提示。
-    void checkProviderHealth()
-    return result
-  })
-  ipcMain.handle('pet:test-model-profile', async (event, profile: unknown) => {
-    if (!modelTrusted(event)) throw new Error('无效的界面请求。')
-    if (!isModelProfile(profile)) throw new Error('模型配置格式无效。')
-    const saved = (await activeController().getLibraryState()).settings.modelProfiles.find((item) => item.id === profile.id)
-    const apiKey = profile.apiKey || (saved?.baseUrl === profile.baseUrl ? saved.apiKey : '')
-    if (!apiKey) throw new Error('请先输入 API Key。')
-    return probeAnthropicEndpoint({ ...profile, apiKey })
-  })
-  ipcMain.handle('pet:set-auto-title', (event, on: unknown) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    if (typeof on !== 'boolean') throw new Error('设置无效。')
-    return activeController().updateSettings({ enableAutoTitleGeneration: on }).then(publicSettings)
-  })
-  ipcMain.handle('pet:set-timestamps', (event, on: unknown) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    if (typeof on !== 'boolean') throw new Error('设置无效。')
-    return activeController().updateSettings({ showMessageTimestamps: on }).then(publicSettings)
-  })
-  ipcMain.handle('pet:set-user-names', (event, userName: unknown, assistantName: unknown) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    if (typeof userName !== 'string' || typeof assistantName !== 'string') throw new Error('称呼无效。')
-    return activeController().updateSettings({ userName, assistantName }).then(publicSettings)
-  })
-  ipcMain.handle('pet:set-avatar', async (event, kind: unknown, bytes: unknown) => {
-    if (!modelTrusted(event)) throw new Error('无效的界面请求。')
-    if (kind !== 'user' && kind !== 'assistant') throw new Error('头像类型无效。')
-    if (!Array.isArray(bytes) || !bytes.every((item) => Number.isInteger(item) && item >= 0 && item <= 255)) {
-      throw new Error('头像数据无效。')
-    }
-    await storeAvatar(kind, bytes as number[])
-  })
-  ipcMain.handle('pet:read-avatar', (event, kind: unknown) => {
-    if (!modelTrusted(event)) throw new Error('无效的界面请求。')
-    if (kind !== 'user' && kind !== 'assistant') throw new Error('头像类型无效。')
-    return readAvatarDataUrl(kind)
-  })
-  ipcMain.handle('pet:open-settings', (event) => { if (trusted(event)) openSettings() })
-  ipcMain.handle('pet:open-onboarding', (event) => { if (trusted(event)) openOnboarding() })
-  // The onboarding wizard's narrow channels: one DeepSeek key, one save, the
-  // fixed guide pages, and the outcome marker. Keys travel one way only.
-  ipcMain.handle('pet:onboarding:test', async (event, apiKey: unknown, model: unknown) => {
-    if (!onboardingTrusted(event)) throw new Error('无效的界面请求。')
-    const key = typeof apiKey === 'string' ? normalizeApiKey(apiKey) : ''
-    const chosen = deepSeekModel(model)
-    if (!key || key.length > 512 || !chosen) throw new Error('API Key 无效。')
-    return probeAnthropicEndpoint(deepSeekProfile(key, chosen))
-  })
-  ipcMain.handle('pet:onboarding:workspace', (event) => {
-    if (!onboardingTrusted(event)) throw new Error('无效的界面请求。')
-    return agentWorkspace
-  })
-  ipcMain.handle('pet:onboarding:pick-workspace', async (event) => {
-    if (!onboardingTrusted(event)) throw new Error('无效的界面请求。')
-    return pickWorkspaceDirectory(onboardingWindow, agentWorkspace)
-  })
-  ipcMain.handle('pet:onboarding:set-workspace', async (event, next: unknown) => {
-    if (!onboardingTrusted(event)) throw new Error('无效的界面请求。')
-    if (typeof next !== 'string') throw new Error('工作目录无效。')
-    return { path: await migrateAgentWorkspace(next) }
-  })
-  ipcMain.handle('pet:onboarding:save', async (event, apiKey: unknown, model: unknown) => {
-    if (!onboardingTrusted(event)) throw new Error('无效的界面请求。')
-    const key = typeof apiKey === 'string' ? normalizeApiKey(apiKey) : ''
-    const chosen = deepSeekModel(model)
-    if (!key || key.length > 512 || !chosen) throw new Error('API Key 无效。')
-    const controller = activeController()
-    const settings = (await controller.getLibraryState()).settings
-    // Re-running the wizard updates the existing DeepSeek profile instead of
-    // stacking a duplicate: match on the shared base URL.
-    const existing = settings.modelProfiles.find((profile) => profile.baseUrl === deepSeekBaseUrl())
-    const profile = deepSeekProfile(key, chosen, existing?.id)
-    await controller.saveModelProfile(profile)
-    if (settings.activeModelProfileId !== profile.id) await controller.setModelProfile(profile.id)
-    writeOnboardingMarker(dataRoot, 'completed')
-  })
-  ipcMain.handle('pet:onboarding:open', (event, page: unknown) => {
-    if (!onboardingTrusted(event)) throw new Error('无效的界面请求。')
-    if (typeof page !== 'string' || !(page in ONBOARDING_PAGES)) throw new Error('页面无效。')
-    void shell.openExternal(ONBOARDING_PAGES[page as OnboardingPage])
-  })
-  ipcMain.handle('pet:onboarding:finish', (event, outcome: unknown) => {
-    if (!onboardingTrusted(event)) throw new Error('无效的界面请求。')
-    if (outcome !== 'completed' && outcome !== 'skipped') throw new Error('状态无效。')
-    writeOnboardingMarker(dataRoot, outcome)
-  })
-  ipcMain.handle('pet:show-panel', (event) => { if (trusted(event)) showPanel() })
-  ipcMain.handle('pet:hide-panel', (event) => { if (trusted(event)) hidePanel() })
-  ipcMain.handle('pet:get-panel-open', (event) => { if (!trusted(event)) throw new Error('无效的界面请求。'); return panelOpen })
-  ipcMain.handle('pet:get-panel-placement', (event) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    syncStageBounds()
-    return panelPlacement
-  })
-  ipcMain.handle('pet:get-panel-direction', (event) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    syncStageBounds()
-    return panelDirection
-  })
-  ipcMain.handle('pet:show-context-menu', (event) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    if (avatarWindow && contextMenu) contextMenu.popup({ window: avatarWindow })
-  })
-  ipcMain.handle('pet:show-text-menu', (event, payload: unknown) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    const text = payload && typeof payload === 'object' && typeof (payload as { text?: unknown }).text === 'string'
-      ? (payload as { text: string }).text
-      : ''
-    if (!text) return null
-    const owner = BrowserWindow.fromWebContents(event.sender)
-    return new Promise<'quote' | 'copy' | null>((resolve) => {
-      let settled = false
-      const finish = (value: 'quote' | 'copy' | null): void => {
-        if (settled) return
-        settled = true
-        resolve(value)
-      }
-      const menu = Menu.buildFromTemplate([
-        { label: '引用', click: () => finish('quote') },
-        { label: '复制', click: () => finish('copy') }
-      ])
-      if (owner) menu.popup({ window: owner, callback: () => finish(null) })
-      else menu.popup({ callback: () => finish(null) })
-    })
-  })
-  ipcMain.handle('pet:set-balance-open', (event, open: unknown) => {
-    if (!trusted(event) && !balanceTrusted(event)) throw new Error('无效的界面请求。')
-    if (typeof open !== 'boolean') throw new Error('余额卡片状态无效。')
-    setBalanceOpen(open)
-  })
-  ipcMain.handle('pet:toggle-balance', (event) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    // Toggled here, not by the renderer: the renderer's cached flag can drift
-    // from this one, and the guard in setBalanceOpen would then swallow every
-    // follow-up flip — the card would open and never close again.
-    setBalanceOpen(!balanceOpen)
-  })
-  ipcMain.handle('pet:get-balance', async (event) => {
-    if (!trusted(event) && !balanceTrusted(event)) throw new Error('无效的界面请求。')
-    const settings = (await activeController().getLibraryState()).settings
-    const key = getDeepSeekBalanceKey(settings, deepseekKey)
-    if (!key) throw new Error('请在设置中添加 DeepSeek API Key。')
-    return fetchDeepSeekBalance(key)
-  })
-  ipcMain.handle('pet:open-external', async (event, value: unknown) => {
-    // 余额卡在独立的 balance 窗口里渲染，同样要能打开充值/用量页。
-    if (!trusted(event) && !balanceTrusted(event)) throw new Error('无效的界面请求。')
-    if (typeof value !== 'string' || value.length > 2_000) throw new Error('无效的链接。')
-    const url = new URL(value)
-    if (!['http:', 'https:', 'mailto:'].includes(url.protocol)) throw new Error('不支持的链接。')
-    await shell.openExternal(url.href)
-  })
-  ipcMain.handle('pet:open-path', async (event, value: unknown) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    if (typeof value !== 'string' || value.length > 2_000 || !path.isAbsolute(value)) throw new Error('文件路径无效。')
-    const target = path.resolve(value)
-    // Image results may point at the original file the tool read, wherever it
-    // lives. Restrict the hand-off to image extensions rather than a folder.
-    if (!/\.(png|jpe?g|gif|webp)$/i.test(target)) throw new Error('只能打开图片文件。')
-    if (!existsSync(target)) throw new Error('文件已经不存在。')
-    const failure = await shell.openPath(target)
-    if (failure) throw new Error(`无法打开原图：${failure}`)
-  })
-  ipcMain.handle('pet:set-bubble-layout', (event, layout: unknown, height: unknown) => {
-    if (!trusted(event)) return
-    if (layout !== 'empty' && layout !== 'composer' && layout !== 'composer_attachments' && layout !== 'composer_models' && layout !== 'full') throw new Error('气泡布局无效。')
-    if (height !== undefined && (typeof height !== 'number' || !Number.isFinite(height) || height < 100 || height > 260)) throw new Error('气泡高度无效。')
-    const nextHeight = (layout === 'composer' || layout === 'composer_attachments') && typeof height === 'number' ? Math.round(height) : undefined
-    if (bubbleLayout === layout && compactBubbleHeight === nextHeight) return
-    const size = stageBounds ?? { x: 0, y: 0, ...stageSize }
-    const previous = bubbleRegion(bubbleLayout, size, compactBubbleHeight, panelDirection)
-    bubbleLayout = layout
-    compactBubbleHeight = nextHeight
-    // 面板窗口的 bounds 就是当前布局的矩形，布局一变就得跟着改。
-    syncPanelBounds()
-    if (shapeShrinkTimer) clearTimeout(shapeShrinkTimer)
-    shapeShrinkTimer = undefined
-    const next = bubbleRegion(layout, size, nextHeight, panelDirection)
-    if (panelOpen && next.width * next.height < previous.width * previous.height) {
-      shapeShrinkTimer = setTimeout(() => {
-        shapeShrinkTimer = undefined
-        applyPointerShape()
-      }, 240)
-    } else {
-      applyPointerShape()
-    }
-  })
-  ipcMain.handle('pet:set-bubble-expanded', (event, expanded: unknown) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    if (typeof expanded !== 'boolean') throw new Error('气泡尺寸无效。')
-    setBubbleExpanded(expanded)
-  })
-  ipcMain.handle('pet:set-avatar-box', (event, box: unknown) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    if (!box || typeof box !== 'object') return
-    const { x, y, width, height } = box as Record<string, unknown>
-    if (![x, y, width, height].every((value) => typeof value === 'number' && Number.isFinite(value))) return
-    const bounds = avatarWindow?.getBounds()
-    if (!bounds) return
-    const left = Math.round(Math.max(0, Math.min(bounds.width, x as number)))
-    const top = Math.round(Math.max(0, Math.min(bounds.height, y as number)))
-    const boxWidth = Math.max(1, Math.min(bounds.width - left, Math.round(width as number)))
-    const boxHeight = Math.max(1, Math.min(bounds.height - top, Math.round(height as number)))
-    avatarBox = {
-      right: bounds.width - left - boxWidth,
-      bottom: bounds.height - top - boxHeight,
-      width: boxWidth,
-      height: boxHeight
-    }
-    // 姿势/大小变化会移动人物可见区的中心，展开方向和命中形状都跟着重算；
-    // 余额卡也在 syncStageBounds 里重新对齐。
-    syncStageBounds()
-  })
-  ipcMain.handle('pet:set-panel-size', (event, width: unknown, height: unknown) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    if (typeof width !== 'number' || typeof height !== 'number' || !Number.isFinite(width) || !Number.isFinite(height)) {
-      throw new Error('面板尺寸无效。')
-    }
-    bubblePanelSize = {
-      width: Math.round(Math.min(4000, Math.max(PANEL_MIN_WIDTH, width))),
-      height: Math.round(Math.min(4000, Math.max(PANEL_MIN_HEIGHT, height)))
-    }
-    syncStageBounds()
-    schedulePanelSizeSave()
-  })
+
+  registerOnboardingIpc(buildOnboardingIpcDeps())
+  registerSettingsIpc(buildSettingsIpcDeps())
+  registerLibrariesIpc(buildLibrariesIpcDeps())
+  registerMiscIpc(buildMiscIpcDeps())
+  registerSideIpc({ trusted, sideChat, activeController, validAttachmentList, resolveAttachments, get avatarWindow() { return avatarWindow } })
+  registerConversationsIpc({ trusted, activeController, sideChat, get panelWindow() { return panelWindow } })
+  registerConversationControlIpc({ trusted, activeController, sideChat, get agentWorkspace() { return agentWorkspace } })
+  registerModelsIpc(buildModelsIpcDeps())
+  registerShellIpc(buildShellIpcDeps())
+  registerPanelIpc(buildPanelIpcDeps())
+  registerBalanceIpc(buildBalanceIpcDeps())
+  registerWindowStateIpc(buildWindowStateIpcDeps())
   ipcMain.on('pet:resize-ghost', (event, pos: unknown) => {
     if (!trusted(event)) return
     if (pos === null) {
@@ -2702,57 +2255,9 @@ function registerIpc(): void {
     pendingApprovals.delete(id)
     pending.resolve(approved === true)
   })
-  ipcMain.handle('pet:set-plan-mode', async (event, on: unknown) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    if (typeof on !== 'boolean') throw new Error('计划模式设置无效。')
-    await activeController().setPlanMode(on)
-  })
-  ipcMain.handle('pet:set-approval-mode', async (event, mode: unknown, conversationId: unknown) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    if (!isApprovalMode(mode)) throw new Error('审批模式无效。')
-    if (conversationId !== undefined && typeof conversationId !== 'string') throw new Error('会话编号无效。')
-    await activeController().setApprovalMode(mode, conversationId as string | undefined)
-  })
-  ipcMain.handle('pet:answer-permission', async (event, id: unknown, allow: unknown, conversationId: unknown) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    if (typeof id !== 'string') throw new Error('操作编号无效。')
-    if (typeof allow !== 'boolean') throw new Error('批准结果无效。')
-    if (conversationId !== undefined && typeof conversationId !== 'string') throw new Error('会话编号无效。')
-    await activeController().answerPermission(id, allow, conversationId as string | undefined)
-  })
-  ipcMain.handle('pet:set-effort', async (event, level: unknown) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    if (!isEffortLevel(level)) throw new Error('思考强度无效。')
-    await activeController().updateSettings({ effort: level })
-  })
-  ipcMain.handle('pet:set-web-search', async (event, on: unknown) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    if (typeof on !== 'boolean') throw new Error('联网搜索设置无效。')
-    await activeController().updateSettings({ webSearchEnabled: on })
-  })
-  ipcMain.handle('pet:set-auto-compact-percent', async (event, percent: unknown) => {
-    if (!trusted(event)) throw new Error('无效的界面请求。')
-    if (!isAutoCompactPercent(percent)) throw new Error('自动压缩阈值应为 50–90 之间的整数。')
-    await activeController().updateSettings({ autoCompactPercent: percent })
-  })
-  ipcMain.handle('pet:set-model-mode', (event, mode: unknown) => {
-    if (!trusted(event)) return
-    const normalized = normalizeModelMode(mode)
-    if (!normalized) throw new Error('模型选项无效。')
-    return activeController().setModelMode(normalized)
-  })
-  ipcMain.handle('pet:set-avatar-state', (event, state: unknown) => {
-    if (!trusted(event)) return
-    if (state !== 'idle' && state !== 'thinking' && state !== 'listening' && state !== 'speaking' && state !== 'acting' && state !== 'success' && state !== 'error') {
-      throw new Error('角色状态无效。')
-    }
-    const taskStatus = activeController().displayedRuntime()?.getSnapshot().taskStatus ?? 'idle'
-    if (state === 'idle' && ['planning', 'awaiting_approval', 'executing', 'verifying'].includes(taskStatus)) {
-      throw new Error('任务进行中时不能将角色状态设为待机。')
-    }
-    rendererAvatarState = state === 'idle' ? undefined : state
-    publishSnapshot()
-  })
+  registerConversationSettingsIpc(buildConversationSettingsIpcDeps())
+  registerPermissionsIpc(buildPermissionsIpcDeps())
+
   registerVoiceIpc({
     ipcMain,
     service: voiceService,
@@ -2789,74 +2294,52 @@ function registerIpc(): void {
       if (error) throw new Error('无法打开目录。')
     }
   })
-  ipcMain.handle('pet:voice-log', (event, level: unknown, message: unknown, data: unknown) => {
-    if (!trusted(event)) return
-    const allowed = new Set(['[asr] mediaRecorder stop', '[asr] mediaRecorder error', '[asr] transcribe start', '[asr] transcribe result', '[asr] transcribe error'])
-    if (typeof message !== 'string' || !allowed.has(message)) return
-    const fields = data && typeof data === 'object' ? data as Record<string, unknown> : {}
-    const safe = Object.fromEntries(['chunks', 'totalSize', 'bytes', 'textLength'].flatMap((key) =>
-      typeof fields[key] === 'number' && Number.isFinite(fields[key]) && Number(fields[key]) >= 0 ? [[key, fields[key]]] : []))
-    voiceLog(message, { level: level === 'error' ? 'error' : 'info', ...safe })
-  })
-  ipcMain.handle('pet:quit', (event) => { if (trusted(event)) app.quit() })
-  ipcMain.handle('pet:begin-drag', (event, cursor: unknown) => {
-    if ((event.sender.id !== avatarWindow?.webContents.id && event.sender.id !== panelWindow?.webContents.id) || !avatarWindow || !isScreenPoint(cursor)) return
-    dragOrigin = { cursor, bounds: avatarWindow.getBounds() }
-    avatarDragging = true
-  })
-  ipcMain.handle('pet:drag-move', (event, current: unknown) => {
-    if ((event.sender.id !== avatarWindow?.webContents.id && event.sender.id !== panelWindow?.webContents.id) || !avatarWindow || !dragOrigin || !isScreenPoint(current)) return
-    const width = dragOrigin.bounds.width
-    const height = dragOrigin.bounds.height
-    const x = Math.round(dragOrigin.bounds.x + current.x - dragOrigin.cursor.x)
-    const y = Math.round(dragOrigin.bounds.y + current.y - dragOrigin.cursor.y)
-    // 头像窗口必须留在当前显示器的工作区内：一旦允许它掉到工作区下面，
-    // 展开面板时舞台会被拉回工作区，人物就会“向上跳”，底部小三角也会
-    // 被屏幕边缘削掉。坐标都是 DIP，系统缩放不同的显示器同样适用。
-    const work = screen.getDisplayNearestPoint({ x: x + Math.round(width / 2), y: y + Math.round(height / 2) }).workArea
-    // 右侧允许伸出窗口右缘的透明余量：人物能贴到屏幕右缘，本体不出屏。
-    const RIGHT_SLACK = AVATAR_RIGHT_SLACK[currentAvatarSize] ?? 37
-    const nextX = Math.min(Math.max(x, work.x), Math.max(work.x, work.x + work.width - width + RIGHT_SLACK))
-    // 窗口底部允许伸出工作区，幅度正好等于人物脚底到窗口底的透明余量：
-    // 人物可以拖到任务栏边缘，但角色本体不会出屏。余量随人物大小档变化。
-    const BOTTOM_SLACK = AVATAR_BOTTOM_SLACK[currentAvatarSize] ?? 60
-    const nextY = Math.min(Math.max(y, work.y), Math.max(work.y, work.y + work.height - height + BOTTOM_SLACK))
-    avatarWindow.setBounds({
-      x: nextX,
-      y: nextY,
-      width,
-      height
-    })
-    syncBalancePosition()
-  })
-  ipcMain.handle('pet:end-drag', (event) => {
-    if (trusted(event)) {
-      dragOrigin = undefined
-      avatarDragging = false
-      syncStageBounds()
-    }
-  })
+  registerWindowDragIpc(buildWindowDragIpcDeps())
 }
 
 // 隔离冒烟测试：配合 DESKTOP_PET_WORKSPACE 指向临时目录时，允许再起一个实例。
 const ownsSingleInstance = process.env.DESKTOP_PET_MULTI_INSTANCE === '1' || app.requestSingleInstanceLock()
 if (!ownsSingleInstance) {
-  // Do not disappear silently: a second copy looks like a crash otherwise.
-  void app.whenReady().then(async () => {
-    try {
-      await dialog.showMessageBox({
-        type: 'info',
-        title: '小鲸已在运行',
-        message: '已经有一个小鲸实例在运行。请先从托盘退出旧实例，再启动新版本。'
-      })
-    } finally {
-      app.quit()
-    }
-  })
-} else app.on('second-instance', (_event, commandLine) => {
+  // 带控制参数的第二实例只负责把命令转给主实例；静默退出，不弹“已在运行”。
+  // 回合进行中请求重启时，弹窗会让主人以为启动失败。
+  const controlCommand = process.argv.includes('--quit') || process.argv.includes('--restart') ||
+    process.argv.some((arg) => arg === '--restart-to' || arg.startsWith('--restart-to='))
+  if (controlCommand) {
+    void app.whenReady().then(() => app.quit())
+  } else {
+    // Do not disappear silently: a second copy looks like a crash otherwise.
+    void app.whenReady().then(async () => {
+      try {
+        await dialog.showMessageBox({
+          type: 'info',
+          title: '小鲸已在运行',
+          message: '已经有一个小鲸实例在运行。请先从托盘退出旧实例，再启动新版本。'
+        })
+      } finally {
+        app.quit()
+      }
+    })
+  }
+}
+app.on('second-instance', (_event, commandLine) => {
   // Lets the packaging script close a running copy without killing it.
   if (commandLine.includes('--quit')) {
     app.quit()
+    return
+  }
+  // 由旧实例自己切版本：app.relaunch 指向目标版本，看门狗负责旧进程退出后
+  // 拉起新版本，不靠外部脚本猜单实例锁什么时候释放。
+  const restartToIndex = commandLine.findIndex((arg) => arg === '--restart-to' || arg.startsWith('--restart-to='))
+  if (restartToIndex >= 0) {
+    const raw = commandLine[restartToIndex]
+    const version = raw.includes('=') ? raw.slice(raw.indexOf('=') + 1) : commandLine[restartToIndex + 1]
+    if (version && /^\d+\.\d+\.\d+$/.test(version)) {
+      logRestart(`second-instance restart-to ${version} pid=${process.pid}`)
+      void restartWhenIdle(version)
+    } else {
+      logRestart(`second-instance restart-to invalid: ${version ?? ''}`)
+      void requestRestart()
+    }
     return
   }
   // One-command restart for the evolve loop: wait for idle, then relaunch.
@@ -2869,6 +2352,11 @@ if (!ownsSingleInstance) {
 })
 
 if (ownsSingleInstance) void app.whenReady().then(async () => {
+  // 全局急停：任何桌面操作进行中都能一键打断，不必先切回面板。
+  globalShortcut.register('Control+Alt+Shift+Esc', () => {
+    void activeController().interruptTurn().catch(() => undefined);
+  });
+  app.on('will-quit', () => globalShortcut.unregisterAll());
   // Scripts can ask a fresh copy to close right away; without this the flag
   // would only work when another instance already holds the single-instance lock.
   if (process.argv.includes('--quit')) {
@@ -2895,6 +2383,13 @@ if (ownsSingleInstance) void app.whenReady().then(async () => {
   resizeGhostAt(null)
   avatarWindow = createAvatarWindow()
   panelWindow = createPanelWindow()
+  // 预览实例默认把面板打开，省得每次手动点头像。等面板页面加载完再开，
+  // 不用固定延时——固定 1.5 秒会赶在渲染层就绪之前调用，窗口留在透明态。
+  if (process.env.DESKTOP_PET_PREVIEW_PANEL === '1' && panelWindow && !panelWindow.isDestroyed()) {
+    const openPreviewPanel = (): void => { setTimeout(() => showPanel(), 300) }
+    if (panelWindow.webContents.isLoading()) panelWindow.webContents.once('did-finish-load', openPreviewPanel)
+    else openPreviewPanel()
+  }
   createTray()
   // 全局键鼠活动：面板提示框里实时显示按键与鼠标三键。
   startInputActivity((activity) => {
@@ -2921,17 +2416,37 @@ if (ownsSingleInstance) void app.whenReady().then(async () => {
 
   // 启动自检：打包脚本用 --self-test 启动新版本，结果落到 data/self-test，
   // 不弹额外窗口、不改用户设置；--self-test-exit 时跑完就退出。
-  if (process.argv.includes('--self-test')) {
+  // 打包版每次启动都自检：重启看门狗和 evolve_restart 启动的新实例不带 --self-test，
+  // 只认这个参数会让日常重启永远跳过自检。跨重启任务恢复仍按 --self-test 判断，互不影响。
+  const selfTestStartedAt = Date.now()
+  if (process.argv.includes('--self-test') || app.isPackaged) {
     setTimeout(() => {
       void (async () => {
+        // 冷启动时窗口可能还没就绪，固定等 3 秒会误报 windows 失败。
+        // 轮询到窗口可见为止，最多 15 秒，超时才判失败。
+        const waitForWindows = async (timeoutMs: number): Promise<boolean> => {
+          const deadline = Date.now() + timeoutMs
+          while (Date.now() < deadline) {
+            if (avatarWindow && !avatarWindow.isDestroyed() && avatarWindow.isVisible() &&
+                panelWindow && !panelWindow.isDestroyed()) return true
+            await new Promise((resolve) => setTimeout(resolve, 250))
+          }
+          return false
+        }
+        const windowsReady = await waitForWindows(15_000)
+        const startedAt = selfTestStartedAt
         const settingsReady = await activeController().getLibraryState().then(() => true).catch(() => false)
         const result = runSelfTest({
           version: app.getVersion(),
           dataRoot,
           rendererRoot: path.join(__dirname, '../renderer'),
-          windowsReady: Boolean(avatarWindow && !avatarWindow.isDestroyed() && avatarWindow.isVisible() &&
-            panelWindow && !panelWindow.isDestroyed()),
-          settingsReady
+          windowsReady,
+          settingsReady,
+          env: {
+            packaged: app.isPackaged,
+            electron: process.versions.electron ?? 'unknown',
+            elapsedMs: Date.now() - startedAt
+          }
         })
         console.log(`Self-test ${result.ok ? 'passed' : 'failed'} (${result.version})`)
         if (process.argv.includes('--self-test-exit')) app.quit()
@@ -3006,6 +2521,7 @@ app.on('before-quit', (event) => {
     console.error('Final conversation save failed:', error)
   }).finally(async () => {
     await controller?.disposeAll().catch(() => undefined)
+    wpsMcpService.close()
     if (relaunchOnQuit) {
       try {
         app.relaunch(relaunchExecPath ? { execPath: relaunchExecPath } : undefined)

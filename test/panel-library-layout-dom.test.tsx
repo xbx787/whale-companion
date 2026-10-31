@@ -72,7 +72,7 @@ describe('conversation library layout', () => {
         if (property.startsWith('on')) return () => () => {}
         if (property === 'getContextUsage') return async () => ({ status: 'unavailable' })
         if (property === 'readAvatar') return async () => null
-        if (property === 'listClaudeWorkflows' || property === 'searchWorkspaceFiles') return async () => []
+        if (property === 'listAppCommands' || property === 'searchWorkspaceFiles') return async () => []
         return async () => undefined
       }
     }) as unknown as PetAPI
@@ -103,8 +103,8 @@ describe('conversation library layout', () => {
     // A floating pane, not a column: no docked marker, and the drawer is its own box.
     expect(host.querySelector('.panel-bubble')?.classList.contains('is-library-docked')).toBe(false)
     expect(host.querySelector('.panel-library-drawer')).not.toBeNull()
-    // The wide shape still earns the list's date headings.
-    expect(host.querySelector('.panel-library-group-heading')?.textContent).toBe('近 7 天')
+    // 未归档列表现在按标签页/其余分段，不再按日期分组。
+    expect(host.querySelector('.panel-library-group-heading')).toBeNull()
     expect(expanded()).toBe('true')
 
     await act(async () => click([...host.querySelectorAll('.panel-session-main')].find((row) => row.textContent?.includes('会话 b'))!))
@@ -135,6 +135,8 @@ describe('conversation library layout', () => {
     expect(host.querySelector('.panel-library-group-heading')).toBeNull()
     expect(expanded()).toBe('true')
 
+    await act(async () => click(host.querySelector('.panel-library-toggle')!))
+    expect(host.querySelector('.panel-library-market')).not.toBeNull()
     await act(async () => click(host.querySelector('.panel-library-toggle')!))
     expect(expanded()).toBe('false')
   })

@@ -2,6 +2,7 @@ import { memo, useEffect, useState } from 'react'
 import type { TimelineEntry } from '../shared/contracts'
 import { formatDuration } from './duration'
 import { MessageMarkdown } from './message-markdown'
+import { RunningDots } from './running-dots'
 
 /** Seconds a thinking block has been running; null when the timestamps are unusable. */
 export function thinkingElapsedSeconds(entry: Pick<TimelineEntry, 'time' | 'endedAt'>, nowMs: number): number | null {
@@ -51,7 +52,7 @@ export const ThinkingItem = memo(function ThinkingItem({ entry, running }: { ent
       <ThoughtIcon />
       <span className={`panel-thought-label${streaming ? ' panel-live-label' : ''}`}>{label}</span>
       {duration && <span className="panel-thought-time">{duration}</span>}
-      <span className={`panel-thought-state${streaming ? ' is-running' : ''}`} aria-hidden="true">{streaming ? '…' : '✓'}</span>
+      <span className={`panel-thought-state${streaming ? ' is-running' : ''}`} aria-hidden="true">{streaming ? <RunningDots /> : '✓'}</span>
     </summary>
     <MessageMarkdown text={entry.text} streaming={streaming} />
   </details>

@@ -84,7 +84,6 @@ export function isFreshUserEntry(
 /** How long a finished/failed dot stays on the portrait before it fades.
  *  Six seconds was easy to miss while looking elsewhere; a completed turn
  *  is worth a longer read. */
-export const TASK_DOT_HOLD_MS = 15000
 
 export interface TaskDot {
   tone: 'busy' | 'waiting' | 'done' | 'failed'
@@ -108,6 +107,7 @@ export function taskDot(state: string | undefined): TaskDot | null {
     case 'awaiting_approval':
     case 'waiting':
     case 'awaiting':
+      // 等待用户回答：闪得比运行中的黄色更快，用来催一下。
       return { tone: 'waiting', pulse: true }
     case 'done':
     case 'completed':

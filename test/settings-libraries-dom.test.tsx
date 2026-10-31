@@ -63,10 +63,6 @@ function bridge(overrides: Partial<SettingsAPI> = {}): SettingsAPI {
     memoryList: async () => [], memorySetEnabled: async (enabled) => enabled,
     memoryUpdate: async (id, text) => ({ id, text, sourceConversationId: 'conversation-1', sourceAt: '2026-10-18T00:00:00.000Z', createdAt: '', updatedAt: '' }),
     memoryDelete: async () => {},
-    growthStatus: async () => ({ available: false, proposals: [] }), growthPropose: async () => { throw new Error('unused') },
-    growthExperiment: async () => { throw new Error('unused') }, growthAdopt: async () => { throw new Error('unused') },
-    growthPublish: async () => { throw new Error('unused') }, growthDiscard: async () => { throw new Error('unused') },
-    growthUpdateNotes: async () => { throw new Error('unused') },
     ...overrides
   }
 }
@@ -85,8 +81,11 @@ describe('settings libraries page', () => {
   it('shows the three libraries and the matching market', async () => {
     await mount(bridge())
     for (const label of ['MCP', '技能', '插件']) expect(container!.textContent).toContain(label)
-    expect(container!.textContent).toContain('MCP 市场')
     expect(container!.textContent).toContain('已安装的演示服务')
+    // 已安装与市场是两个分段，切到市场才会渲染市场条目。
+    await act(async () => click('市场'))
+    await act(async () => { await Promise.resolve() })
+    expect(container!.textContent).toContain('MCP 市场')
     expect(container!.textContent).toContain('市场里的另一项')
     expect(container!.textContent).toContain('已添加')
   })
@@ -95,6 +94,7 @@ describe('settings libraries page', () => {
     const search = vi.fn(async () => market)
     await mount(bridge({ searchLibraryMarket: search }))
     await act(async () => click('技能'))
+    await act(async () => click('市场'))
     await act(async () => { await Promise.resolve() })
     expect(container!.textContent).toContain('技能市场')
     expect(search).toHaveBeenCalledWith('skill', '')
@@ -103,6 +103,7 @@ describe('settings libraries page', () => {
   it('installs a market entry through the bridge', async () => {
     const install = vi.fn(async () => ({ items: [installed], busy: false }))
     await mount(bridge({ installLibrary: install }))
+    await act(async () => click('市场'))
     await act(async () => click('添加'))
     expect(install).toHaveBeenCalledWith(expect.objectContaining({ id: 'another' }))
   })
@@ -122,12 +123,14 @@ describe('settings libraries page', () => {
     const update = vi.fn(async (patch) => ({ ...settings, ...patch }))
     await mount(bridge({ update }))
     await act(async () => click('技能'))
+    await act(async () => click('市场'))
+    await act(async () => { await Promise.resolve() })
     expect(container!.textContent).toContain('技能市场来源')
     expect(container!.textContent).toContain('Anthropic 官方')
     expect(container!.textContent).toContain('Superpowers（社区）')
     const source = [...container!.querySelectorAll<HTMLButtonElement>('.settings-skill-source')]
       .find((button) => button.textContent?.includes('Superpowers'))!
     await act(async () => source.click())
-    expect(update).toHaveBeenCalledWith(expect.objectContaining({ skillMarketSources: ['anthropic'] }))
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ skillMarketSources: ['anthropic', 'awesome'] }))
   })
 })

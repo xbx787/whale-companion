@@ -105,7 +105,7 @@ describe('temporary side chat stays in the same panel', () => {
   let stopSide: ReturnType<typeof vi.fn>
   let removeSideQueuedMessage: ReturnType<typeof vi.fn>
   let removeQueuedMessage: ReturnType<typeof vi.fn>
-  let listClaudeWorkflows: ReturnType<typeof vi.fn>
+  let listAppCommands: ReturnType<typeof vi.fn>
   let prepareDroppedFile: ReturnType<typeof vi.fn>
   let sideRuntimeState: AppSnapshot
 
@@ -125,7 +125,7 @@ describe('temporary side chat stays in the same panel', () => {
     stopSide = vi.fn(async () => undefined)
     removeSideQueuedMessage = vi.fn(async () => undefined)
     removeQueuedMessage = vi.fn(async () => undefined)
-    listClaudeWorkflows = vi.fn(async () => [
+    listAppCommands = vi.fn(async () => [
       ...['new', 'side', 'btw', 'sessions', 'model', 'help', 'compact', 'goal', 'review'].map((name) =>
         ({ name, description: '', kind: 'command' as const, source: 'builtin' as const }))
     ])
@@ -142,7 +142,7 @@ describe('temporary side chat stays in the same panel', () => {
       sendMessage: sendMain, sendSideChatMessage: sendSide, stop: stopMain, stopSideChat: stopSide,
       removeSideQueuedMessage, removeQueuedMessage,
       getPathForFile: (file: File) => `C:\\workspace\\${file.name}`,
-      prepareDroppedFile, listClaudeWorkflows,
+      prepareDroppedFile, listAppCommands,
       saveDraft, getDraft, getSideChat: async () => emptySide(), setSideChatExpanded,
       onSideChatSnapshot: (listener: (next: SideChatSnapshot) => void) => {
         sideListeners.add(listener)
@@ -155,7 +155,7 @@ describe('temporary side chat stays in the same panel', () => {
         if (property === 'getDraft') return async () => ''
         if (property === 'getContextUsage' || property === 'getSideChatContextUsage') return async () => ({ status: 'unavailable' })
         if (property === 'readAvatar') return async () => null
-        if (property === 'listClaudeWorkflows' || property === 'searchWorkspaceFiles') return async () => []
+        if (property === 'listAppCommands' || property === 'searchWorkspaceFiles') return async () => []
         return async () => undefined
       }
     }) as unknown as PetAPI

@@ -409,6 +409,8 @@ export function Live2DPortrait({
       height: Math.max(1, host.clientHeight)
     })
     appRef.current = app
+    // 常驻桌面的人物不需要 60 帧：30 帧足够顺滑，GPU 占用和功耗明显下降。
+    if (app.ticker) app.ticker.maxFPS = 30
     const resize = (): void => {
       const model = modelRef.current
       if (model && !disposed) {
@@ -531,6 +533,36 @@ export function Live2DPortrait({
     const host = hostRef.current
     if (model && app && host) layoutModel(model, app, host, viewport)
   }, [viewport])
+
+  // 两档帧率：最低 30，显卡有余量时升到 60，绝不低于 30。
+  // 用 ticker 实测帧率判断余量：连续两次跑满 30 才升 60，掉到 45 以下退回 30，不硬撑。
+  useEffect(() => {
+    const app = appRef.current
+    if (!app || !app.ticker) return
+    const ticker = app.ticker
+    let level: 30 | 60 = 30
+    let healthySamples = 0
+    const apply = (next: 30 | 60): void => {
+      if (level === next) return
+      level = next
+      ticker.maxFPS = next
+    }
+    const probe = (): void => {
+      const actual = ticker.FPS
+      if (level === 30) {
+        healthySamples = actual >= 29 ? healthySamples + 1 : 0
+        if (healthySamples >= 2) {
+          healthySamples = 0
+          apply(60)
+        }
+      } else if (actual < 45) {
+        apply(30)
+      }
+    }
+    ticker.maxFPS = 30
+    const timer = window.setInterval(probe, 6_000)
+    return () => window.clearInterval(timer)
+  }, [manifest])
 
   return (
     <div ref={hostRef} className={['live2d-portrait', className].filter(Boolean).join(' ')} aria-hidden="true"

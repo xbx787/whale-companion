@@ -49,6 +49,7 @@ export function usePetState() {
   useEffect(() => {
     let active = true;
     let unsubscribe: (() => void) | undefined;
+    let retryTimer: number | undefined;
 
     try {
       const bridge = petBridge();
@@ -106,22 +107,33 @@ export function usePetState() {
         setSnapshot(incoming);
       });
       // First mount: the panel still needs a snapshot even while idle (no
-      // publishes are flowing). Yields to anything that already arrived.
-      void bridge.getSnapshot().then((next) => {
-        if (active && revisionRef.current < 0) {
-          conversationRef.current = next.conversationId ?? null;
-          revisionRef.current = next.timelineRevision;
-          setSnapshot(next);
-        }
-      }).catch((cause: unknown) => {
-        if (active && revisionRef.current < 0) setError(errorText(cause));
-      });
+      // publishes are flowing). The renderer may boot before the controller
+      // finishes loading the library, in which case getSnapshot rejects; retry
+      // instead of leaving the panel stuck on "loading" until a tab switch.
+      const pull = (attempt: number): void => {
+        void bridge.getSnapshot().then((next) => {
+          if (active && revisionRef.current < 0) {
+            conversationRef.current = next.conversationId ?? null;
+            revisionRef.current = next.timelineRevision;
+            setSnapshot(next);
+          }
+        }).catch((cause: unknown) => {
+          if (!active) return;
+          if (attempt < 30) {
+            retryTimer = window.setTimeout(() => pull(attempt + 1), 200)
+            return
+          }
+          if (revisionRef.current < 0) setError(errorText(cause))
+        })
+      }
+      pull(0)
     } catch (cause) {
       setError(errorText(cause));
     }
 
     return () => {
       active = false;
+      window.clearTimeout(retryTimer);
       unsubscribe?.();
     };
   }, []);

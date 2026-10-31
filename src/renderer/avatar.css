@@ -58,7 +58,7 @@ body.avatar-window { -webkit-user-select: none; user-select: none; }
 /* 舞台（200×220）的直接子元素：top/right 都相对人物窗口。不要把它放回
    `.avatar-hit-target` 里，否则会相对按钮（人物大小）定位，点落到头发上。
    2px 的抬升是用户要求的观感微调，别并进状态锚点。 */
-.avatar-status-strip { position: absolute; z-index: 4; top: calc(var(--avatar-dot-y) + 20.2px); right: calc(88px - var(--avatar-w, 116.5px) / 2 + 2.4px); width: 0; height: 0; pointer-events: none; }
+.avatar-status-strip { position: absolute; z-index: 8; top: calc(var(--avatar-dot-y) + 20.2px); right: calc(88px - var(--avatar-w, 116.5px) / 2 + 2.4px); width: 0; height: 0; pointer-events: none; }
 /* 点不再排成一条直线：以 50px 为半径沿右上角转成弧形，每个点的偏移由
    avatar.tsx 按角度算好写进变量。这个容器只提供锚点，不参与布局。 */
 .avatar-status-dots { display: contents; }
@@ -77,10 +77,12 @@ body.avatar-window { -webkit-user-select: none; user-select: none; }
 /* 只呼吸透明度，不改尺寸：几个对话点必须始终等大。 */
 @keyframes avatar-task-pulse {
   0%, 100% { opacity: 1; }
-  50% { opacity: .45; }
+  50% { opacity: .5; }
 }
 @media (prefers-reduced-motion: no-preference) {
-  .avatar-status-dot.is-pulsing { animation: avatar-task-pulse 2s ease-in-out infinite; }
+  .avatar-status-dot.is-pulsing.is-busy { animation: avatar-task-pulse 2s ease-in-out infinite; }
+/* 等待用户回答：同一呼吸曲线，周期缩到 1 秒，比运行中的黄色更急。 */
+.avatar-status-dot.is-pulsing.is-waiting { animation: avatar-task-pulse 1s ease-in-out infinite; }
 }
 /* All visual layers sit inside the immutable hit target. Each channel owns a
    separate transform so breathing, task, voice, idle and one-shot motion can

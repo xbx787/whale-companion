@@ -87,4 +87,24 @@ describe('DSH 子代理托盘', () => {
     expect(snapshots[0].timeline![0].text).toBe('执行命令（已完成）')
     expect(snapshots[0].timeline![0].tool).toMatchObject({ status: 'done', output: '完成' })
   })
+
+  it('停止子代理时把子会话 id 交给 DSH', async () => {
+    const calls: Array<[string, string]> = []
+    const client = createClient()
+    const privateClient = client as unknown as {
+      sessionId: string
+      runtime: { interruptSubagent: (sessionId: string, childId: string) => Promise<boolean> }
+      startSubagentTask: (id: string, title: string, input: unknown) => void
+      handleSubagentEvent: (params: Record<string, unknown>, sessionId: string) => void
+    }
+    privateClient.sessionId = 's1'
+    privateClient.runtime.interruptSubagent = async (sessionId, childId) => {
+      calls.push([sessionId, childId])
+      return true
+    }
+    privateClient.startSubagentTask('call-1', 'subagent', { prompt: '整理资料' })
+    privateClient.handleSubagentEvent({ sessionId: 's1', childId: 'child-1', parentCallId: 'call-1', phase: 'start', callId: 't1', toolName: 'pwsh' }, 's1')
+    await client.stopSubagent('call-1')
+    expect(calls).toEqual([['s1', 'child-1']])
+  })
 })

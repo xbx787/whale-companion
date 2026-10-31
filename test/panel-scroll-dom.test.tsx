@@ -51,7 +51,7 @@ describe('conversation switch scrolling', () => {
         if (prop === 'getDraft') return () => Promise.resolve('')
         if (prop === 'getContextUsage') return () => Promise.resolve({ status: 'unavailable' })
         if (prop === 'readAvatar') return () => Promise.resolve(null)
-        if (prop === 'listClaudeWorkflows') return () => Promise.resolve([])
+        if (prop === 'listAppCommands') return () => Promise.resolve([])
         if (prop === 'searchWorkspaceFiles') return () => Promise.resolve([])
         return () => Promise.resolve(true)
       }
@@ -87,6 +87,23 @@ describe('conversation switch scrolling', () => {
     })
     // 切换对话用直接赋值定位，不走平滑滚动，免得 onScroll 把跟随关掉。
     expect(feed.scrollTop).toBe(1200)
+  })
+
+  it('only renders the tail of a long transcript at first', async () => {
+    const long: AppSnapshot = {
+      ...snapshot,
+      timelineRevision: 9,
+      timeline: Array.from({ length: 400 }, (_, index) => ({
+        id: `long-${index}`, kind: 'assistant' as const,
+        time: '2026-10-15T10:00:00.000Z', text: `第 ${index} 条`
+      }))
+    }
+    await act(async () => {
+      root.render(<PanelBubble visible snapshot={long} error={null} run={async (action) => { await action(window.pet); return true }} />)
+    })
+    const rendered = host.querySelectorAll('[data-entry-id]').length
+    expect(rendered).toBeGreaterThan(0)
+    expect(rendered).toBeLessThan(400)
   })
 
   it('keeps pinning when the switched transcript arrives in a later snapshot', async () => {

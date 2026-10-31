@@ -6,7 +6,7 @@ import type {
 import type { DialogueLine } from './deepseek'
 import type { AgentRuntime } from './agent-runtime'
 import { attachmentContext, validAttachmentList } from './local-context'
-import { parseAppSlashCommand } from './claude-workflows'
+import { parseAppSlashCommand } from './app-commands'
 
 export interface SideChatSource {
   parentConversationId: string | null
@@ -322,6 +322,16 @@ export class SideChatController {
     const index = side.pending.findIndex((message) => message.id === messageId)
     if (index < 0) throw new Error('找不到这条待发送消息。')
     side.pending.splice(index, 1)
+    this.changed(side)
+  }
+
+  moveQueued(sessionId: string, messageId: string, beforeId: string | null): void {
+    const side = this.require(sessionId)
+    const from = side.pending.findIndex((message) => message.id === messageId)
+    if (from < 0) throw new Error('找不到这条待发送消息。')
+    const [message] = side.pending.splice(from, 1)
+    const to = beforeId === null ? side.pending.length : side.pending.findIndex((entry) => entry.id === beforeId)
+    side.pending.splice(to < 0 ? side.pending.length : to, 0, message)
     this.changed(side)
   }
 

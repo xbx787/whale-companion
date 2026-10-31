@@ -68,8 +68,10 @@ export interface LibrarySnapshot {
  *  The colon keeps it distinct from @file and @[session] mentions. */
 const LIBRARY_MENTION = /(?<![\p{L}\p{N}_.@])@(mcp|skill|plugin):([^\s@]+)/gu
 
-export function libraryMentionToken(item: Pick<LibraryItem, 'kind' | 'id'>): string {
-  return `@${item.kind}:${item.id}`
+/** 输入框里展示并插入的是技能/插件的名字，不是内部 id；内部 id 太长，
+ *  用户看不出这是哪个技能。旧记录里的 id token 仍按 id 兼容解析。 */
+export function libraryMentionToken(item: Pick<LibraryItem, 'kind' | 'name'>): string {
+  return `@${item.kind}:${item.name}`
 }
 
 function launchValid(value: unknown): value is LibraryLaunch {
@@ -115,4 +117,14 @@ export function parseLibraryMentions(text: string): Array<{ kind: LibraryKind; i
     found.push({ kind, id: match[2] })
   }
   return found
+}
+
+/** 库引用只通过 activeLibraries 注入，正文里要把 token 去掉；否则 DSH 会把
+ *  `@skill:...` 当文件引用，报“找不到引用文件”。 */
+export function stripLibraryMentions(text: string): string {
+  return text
+    .replace(/(?<![\p{L}\p{N}_.@])@(mcp|skill|plugin):([^\s@]+)/gu, '')
+    .replace(/[ \t]{2,}/gu, ' ')
+    .replace(/\n{3,}/gu, '\n\n')
+    .trim()
 }

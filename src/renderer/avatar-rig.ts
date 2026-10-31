@@ -23,7 +23,9 @@ export interface PersonaVisualRig {
   motion: PersonaMotionProfile
 }
 
-const xiaojingBody = new URL('./assets/whale-girl-ahoge-body.png', import.meta.url).href
+const xiaojingBody = new URL('./assets/whale-girl-ahoge-body@2x.png', import.meta.url).href
+// 对话头像仍用原图：它会被缩到几十像素，2 倍舞台图在这里没有优势。
+const xiaojingAvatar = new URL('./assets/whale-girl-ahoge-body.png', import.meta.url).href
 const rinBody = new URL('./assets/personas/whale-persona-rin-body.png', import.meta.url).href
 const remBody = new URL('./assets/personas/whale-persona-rem-body.png', import.meta.url).href
 const yuiBody = new URL('./assets/personas/whale-persona-yui-body.png', import.meta.url).href
@@ -31,14 +33,14 @@ const yukinoBody = new URL('./assets/personas/whale-persona-yukino-body.png', im
 
 const rigs: Record<string, PersonaVisualRig> = {
   xiaojing: {
-    id: 'xiaojing', body: xiaojingBody, ahoge: null, avatar: xiaojingBody,
+    id: 'xiaojing', body: xiaojingBody, ahoge: null, avatar: xiaojingAvatar,
     faces: {
-      focus: new URL('./assets/poses/focus.png', import.meta.url).href,
-      smile: new URL('./assets/poses/smile.png', import.meta.url).href,
-      surprise: new URL('./assets/poses/surprise.png', import.meta.url).href,
-      sleepy: new URL('./assets/poses/sleepy.png', import.meta.url).href,
-      shy: new URL('./assets/poses/shy.png', import.meta.url).href,
-      failed: new URL('./assets/poses/failed.png', import.meta.url).href
+      focus: new URL('./assets/poses/focus@2x.png', import.meta.url).href,
+      smile: new URL('./assets/poses/smile@2x.png', import.meta.url).href,
+      surprise: new URL('./assets/poses/surprise@2x.png', import.meta.url).href,
+      sleepy: new URL('./assets/poses/sleepy@2x.png', import.meta.url).href,
+      shy: new URL('./assets/poses/shy@2x.png', import.meta.url).href,
+      failed: new URL('./assets/poses/failed@2x.png', import.meta.url).href
     },
     motion: { accent: '122 190 246', energy: 1, statusAnchor: { x: .88, y: .09 }, faceAnchor: { x: .50, y: .35 } }
   },

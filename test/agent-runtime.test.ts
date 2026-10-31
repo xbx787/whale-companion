@@ -326,14 +326,14 @@ describe('task cancellation', () => {
       }
     }
     const runtime = new AgentRuntime(new NoteStore(testRoot), undefined, undefined, model, workspace)
-    const original = '总结 @{docs/plan.md}'
+    const original = '@{docs/plan.md} 总结'
     await runtime.sendMessage(original)
     expect(calls).toHaveLength(1)
     expect(calls[0].at(-1)?.content).toContain('PRIVATE FILE CONTENT')
     expect(runtime.exportConversationState().history.at(-2)?.content).toBe(original)
     expect(JSON.stringify(runtime.exportConversationState().history)).not.toContain('PRIVATE FILE CONTENT')
 
-    await runtime.sendMessage('读取 @{../outside.md}')
+    await runtime.sendMessage('@{../outside.md} 读取')
     expect(calls).toHaveLength(1)
     expect(runtime.getSnapshot().taskStatus).toBe('failed')
     expect(runtime.getSnapshot().timeline.at(-1)?.text).toContain('不能越过工作区')
@@ -428,6 +428,10 @@ describe('task cancellation', () => {
       toolUseId: 'read-1', name: 'Read', status: 'done', activity: 'reading', output: '文件已读取'
     })
     expect(runtime.getSnapshot().agentActivity).toBeUndefined()
+    // 每条工具行都带开始时刻和耗时，面板才能把时间固定在 description 右边。
+    expect(typeof tools[0].tool?.startedAt).toBe('string')
+    expect(typeof tools[0].tool?.durationMs).toBe('number')
+    expect(tools[0].tool!.durationMs!).toBeGreaterThanOrEqual(0)
   })
 
   it('lets a late result settle its existing tool row without reviving a finished turn', async () => {
@@ -903,7 +907,7 @@ describe('plan mode and /goal truth', () => {
 
   it('parks a tool permission on the snapshot and forwards the verdict', async () => {
     let report!: (request: { id: string; tool: string; summary: string; input: string } | null) => void
-    const answered: Array<[string, boolean]> = []
+    const answered: Array<[string, string]> = []
     const model: ModelClient = {
       respond: async () => ({ text: 'ok' }),
       setApprovalMode: async () => true,
@@ -913,8 +917,18 @@ describe('plan mode and /goal truth', () => {
     const runtime = new AgentRuntime(new NoteStore(testRoot), undefined, undefined, model)
     report({ id: 'p1', tool: 'Bash', summary: '执行命令：npm test', input: '{"command":"npm test"}' })
     expect(runtime.getSnapshot().permission).toMatchObject({ id: 'p1', tool: 'Bash' })
-    await runtime.answerPermission('p1', true)
-    expect(answered).toEqual([['p1', true]])
+    await runtime.answerPermission('p1', 'once')
+    expect(answered).toEqual([['p1', 'once']])
+  })
+
+  it('hands the saved danger mode back to the kernel on restore', async () => {
+    const record = await new ConversationStore(testRoot).createConversation('危险模式恢复', 'dsh')
+    const setApprovalMode = vi.fn(async () => true)
+    const kernel: ModelClient = { respond: async () => ({ text: 'ok' }), setApprovalMode }
+    const runtime = new AgentRuntime(new NoteStore(testRoot), undefined, undefined, kernel)
+    runtime.restoreConversation({ ...record, approvalMode: 'danger-full-access' })
+    await vi.waitFor(() => expect(setApprovalMode).toHaveBeenCalledWith('danger-full-access'))
+    expect(runtime.getSnapshot().approvalMode).toBe('danger-full-access')
   })
 
   it('restores a saved approval mode, including records written before it existed', async () => {
@@ -1183,5 +1197,28 @@ describe('subagents, interactions and goal truth in the snapshot', () => {
     expect(context).toContain('第一轮完成')
     replies[1]({ text: '第二轮完成' })
     await second
+  })
+
+  it('parks a host plan and clears it when the panel decides', async () => {
+    const runtime = new AgentRuntime(new NoteStore(testRoot), undefined, undefined, { respond: async () => ({ text: '' }) })
+    const pending = runtime.askHostPlan('# 计划\n1. 先读代码\n2. 再改')
+    const parked = runtime.getSnapshot().plan
+    expect(parked?.plan).toContain('先读代码')
+    await runtime.answerPlan(parked!.id, true)
+    await expect(pending).resolves.toBe(true)
+    expect(runtime.getSnapshot().plan).toBeNull()
+  })
+
+  it('parks a host question and resolves it with the panel answer', async () => {
+    const runtime = new AgentRuntime(new NoteStore(testRoot), undefined, undefined, { respond: async () => ({ text: '' }) })
+    const pending = runtime.askHost([{
+      key: 'approve', question: '批准这个计划吗？',
+      options: [{ label: '批准' }, { label: '不批准' }], multiSelect: false
+    }])
+    const parked = runtime.getSnapshot().question
+    expect(parked?.questions[0].question).toBe('批准这个计划吗？')
+    await runtime.answerQuestion(parked!.id, { approve: '批准' })
+    await expect(pending).resolves.toEqual({ approve: '批准' })
+    expect(runtime.getSnapshot().question).toBeNull()
   })
 })

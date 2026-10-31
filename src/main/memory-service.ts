@@ -1,3 +1,4 @@
+import { isObject } from './object-util'
 import { randomUUID } from 'node:crypto'
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
@@ -51,9 +52,6 @@ const MEMORY_PROMPT = [
   '只输出合法 JSON 对象，格式为 {"facts":["事实一","事实二"]}。'
 ].join('\n')
 
-function isObject(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
-}
 
 function normalizeText(value: string): string {
   return value.replace(/[\r\n\t]+/gu, ' ').replace(/\s+/gu, ' ').trim()

@@ -13,18 +13,20 @@ export interface TabContextMenuProps {
   running: boolean;
   current: boolean;
   onRename: () => void;
+  onCloseTab: () => void;
   onArchive: () => void;
   onDelete: () => void;
   onClose: () => void;
 }
 
-function Icon({ kind }: { kind: 'rename' | 'archive' | 'delete' }) {
+function Icon({ kind }: { kind: 'rename' | 'close' | 'archive' | 'delete' }) {
   if (kind === 'rename') return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m4 13 9-9 3 3-9 9-4 1 1-4ZM11.5 5.5l3 3" /></svg>;
+  if (kind === 'close') return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5.5 5.5 9 9m0-9-9 9" /></svg>;
   if (kind === 'archive') return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 5h13v3h-13zM5 8v8h10V8M8 11h4" /></svg>;
   return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 6h11M8 6V4.5h4V6m-6 0 .6 10h6.8L14 6M8.5 9v4.5m3-4.5v4.5" /></svg>;
 }
 
-export function TabContextMenu({ title, x, y, container, busy, running, current, onRename, onArchive, onDelete, onClose }: TabContextMenuProps) {
+export function TabContextMenu({ title, x, y, container, busy, running, current, onRename, onCloseTab, onArchive, onDelete, onClose }: TabContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
@@ -69,6 +71,7 @@ export function TabContextMenu({ title, x, y, container, busy, running, current,
     <div ref={menuRef} className="tab-context-menu" role="menu" aria-label={`会话操作：${title}`} style={position ?? { left: x, top: y, visibility: 'hidden' }}>
       <div className="tab-context-menu-title" title={title}>{title}</div>
       <button type="button" role="menuitem" disabled={busy} title="重命名会话" onClick={() => invoke(onRename)}><Icon kind="rename" />重命名</button>
+      <button type="button" role="menuitem" disabled={busy || current} title={current ? '当前会话的标签不能关闭' : '关闭标签，会话保留在未归档'} onClick={() => invoke(onCloseTab)}><Icon kind="close" />关闭</button>
       <button type="button" role="menuitem" disabled={cannotRemove} title={cannotRemove ? '这个会话还在运行，结束后才能移除' : '归档会话'} onClick={() => invoke(onArchive)}><Icon kind="archive" />归档</button>
       <button type="button" role="menuitem" className="is-danger" disabled={cannotRemove} title={cannotRemove ? '这个会话还在运行，结束后才能移除' : '删除会话'} onClick={() => invoke(onDelete)}><Icon kind="delete" />删除</button>
     </div>,

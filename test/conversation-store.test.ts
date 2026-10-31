@@ -293,7 +293,7 @@ describe('persistent conversation library', () => {
       toolRowDetail: 'brief',
       autoScroll: true, expandFileEditsByDefault: false, sessionSort: 'updated', titleLocale: 'auto',
       titleModel: 'deepseek-flash', loadUserSettings: true,
-      skillMarketSources: ['anthropic', 'superpowers']
+      skillMarketSources: ['anthropic', 'superpowers', 'awesome'], hiddenTabIds: [], windowOpacity: 100
     })
     expect((await migrated.listConversations()).length).toBe(8)
     expect((await migrated.getConversation(created[0].id))?.pendingMessages[0].text).toBe('继续执行')

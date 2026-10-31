@@ -1,4 +1,4 @@
-import { normalizeApprovalMode, normalizeModelMode, type AgentCapabilities, type AgentGoal, type ApprovalMode, type AppSnapshot, type AskAnswers, type ContextUsageSnapshot, type EffortLevel, type ModelMode, type ModelProfile, type ProposedAction, type SubagentTask, type TimelineEntry, type ToolPermissionRequest, type UserAttachment } from '../shared/contracts'
+import { normalizeApprovalMode, normalizeModelMode, type AgentCapabilities, type AgentGoal, type ApprovalMode, type AppSnapshot, type AskAnswers, type AskQuestion, type ContextUsageSnapshot, type EffortLevel, type ModelMode, type ModelProfile, type ProposedAction, type SubagentTask, type TimelineEntry, type ToolPermissionRequest, type UserAttachment } from '../shared/contracts'
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import type { AgentKernel } from './agent-kernel'
@@ -15,6 +15,7 @@ import { NoteStore, type NoteDraft } from './note-store'
 import { attachmentContext, expandFileMentions, validAttachmentList } from './local-context'
 import { memoryDocumentBlock } from './memory-document'
 import type { ConversationBridge, ConversationTarget } from './conversation-tools'
+import { killToolProcess } from './tool-process'
 
 const MODE_SWITCH_TEXT: Record<ModelMode, string> = {
   dsh: '已切换到小鲸引擎 + DeepSeek。',
@@ -95,6 +96,10 @@ export class AgentRuntime {
   /** 停止（含静默退出）后 DSH 仍可能把最后一笔用量落盘；窗口内允许补到那一轮。 */
   private lateUsageUntil = 0
   private lateUsageUserId?: string
+  /** 宿主侧提问（ask_user 工具）正在等待的用户回答。 */
+  private hostAsk?: { id: string; resolve: (answers: AskAnswers | null) => void }
+  /** 宿主侧计划（submit_plan 工具）正在等待的批准。 */
+  private hostPlan?: { id: string; resolve: (approved: boolean) => void }
   private generation = 0
   private contextGeneration = 0
   private sdkSessionId: string | null = null
@@ -188,6 +193,7 @@ export class AgentRuntime {
     // Task-tool subagents; the SDK client throttles progress to 2 s.
     dshKernel?.setSubagentTasksListener?.((tasks) => {
       this.state.subagents = tasks;
+      this.syncSubagentEntries(tasks);
       this.emit();
     });
     this.state = {
@@ -204,7 +210,8 @@ export class AgentRuntime {
       subagents: [],
       subagentControls: Boolean(dshKernel && (
         typeof (dshKernel as { backgroundTask?: unknown }).backgroundTask === 'function' ||
-        typeof (dshKernel as { stopTask?: unknown }).stopTask === 'function'
+        typeof (dshKernel as { stopTask?: unknown }).stopTask === 'function' ||
+        typeof (dshKernel as { stopSubagent?: unknown }).stopSubagent === 'function'
       )),
       timelineRevision: 0
     }
@@ -213,7 +220,13 @@ export class AgentRuntime {
     if (dshKernel && evolveHooks) {
       dshKernel.setEvolveBridge?.({
         ...evolveHooks,
-        enabled: () => this.state.approvalMode === 'selfEvolve'
+        enabled: () => this.state.approvalMode === 'selfEvolve',
+        // status 只查“有没有跨重启任务”，不查模式开关；把模式一起带出去，
+        // 免得「模式开着但没有任务」被读成 false。
+        status: async () => {
+          const base = await evolveHooks.status()
+          return { ...(base as Record<string, unknown>), mode: this.state.approvalMode }
+        }
       })
     }
   }
@@ -290,11 +303,41 @@ export class AgentRuntime {
     this.emit()
   }
 
+  /** 只结束当前正在跑的命令进程，不取消整个回合。找不到对应进程时返回
+   *  false，调用方退回整轮取消。 */
+  async stopRunningCommand(): Promise<boolean> {
+    const running = [...this.state.timeline].reverse().find((entry) =>
+      entry.kind === 'tool' && entry.tool?.status === 'running')
+    // tool.input 是 JSON 字符串，不是已经解析好的对象。
+    let command = ''
+    if (typeof running?.tool?.input === 'string') {
+      try {
+        const parsed: unknown = JSON.parse(running.tool.input)
+        const value = parsed && typeof parsed === 'object' ? (parsed as { command?: unknown }).command : undefined
+        if (typeof value === 'string') command = value
+      } catch { /* 不是命令工具或输入不是 JSON。 */ }
+    }
+    const pid = (this.dshKernel as { runtimePid?: () => number | undefined } | undefined)?.runtimePid?.()
+    if (!command || !pid) return false
+    return killToolProcess(pid, command)
+  }
+
   /** Forwards the panel's allow/deny to the model that parked the call. */
-  async answerPermission(id: string, allow: boolean): Promise<void> {
-    const model = this.model as (ModelClient & { answerPermission?: (id: string, allow: boolean) => boolean }) | undefined
+  async answerPermission(id: string, decision: 'once' | 'always' | 'deny'): Promise<void> {
+    const model = this.model as (ModelClient & { answerPermission?: (id: string, decision: 'once' | 'always' | 'deny') => boolean }) | undefined
     if (!model?.answerPermission) throw new Error('当前没有等待批准的操作。')
-    if (!model.answerPermission(id, allow)) throw new Error('这次操作已经失效。')
+    if (!model.answerPermission(id, decision)) throw new Error('这次操作已经失效。')
+  }
+
+  /** 当前「始终允许」的工具类别，面板展示与撤销用。 */
+  listAlwaysAllowed(): string[] {
+    const model = this.model as (ModelClient & { listAlwaysAllowed?: () => string[] }) | undefined
+    return model?.listAlwaysAllowed?.() ?? []
+  }
+
+  clearAlwaysAllowed(kind?: string): void {
+    const model = this.model as (ModelClient & { clearAlwaysAllowed?: (kind?: string) => void }) | undefined
+    model?.clearAlwaysAllowed?.(kind)
   }
 
   /** The controller owns the only path that clears a goal: interrupt the loop
@@ -502,8 +545,12 @@ export class AgentRuntime {
     this.onChange()
   }
 
-  getSnapshot(): AppSnapshot {
-    // `timeline` rides along by reference — it is the one big field, the
+  /** 当前时间线总条数。分页窗口之外的旧条目要按它算偏移，不能读被截断的数组。 */
+  timelineLength(): number {
+    return this.state.timeline.length
+  }
+
+  getSnapshot(): AppSnapshot {    // `timeline` rides along by reference — it is the one big field, the
     // publisher keeps its payload down to the changed entries
     // (takeTimelineDelta), and every consumer treats it as read-only. The
     // rest keeps the old deep-copy semantics (snapshot in time), which is
@@ -702,13 +749,19 @@ export class AgentRuntime {
     this.contextGeneration += 1
     if (this.state.mode === 'dsh') this.disposeAgentQuery()
     this.generation += 1
-    this.history.splice(0, this.history.length, ...structuredClone(record.history))
+    // record 是刚从磁盘读出的新对象，没有别处持有，直接接管即可。
+    // 以前这里再 structuredClone 一遍，长会话会有一次整段翻倍的内存峰值。
+    this.history.splice(0, this.history.length, ...record.history)
     // A restore replaces the whole history; the next publish sends it in full.
-    this.state.timeline = structuredClone(record.timeline)
+    this.state.timeline = record.timeline
     this.state.timelineRevision += 1
     this.timelineDirty.clear()
     this.timelineSentRevision = -1
     this.state.taskStatus = record.taskStatus
+    // 审批模式跟着会话走：切会话、归档再恢复、重启都不能把它打回默认。
+    this.state.approvalMode = normalizeApprovalMode(record.approvalMode)
+    this.state.planMode = this.state.approvalMode === 'read-only'
+    if (this.state.approvalMode !== 'read-only') this.lastNonPlanApproval = this.state.approvalMode
     this.state.avatarState = 'idle'
     this.state.currentTask = undefined
     this.state.proposal = undefined
@@ -755,7 +808,10 @@ export class AgentRuntime {
     this.state.approvalMode = savedMode
     this.state.planMode = savedMode === 'read-only'
     if (savedMode !== 'read-only') this.lastNonPlanApproval = savedMode
-    if (mode === 'dsh' && savedMode !== 'danger-full-access') {
+    // 所有模式都要交还给内核。以前 danger-full-access 被排除在外，记录里
+    // 恢复了、按钮也显示对了，但内核仍是 workspace-write，重启后实际权限
+    // 就丢了。审批模式是用户明确保留的偏好，不属于自动升权。
+    if (mode === 'dsh') {
       void Promise.resolve(this.dshKernel?.setApprovalMode?.(savedMode)).catch(() => undefined)
     }
 
@@ -1038,14 +1094,22 @@ export class AgentRuntime {
     }
   }
 
+  /** 暂停/恢复目标：只决定对话停下后要不要自动发继续消息。 */
+  setGoalPaused(paused: boolean): void {
+    const goal = this.state.goal
+    if (!goal || Boolean(goal.paused) === paused) return
+    this.state.goal = { ...goal, paused }
+    this.emit()
+  }
+
   /** Sends the next local goal round after the current turn has fully settled.
    *  A zero-delay timer keeps the recursive send off this call stack. */
   private scheduleGoalContinuation(): void {
     const goal = this.state.goal
-    if (!goal || goal.phase === 'stopping' || this.queuePauseReason) return
+    if (!goal || goal.phase === 'stopping' || goal.paused || this.queuePauseReason) return
     setTimeout(() => {
       const current = this.state.goal
-      if (!current || current.phase === 'stopping' || this.queuePauseReason) return
+      if (!current || current.phase === 'stopping' || current.paused || this.queuePauseReason) return
       if (this.isBusy()) return
       void this.sendMessage(this.goalPrompt(current.condition, true), [], '', undefined, true)
         .catch((error: unknown) => {
@@ -1091,15 +1155,56 @@ export class AgentRuntime {
     this.add('system', '已拒绝，本次没有写入文件。')
   }
 
+  /** 宿主侧提问：把问题挂到快照上，面板用同一张提问卡渲染；等用户回答或跳过。 */
+  async askHost(questions: AskQuestion[]): Promise<AskAnswers | null> {
+    if (!questions.length) return null
+    const id = crypto.randomUUID()
+    this.state.question = { id, questions }
+    this.syncApprovalWait()
+    this.emit()
+    return await new Promise<AskAnswers | null>((resolve) => { this.hostAsk = { id, resolve } })
+  }
+
   /** Forwards the panel's answer (or skip) to the model that parked the question. */
   async answerQuestion(id: string, answers: AskAnswers | null): Promise<void> {
+    if (this.hostAsk && this.hostAsk.id === id) {
+      const pending = this.hostAsk
+      this.hostAsk = undefined
+      this.state.question = null
+      this.syncApprovalWait()
+      this.emit()
+      pending.resolve(answers)
+      return
+    }
     const model = this.model as (ModelClient & { answerQuestion?: (id: string, answers: AskAnswers | null) => boolean | Promise<boolean> }) | undefined
     if (!model?.answerQuestion) throw new Error('当前没有等待回答的问题。')
     if (!await model.answerQuestion(id, answers)) throw new Error('这个问题已经失效。')
   }
 
+  /** 宿主侧计划：把计划挂到快照上，面板用计划批准卡渲染；等批准或退回。 */
+  async askHostPlan(plan: string): Promise<boolean> {
+    const id = crypto.randomUUID()
+    this.state.plan = { id, plan }
+    this.emit()
+    return await new Promise<boolean>((resolve) => { this.hostPlan = { id, resolve } })
+  }
+
   /** Forwards the panel's verdict on a parked plan to the model that asked. */
   async answerPlan(id: string, approved: boolean): Promise<void> {
+    if (this.hostPlan && this.hostPlan.id === id) {
+      const pending = this.hostPlan
+      const planText = this.state.plan?.plan
+      this.hostPlan = undefined
+      this.state.plan = null
+      this.state.approvedPlan = approved ? planText?.slice(0, 4_000) : undefined
+      if (approved) {
+        // 批准后就离开计划模式，下一步直接执行。
+        await this.setPlanMode(false).catch(() => undefined)
+      }
+      this.emit()
+      pending.resolve(approved)
+      return
+    }
     const model = this.model as (ModelClient & { answerPlan?: (id: string, approved: boolean) => boolean }) | undefined
     if (!model?.answerPlan) throw new Error('当前没有等待批准的计划。')
     const parked = this.state.plan
@@ -1443,14 +1548,20 @@ export class AgentRuntime {
     const text = `${toolLabel(toolName)}${status === 'running' ? '（执行中）' : status === 'error' ? '（失败）' : '（已完成）'}`
     if (existing) {
       existing.text = text
+      const startedAt = existing.tool?.startedAt
+      const startedMs = startedAt ? Date.parse(startedAt) : NaN
+      const durationMs = status !== 'running' && Number.isFinite(startedMs)
+        ? Math.max(0, Date.now() - startedMs) : undefined
       existing.tool = { ...existing.tool!, status, input: event.input ?? existing.tool?.input, output: event.output ?? existing.tool?.output,
         activity,
+        ...(durationMs !== undefined ? { durationMs } : {}),
         ...(event.images?.length ? { images: event.images } : {}) }
       this.markTimelineDirty(existing)
     } else {
       const entry: TimelineEntry = {
         id: crypto.randomUUID(), time: new Date().toISOString(), kind: 'tool', text,
         tool: { toolUseId: event.toolUseId, name: toolName, status, input: event.input, output: event.output, activity,
+          startedAt: new Date().toISOString(),
           ...(event.images?.length ? { images: event.images } : {}) }
       }
       this.state.timeline.push(entry)
@@ -1585,6 +1696,32 @@ export class AgentRuntime {
 
   /** Records that an entry changed since the last publisher take; the id-keyed
    *  map keeps one (latest) copy per entry. */
+  /** 子代理既是状态行卡片，也是对话内的一条稿：任务变化时同步到时间线，
+   *  结束的条目保留，切换会话后仍能看到它是谁、做了什么。 */
+  private syncSubagentEntries(tasks: SubagentTask[]): void {
+    for (const task of tasks) {
+      const id = `subagent:${task.taskId}`
+      const index = this.state.timeline.findIndex((entry) => entry.id === id)
+      if (index >= 0) {
+        const next: TimelineEntry = { ...this.state.timeline[index], text: task.description, subagent: task, endedAt: task.endedAt }
+        this.state.timeline[index] = next
+        this.markTimelineDirty(next)
+      } else {
+        const entry: TimelineEntry = {
+          id,
+          time: task.startedAt ?? new Date().toISOString(),
+          kind: 'subagent',
+          text: task.description,
+          subagent: task,
+          endedAt: task.endedAt
+        }
+        this.state.timeline.push(entry)
+        this.markTimelineDirty(entry)
+      }
+    }
+    this.state.timelineRevision += 1
+  }
+
   private markTimelineDirty(entry: TimelineEntry): void {
     this.state.timelineRevision += 1
     this.timelineDirty.set(entry.id, entry)

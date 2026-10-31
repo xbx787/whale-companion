@@ -55,7 +55,7 @@ describe('a sent picture opens the image viewer', () => {
         if (prop === 'getContextUsage') return () => Promise.resolve({ status: 'unavailable' })
         if (prop === 'readAvatar') return () => Promise.resolve(null)
         if (prop === 'readImagePreview') return () => Promise.resolve('data:image/png;base64,AAAA')
-        if (prop === 'listClaudeWorkflows') return () => Promise.resolve([])
+        if (prop === 'listAppCommands') return () => Promise.resolve([])
         if (prop === 'searchWorkspaceFiles') return () => Promise.resolve([])
         return () => Promise.resolve(undefined)
       }

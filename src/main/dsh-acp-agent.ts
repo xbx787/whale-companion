@@ -19,7 +19,8 @@ import type {
   SubagentTask,
   TaskUsage,
   TimelineEntry,
-  ToolPermissionRequest
+  ToolPermissionRequest,
+  PlanApprovalRequest
 } from '../shared/contracts'
 import type { ConversationBridge } from './conversation-tools'
 import type { EvolveBridge } from './evolve-tools'
@@ -27,7 +28,7 @@ import { resolveDeepSeekToolsKey } from './deepseek-tools'
 import { buildPersona } from './persona'
 import { toolLabel } from '../shared/tool-labels'
 import { syncDshSkills } from './dsh-skills'
-import { syncDshAcpModelPatch, syncDshCompactPatch, syncDshGoalToolPatch, syncDshWebPatch } from './dsh-web-policy'
+import { syncDshAcpModelPatch, syncDshCompactPatch, syncDshGoalToolPatch, syncDshPwshPatch, syncDshWebPatch } from './dsh-web-policy'
 import { normalizeDshModel } from './dsh-model'
 import { buildDshHostRules } from './dsh-prompt'
 import { findDshSessionLog, readDshSessionUsage, subtractUsage, type DshSessionUsage } from './dsh-session-log'
@@ -60,6 +61,8 @@ interface PendingPermission {
   resolve: (optionId: string | null) => void
   allowOptionId: string
   rejectOptionId: string
+  /** 批准“始终允许”时记下的工具类别。 */
+  kind: string
 }
 
 function objectValue(value: unknown): Record<string, unknown> {
@@ -177,7 +180,10 @@ export class DshAcpAgentClient implements ModelClient {
   private planMode = false
   private busy = false
   private permissionListener: ((request: ToolPermissionRequest | null) => void) | undefined
+  private planListener: ((request: PlanApprovalRequest | null) => void) | undefined
+  private readonly pendingPlans = new Map<string, { resolve: (optionId: string | null) => void; allowOptionId: string; rejectOptionId: string }>()
   private readonly pendingPermissions = new Map<string, PendingPermission>()
+  private readonly alwaysAllowedKinds = new Set<string>()
   /** 插话回显：DSH 把 steer 的用户消息写进会话后，用它确认投递。 */
   private steerEchoListener?: (messageId: string) => void
   private lastContextUsage: ContextUsageSnapshot = { status: 'unavailable' }
@@ -199,6 +205,8 @@ export class DshAcpAgentClient implements ModelClient {
   private subagentListener?: (tasks: SubagentTask[]) => void
   /** DSH 的子代理是一层工具调用，这里按工具 id 记成托盘里的任务。 */
   private readonly subagentTasks = new Map<string, SubagentTask>()
+  /** 子代理工具调用 id → DSH 子会话 id，停止/发消息时要用。 */
+  private readonly subagentChildren = new Map<string, string>()
   /** 当前在等回答的提问工具调用；回答时用它把标签映射回 id。 */
   private questionListener?: (question: AskQuestionRequest | null) => void
   private pendingAsk: { callId: string; request: AskQuestionRequest } | null = null
@@ -286,6 +294,7 @@ export class DshAcpAgentClient implements ModelClient {
     // 启动前把模型钉到目录里的 id，否则会回 image:false。
     try {
       syncDshAcpModelPatch(this.options.dshHome, this.provider, this.model, this.providerBaseUrl)
+      syncDshPwshPatch(this.options.dshHome)
     } catch (error) {
       throw new Error(`无法写入 DSH 模型配置：${error instanceof Error ? error.message : String(error)}`)
     }
@@ -603,6 +612,8 @@ export class DshAcpAgentClient implements ModelClient {
   }
 
   private decidePermission(kind: string): 'allow' | 'reject' | 'ask' {
+    // “始终允许”过的工具类别不再打扰用户；随时可在审批面板里清空。
+    if (this.alwaysAllowedKinds.has(kind)) return 'allow'
     if (this.approvalMode === 'danger-full-access' || this.approvalMode === 'selfEvolve') return 'allow'
     // 计划模式只读：写操作直接拒绝，不打扰用户。
     if (this.planMode) return READ_ONLY_KINDS.has(kind) ? 'allow' : 'reject'
@@ -636,7 +647,22 @@ export class DshAcpAgentClient implements ModelClient {
     const rejectOptionId = textValue(reject?.optionId) || 'reject-once'
     const toolName = textValue(toolCall.title) || cached?.title || '工具'
     const kind = effectiveToolKind(textValue(toolCall.kind), toolName)
-    const decision = this.decidePermission(kind)
+    // 计划模式下，提交计划/退出计划是唯一的放行口；其他写操作仍然拒绝。
+    const planTool = this.planMode && /submit[_\s-]?plan|exit[_\s-]?plan/iu.test(toolName)
+    // 计划模式下，提交计划先给面板看正文：批准才放行，退回则拒绝。
+    if (planTool && this.planListener) {
+      const planId = toolCallId || randomUUID()
+      const rawPlan = objectValue(toolCall.rawInput)
+      const planText = textValue(rawPlan.plan) || textValue(rawPlan.planText) || textValue(toolCall.content)
+      const optionId = await new Promise<string | null>((resolve) => {
+        this.pendingPlans.set(planId, { resolve, allowOptionId, rejectOptionId })
+        this.planListener?.({ id: planId, plan: planText || cached?.input || '' })
+      })
+      this.planListener?.(null)
+      if (!optionId) return { outcome: { outcome: 'cancelled' } }
+      return { outcome: { outcome: 'selected', optionId } }
+    }
+    const decision = planTool ? 'allow' : this.decidePermission(kind)
     if (decision === 'allow') return { outcome: { outcome: 'selected', optionId: allowOptionId } }
     if (decision === 'reject') return { outcome: { outcome: 'selected', optionId: rejectOptionId } }
 
@@ -653,12 +679,17 @@ export class DshAcpAgentClient implements ModelClient {
       input: input.length > MAX_PERMISSION_INPUT ? `${input.slice(0, MAX_PERMISSION_INPUT)}\n…（已截断）` : input
     }
     const optionId = await new Promise<string | null>((resolve) => {
-      this.pendingPermissions.set(id, { resolve, allowOptionId, rejectOptionId })
+      this.pendingPermissions.set(id, { resolve, allowOptionId, rejectOptionId, kind })
       listener(requestForUser)
     })
     listener(null)
     if (!optionId) return { outcome: { outcome: 'cancelled' } }
     return { outcome: { outcome: 'selected', optionId } }
+  }
+
+  /** 当前内核进程的 PID；面板用它按进程树结束单条命令。 */
+  runtimePid(): number | undefined {
+    return this.runtime.pid()
   }
 
   setApprovalMode(mode: ApprovalMode): boolean {
@@ -678,6 +709,28 @@ export class DshAcpAgentClient implements ModelClient {
     if (this.sessionId) {
       void this.runtime.setPlan(this.sessionId, on).catch(() => undefined)
     }
+    return true
+  }
+
+  setPlanListener(listener: (request: PlanApprovalRequest | null) => void): void {
+    this.planListener = listener
+  }
+
+  /** 当前允许过「始终允许」的工具类别，面板据此展示并撤销。 */
+  listAlwaysAllowed(): string[] {
+    return [...this.alwaysAllowedKinds]
+  }
+
+  clearAlwaysAllowed(kind?: string): void {
+    if (kind) this.alwaysAllowedKinds.delete(kind)
+    else this.alwaysAllowedKinds.clear()
+  }
+
+  answerPlan(id: string, approved: boolean): boolean {
+    const pending = this.pendingPlans.get(id)
+    if (!pending) return false
+    this.pendingPlans.delete(id)
+    pending.resolve(approved ? pending.allowOptionId : pending.rejectOptionId)
     return true
   }
 
@@ -838,6 +891,12 @@ export class DshAcpAgentClient implements ModelClient {
     const started = task.startedAt ? Date.parse(task.startedAt) : NaN
     if (Number.isFinite(started)) task.durationMs = Math.max(0, Date.now() - started)
     if (output) task.summary = output.replace(/\s+/gu, ' ').trim().slice(0, 200)
+    // 收尾时把还挂着「执行中」的步骤一并结掉，避免完成后仍显示转圈。
+    if (task.timeline?.length) {
+      task.timeline = task.timeline.map((entry) => entry.tool?.status === 'running'
+        ? { ...entry, tool: { ...entry.tool, status: 'done' as const } }
+        : entry)
+    }
     this.publishSubagentTasks()
   }
 
@@ -850,6 +909,8 @@ export class DshAcpAgentClient implements ModelClient {
     if (textValue(params.sessionId) !== sessionId) return
     const parentCallId = textValue(params.parentCallId)
     if (!parentCallId) return
+    const childId = textValue(params.childId)
+    if (childId) this.subagentChildren.set(parentCallId, childId)
     const task = this.subagentTasks.get(parentCallId)
     if (!task) return
     const phase = textValue(params.phase)
@@ -894,11 +955,29 @@ export class DshAcpAgentClient implements ModelClient {
     if (changed) this.publishSubagentTasks()
   }
 
-  answerPermission(id: string, allow: boolean): boolean {
+  /** 停止一个子代理：走补丁的 session/subagent_interrupt。 */
+  async stopSubagent(taskId: string): Promise<void> {
+    const task = this.subagentTasks.get(taskId)
+    const childId = task?.toolUseId ? this.subagentChildren.get(task.toolUseId) : undefined
+    if (!childId || !this.sessionId) throw new Error('这个子代理还没有可用的会话。')
+    if (!await this.runtime.interruptSubagent(this.sessionId, childId)) {
+      throw new Error('DSH 没有接受停止请求。')
+    }
+  }
+
+  /** 给一个可续聊的子代理发消息。 */
+  async messageSubagent(toolUseId: string, text: string): Promise<boolean> {
+    const childId = this.subagentChildren.get(toolUseId)
+    if (!childId || !this.sessionId) return false
+    return await this.runtime.promptSubagent(this.sessionId, childId, text, 'queue')
+  }
+
+  answerPermission(id: string, decision: 'once' | 'always' | 'deny'): boolean {
     const pending = this.pendingPermissions.get(id)
     if (!pending) return false
     this.pendingPermissions.delete(id)
-    pending.resolve(allow ? pending.allowOptionId : pending.rejectOptionId)
+    if (decision === 'always') this.alwaysAllowedKinds.add(pending.kind)
+    pending.resolve(decision === 'deny' ? pending.rejectOptionId : pending.allowOptionId)
     return true
   }
 
@@ -1114,6 +1193,8 @@ export class DshAcpAgentClient implements ModelClient {
     this.settleQuestions('本轮已停止，问题已取消。')
     for (const pending of this.pendingPermissions.values()) pending.resolve(null)
     this.pendingPermissions.clear()
+    for (const pending of this.pendingPlans.values()) pending.resolve(null)
+    this.pendingPlans.clear()
     this.permissionListener?.(null)
     if (this.sessionId) await this.runtime.cancel(this.sessionId)
   }

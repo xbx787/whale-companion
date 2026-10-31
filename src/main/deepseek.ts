@@ -82,7 +82,7 @@ export interface ModelClient {
   setApprovalModeListener?(listener: (mode: ApprovalMode) => void): void
   /** Clients that park tool calls for approval implement this. */
   setPermissionListener?(listener: (request: ToolPermissionRequest | null) => void): void
-  answerPermission?(id: string, allow: boolean): boolean
+  answerPermission?(id: string, decision: 'once' | 'always' | 'deny'): boolean
   /** Compaction start/end; `auto` marks the CLI's own threshold trigger. */
   setCompactingListener?(listener: (state: CompactionState) => void): void
   /** Clients that can abort what the current turn is doing implement this

@@ -1,8 +1,8 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type AnimationEvent, type MouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
-import { normalizeApprovalMode, type AppSnapshot, ApprovalMode, BubbleLayout, ClaudeWorkflowOption, ContextUsageSnapshot, ConversationSummary, EffortLevel, ModelMode, ModelProfile, PanelDirection, PanelPlacement, PendingMessage, PetAPI, ProposedAction, SideChatSnapshot, TaskMetrics, TaskStatus, TimelineEntry, type ToolRowDetail, UserAttachment, VoiceConfig } from '../shared/contracts';
+import { normalizeApprovalMode, type AppSnapshot, type AskAnswers, type AskQuestionRequest, ApprovalMode, BubbleLayout, AppCommandOption, ContextUsageSnapshot, ConversationSummary, EffortLevel, ModelMode, ModelProfile, PanelDirection, PanelPlacement, PendingMessage, PetAPI, ProposedAction, SideChatSnapshot, TaskMetrics, TaskStatus, TimelineEntry, type ToolRowDetail, UserAttachment, VoiceConfig } from '../shared/contracts';
 import { AUTO_COMPACT_DEFAULT_PERCENT, AUTO_COMPACT_MAX_PERCENT, AUTO_COMPACT_MIN_PERCENT, PANEL_MIN_HEIGHT, PANEL_MIN_WIDTH } from '../shared/contracts';
+import { formatCommandDuration, formatDuration, formatToolDuration } from './duration'
 import { isImageAttachmentName } from '../shared/image-preview';
-import { EFFORT_LABELS } from '../shared/effort';
 import { EffortSlider } from './effort-slider';
 import { EventImages } from './event-images';
 import { formatSelectionQuote } from './message-quote';
@@ -11,10 +11,53 @@ import { AttachmentPreview, previewPlacement, type PreviewPlacement } from './at
 import { agentTasks } from './agent-tasks';
 import { fileBadge, splitAttachmentNote } from './attachment-note';
 import { ComposerSuggestions, detectComposerTrigger, fileMention, librarySuggestionItems, sessionSuggestionItems, workflowSuggestionItems, type ComposerSuggestion } from './composer-suggestions';
-import type { LibraryItem } from '../shared/libraries';
+import { LIBRARY_LABELS, type LibraryItem } from '../shared/libraries';
 import { pastedFileName, pastedFiles, restoreComposerState, stashComposerState, type StashedComposer } from './composer-drafts';
 import { GoalBanner } from './goal-banner';
 import { MessageMarkdown, writeClipboard } from './message-markdown';
+import { abbreviateWorkspace, MessageBody, modeLabels, noopOpenImage, RunParagraph, stampText, stripAnsi, timeText, toolImagePath, turnMenuTitle } from './panel-message';
+import { ApprovalCard, avatarCache, AvatarGlyph, ToolElapsed } from './panel-atoms';
+import { clampEditorHeight, EDITOR_MAX_HEIGHT, EDITOR_ONE_LINE, editorHeightBounds, fileToBase64, fitEditorHeight, prepareFileAttachment } from './panel-editor';
+import { useExitAnimation } from './panel-exit-animation';
+import { APPROVAL_MODE_LABELS, APPROVAL_MODES, EARLIER_MIN_ENTRIES, EARLIER_STEP_GROUPS, EMPTY_TAB_ORDER, EMPTY_TIMELINE, HISTORY_STEP_ENTRIES, INITIAL_HISTORY_ENTRIES, UNARCHIVED_LIMIT } from './panel-constants';
+import { RightRail } from './panel-right-rail';
+import { LibraryMarket } from './panel-library-market';
+import { LibraryHeader } from './panel-library-header';
+import { SessionRow } from './panel-session-row';
+import { LibraryBatchBar } from './panel-library-batch';
+import { useFeedScroll } from './use-feed-scroll';
+import { ModelPicker } from './panel-model-picker';
+import { ApprovalMenu } from './panel-approval-menu';
+import { ContextMenu } from './panel-context-menu';
+import { BypassConfirmDialog, EvolveConfirmDialog } from './panel-permission-dialogs';
+import { AttachmentPreviewStrip } from './panel-attachment-preview-strip';
+import { AttachmentChips } from './panel-attachment-chips';
+import { ComposerSendRow } from './panel-composer-send';
+import { PanelStatusBar } from './panel-status-bar';
+import { TurnBlock } from './panel-turn';
+import { useComposerKeys } from './use-composer-keys';
+import { useComposeDockHeight } from './use-compose-dock-height';
+import { forgetParentSide, forgetSideSession, rememberVisibleSide as rememberVisibleSideUtil, sideSessionExists as sideSessionExistsUtil } from './panel-side-session';
+import { useDraftPersist } from './use-draft-persist';
+import { usePanelWindowChrome } from './use-panel-chrome';
+import { useEditorHeight } from './use-editor-height';
+import { useFeedAnchors } from './use-feed-anchors';
+import { useDismissable } from './use-dismissable';
+import { useEscapeToStop } from './use-escape-to-stop';
+import { useTabFlip } from './use-tab-flip';
+import { endPanelResize as endPanelResizeImpl } from './end-panel-resize';
+import { beginPanelResize as beginPanelResizeImpl, beginWindowDrag as beginWindowDragImpl } from './panel-drag';
+import { movePanelResize as movePanelResizeImpl } from './panel-drag';
+import { useResizeFinish } from './use-resize-finish';
+import { nudgeAutoCompact as nudgeAutoCompactImpl, openAttachmentImage as openAttachmentImageImpl, showAttachmentPreview as showAttachmentPreviewImpl } from './panel-attachments-actions';
+import { decideAction, stopAction } from './panel-runtime-actions';
+import { applyApprovalMode as applyApprovalModeImpl, chooseApprovalMode as chooseApprovalModeImpl, type ApprovalModeActionsDeps } from './panel-approval-actions';
+import { chooseEffort as chooseEffortImpl, choosePlanMode as choosePlanModeImpl, discardSide as discardSideImpl, setSideExpanded as setSideExpandedImpl } from './panel-mode-actions';
+import { loadOlderPage as loadOlderPageImpl } from './load-older-page';
+import { EntryItem, TimelineItem, type RowDisplay } from './panel-timeline-item';
+export { EntryItem, TimelineItem } from './panel-timeline-item';
+export type { RowDisplay } from './panel-timeline-item';
+export { clampEditorHeight, EDITOR_MAX_HEIGHT, EDITOR_ONE_LINE, editorHeightBounds } from './panel-editor';
 import { TabContextMenu } from './tab-context-menu';
 import { TurnContextMenu } from './turn-context-menu';
 import { drawerBottomOffset } from './panel-drawer';
@@ -25,7 +68,7 @@ import { AskQuestionPanel } from './ask-question';
 import { PlanApprovalPanel } from './plan-approval';
 import { ToolApprovalPanel } from './tool-approval';
 import { ThinkingItem } from './thinking-item';
-import { groupTimeline, liftAsides, sameTimelineEntry, segmentTurn, splitTurnTail, tailWindow, type TurnSegment } from './timeline-groups';
+import { groupTimeline, sameTimelineEntry, segmentTurn, splitTurnTail, tailWindow, type TurnSegment } from './timeline-groups';
 import { navMarks, NAV_WINDOW_COMPACT, NAV_WINDOW_WIDE, TimelineNav } from './timeline-nav';
 import { ToolDiffBody } from './tool-diff-body';
 import { ToolImageOutput } from './tool-images';
@@ -38,6 +81,16 @@ import { WorkingIndicator } from './working-indicator';
 import { SubagentTray } from './subagent-tray';
 import { TurnProcess, WorkCluster } from './work-cluster';
 import { petBridge } from './pet-state';
+import {
+  ApprovalIcon, GoalIcon, PlanIcon, WebSearchIcon, PlusIcon, GripIcon, CloseIcon, ReturnIcon,
+  ModelIcon, ConversationsIcon, SelectIcon, BackIcon, EditIcon, ArchiveIcon, DeleteIcon,
+  ExportIcon, ImportIcon, PinIcon, ContextMeter
+} from './panel-icons';
+import {
+  APPROVAL_MODE_HINTS, MAIN_ONLY_SIDE_COMMANDS, taskLabels, sideOnlySlashError, senderBadge, localizeAskRequest, conversationStatus, statusRunning,
+  restoreAskAnswers, kindLabels, mergeComposerDraft, mergeComposerAttachments,
+  type DroppedAttachment
+} from './panel-utils';
 import { personaAvatarUrl } from './avatar-art';
 import { VoiceManager, type VoiceManagerPhase } from './voice-manager';
 import { VoiceButton, VoiceWaveform } from './voice-button';
@@ -48,583 +101,9 @@ import './panel-theme-tune.css';
 
 // 审批菜单按 DSH 的沙箱预设排列，严格到宽松：只读、工作区写入、完全访问，
 // 最后一档是应用自己的自我进化（完全访问 + 修改自身和重启）。
-const APPROVAL_MODES: ApprovalMode[] = ['read-only', 'workspace-write', 'danger-full-access', 'selfEvolve']
-const APPROVAL_MODE_LABELS: Record<ApprovalMode, string> = {
-  'read-only': '手动审批',
-  'workspace-write': '工作区写入',
-  'danger-full-access': '完全访问',
-  selfEvolve: '自我进化'
-}
-const APPROVAL_MODE_HINTS: Record<ApprovalMode, string> = {
-  'read-only': '每次修改文件或执行命令前都先问你',
-  'workspace-write': '允许在工作区内改文件，越界操作由沙箱拦住',
-  'danger-full-access': '所有工具直接执行，不再询问',
-  selfEvolve: '最高权限：可改代码、打包、重启并跨重启续跑'
-}
-
-/** One icon per permission mode: a hand (manual approval), a pencil (workspace
- *  writes), a warning shield (everything runs), a hexagon (self restart). */
-function ApprovalIcon({ mode }: { mode: ApprovalMode }) {
-  if (mode === 'read-only') {
-    // 手动审批：一只举起的手。
-    return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6.4 10.6V6.4a1.2 1.2 0 0 1 2.4 0v3.3" /><path d="M8.8 9.7V5.2a1.2 1.2 0 0 1 2.4 0v4.5" /><path d="M11.2 9.4V6.4a1.2 1.2 0 0 1 2.4 0v5.5c0 2.7-1.9 4.5-4.5 4.5H8.2c-1.4 0-2.5-.7-3.2-1.9l-1.2-2.1a1.1 1.1 0 0 1 1.8-1.2l1.4 1.4" /></svg>
-  }
-  if (mode === 'workspace-write') {
-    return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.2 15.8l.9-3.8 7.6-7.6a1.5 1.5 0 0 1 2.1 2.1l-7.6 7.6-3 .9Z" /><path d="m11.7 5.4 2.1 2.1" /></svg>
-  }
-  if (mode === 'danger-full-access') {
-    return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.8 16.2 5v5.1c0 3.5-2.4 6.3-6.2 7.4-3.8-1.1-6.2-3.9-6.2-7.4V5L10 2.8Z" /><path d="M10 7.1v4.1" /><path d="M10 13.7h.01" /></svg>
-  }
-  // 自我进化：科技感六边形 + 向上的箭头，紫色由 CSS 给。
-  return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.4 16.4 6v8L10 17.6 3.6 14V6z" /><path d="M10 13.2V7.1" /><path d="m7.3 9.6 2.7-2.6 2.7 2.6" /><path d="M7 14.6h6" /><circle cx="10" cy="15.1" r=".6" /></svg>
-}
-
-/** Goal mode: a target with an arrow; plan mode: a checklist. */
-function GoalIcon() {
-  return <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7" /><circle cx="10" cy="10" r="3.2" /><path d="M10 10 16.2 3.8" /><path d="M12.8 3.8h3.4v3.4" /></svg>
-}
-
-function PlanIcon() {
-  return <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="4.4" y="3.6" width="11.2" height="13.2" rx="1.8" /><path d="M7.4 7.2h5.2" /><path d="M7.4 10h5.2" /><path d="M7.4 12.8h3.2" /></svg>
-}
-
-/** 联网搜索：地球加放大镜手柄，和搜索类工具图标同一套线条。 */
-function WebSearchIcon() {
-  return <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.9" cy="8.9" r="5.3" /><path d="M3.9 8.9h10" /><path d="M8.9 3.6c1.5 1.6 2.3 3.3 2.3 5.3s-.8 3.7-2.3 5.3c-1.5-1.6-2.3-3.3-2.3-5.3s.8-3.7 2.3-5.3Z" /><path d="m12.9 12.9 3.1 3.1" /></svg>
-}
-
-const taskLabels: Record<TaskStatus, string> = {
-  idle: '待命',
-  planning: '整理任务',
-  awaiting_approval: '需要回复',
-  executing: '正在执行',
-  verifying: '验证结果',
-  done: '已完成',
-  failed: '执行失败',
-  cancelled: '已停止',
-};
-
-const MAIN_ONLY_SIDE_COMMANDS = new Set(['new', 'side', 'btw', 'sessions', 'model', 'help', 'goal', 'compact']);
-
-function sideOnlySlashError(text: string): string | null {
-  const name = /^\/([a-z][a-z0-9_-]*)(?=\s|$)/iu.exec(text.trim())?.[1]?.toLowerCase();
-  if (!name || !MAIN_ONLY_SIDE_COMMANDS.has(name)) return null;
-  return name === 'side' || name === 'btw'
-    ? '当前已在临时会话；先收起，再从主线开启。'
-    : name === 'compact' ? '请使用临时会话上下文菜单中的「压缩上下文」。'
-    : `/${name} 仅适用于主线，请先收起临时会话。`;
-}
-
-const senderBadges: Record<string, string> = { 定时任务: '时', 自动恢复: '恢', 上下文压缩: '压', 重启恢复: '启' };
-function senderBadge(name: string): string {
-  return senderBadges[name] ?? name.slice(0, 1);
-}
-
-const kindLabels: Record<TimelineEntry['kind'], string> = {
-  user: '你',
-  assistant: '小鲸',
-  system: '系统',
-  tool: '工具',
-  thinking: '思考',
-};
-
-
-function PlusIcon() {
-  return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12" /></svg>;
-}
-
-function ReturnIcon() {
-  // The enter/return arrow: the guide-a-queued-message action says it with a
-  // key shape the way the keyboard actually does it.
-  return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16.5 5v5.2a2.3 2.3 0 0 1-2.3 2.3H5" /><path d="m8.2 9.3-3.2 3.2 3.2 3.2" /></svg>;
-}
-
-function ModelIcon() {
-  return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 5h12M4 10h12M4 15h12" /><circle cx="7" cy="5" r="1.5" /><circle cx="12" cy="10" r="1.5" /><circle cx="9" cy="15" r="1.5" /></svg>;
-}
-
-/** 思考强度不再用文字，用火花的数量表示：低 1 颗、高 2 颗、最大 3 颗。
- *  图标盒固定 16px，三档尺寸一致。 */
-function EffortIcon({ level = 'max' }: { level?: EffortLevel }) {
-  const spark = (cx: number, cy: number) => (
-    <path key={`${cx}-${cy}`} d={`M${cx} ${cy - 3.4}c.5 2.1.9 2.5 3 3-2.1.5-2.5.9-3 3-.5-2.1-.9-2.5-3-3 2.1-.5 2.5-.9 3-3Z`} />
-  );
-  const points: Array<[number, number]> = level === 'low'
-    ? [[10, 10]]
-    : level === 'high' ? [[6, 10], [14, 10]] : [[10, 5.5], [5.5, 13], [14.5, 13]];
-  return <svg viewBox="0 0 20 20" aria-hidden="true">{points.map(([x, y]) => spark(x, y))}</svg>;
-}
-
-function ConversationsIcon() {
-  return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 5h12M4 10h12M4 15h8" /></svg>;
-}
-
-function SelectIcon() {
-  return <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3.5" y="4" width="11" height="11" rx="2" /><path d="m6.5 9.4 2.3 2.2 3.6-3.8M16.5 7v9" /></svg>;
-}
-
-function BackIcon() {
-  return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m11.8 4.5-5.5 5.5 5.5 5.5M6.8 10h9" /></svg>;
-}
-
-function EditIcon() {
-  return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m4 14.6 8.9-8.9 2.4 2.4-8.9 8.9-3.2.7.8-3.1ZM11.8 6.8l2.4 2.4" /></svg>;
-}
-
-function ArchiveIcon({ restore = false }: { restore?: boolean }) {
-  return restore
-    ? <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 7h12v9H4zM3 4h14v3H3zM7 12h6m-5-2-2 2 2 2" /></svg>
-    : <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 7h12v9H4zM3 4h14v3H3zM8 11h4m-2-2v4" /></svg>;
-}
-
-function DeleteIcon() {
-  return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 5.5h11m-9 0 .6 11h5.8l.6-11M8 5.5V3.7h4v1.8M8.5 8.5v5m3-5v5" /></svg>;
-}
-
-function ExportIcon() {
-  return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3.5v8.2m-3-3.1 3 3.1 3-3.1M4.5 13.5v2.2h11v-2.2" /></svg>;
-}
-
-function ImportIcon() {
-  return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 11.7V3.5m-3 3.1 3-3.1 3 3.1M4.5 13.5v2.2h11v-2.2" /></svg>;
-}
-
-function PinIcon({ pinned }: { pinned: boolean }) {
-  return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 3.5h6l-.7 4 2.7 2.7v1.3H5v-1.3l2.7-2.7-.7-4ZM10 11.5v5" />{pinned && <path d="M4.5 15.5 15.5 4.5" />}</svg>;
-}
-
-function ContextMeter({ usage, compacting, open, onToggle }: {
-  usage?: ContextUsageSnapshot; compacting?: boolean; open: boolean; onToggle: () => void
-}) {
-  const available = usage?.status === 'available' && Number.isFinite(usage.usedPercent);
-  const used = available ? Math.max(0, Math.min(100, Math.round(usage.usedPercent!))) : 0;
-  return <button type="button" className={`panel-context-meter${available ? ' is-known' : ''}${compacting ? ' is-compacting' : ''}${used >= 70 ? ' is-high' : ''}`} aria-label="上下文" aria-haspopup="dialog" aria-expanded={open} title={compacting ? '正在压缩…' : available ? `上下文已用 ${used}%` : '用量暂不可读取'} onClick={onToggle}>
-    <svg viewBox="0 0 24 24" aria-hidden="true"><circle className="panel-context-track" cx="12" cy="12" r="9" /><circle className="panel-context-progress" cx="12" cy="12" r="9" pathLength="100" strokeDasharray={`${used} 100`} /></svg>
-  </button>;
-}
-
-interface DroppedAttachment extends UserAttachment { id: string }
-
-/** A rejected submission goes back to the conversation it came from. Keep
- * anything the owner typed or dropped while the IPC request was in flight. */
-function mergeComposerDraft(submitted: string, current: string): string {
-  if (!submitted) return current;
-  if (!current) return submitted;
-  return `${submitted.trimEnd()}\n\n${current}`;
-}
-
-function mergeComposerAttachments(submitted: DroppedAttachment[], current: DroppedAttachment[]): DroppedAttachment[] {
-  const merged = [...submitted];
-  for (const item of current) {
-    if (!merged.some((existing) => existing.id === item.id ||
-      (existing.name === item.name && existing.path === item.path && existing.content === item.content))) merged.push(item);
-  }
-  return merged;
-}
-
-const noopOpenImage = (): void => {};
-
-/** A tool past this mark gets a kill switch in its row. */
-const KILL_AFTER_MS = 60_000;
-/** Stable identity for an absent timeline so the grouping memos below survive
- *  re-renders that don't touch the timeline at all. */
-const EMPTY_TIMELINE: TimelineEntry[] = [];
-/** The feed renders only its tail by default; scrolling to the top extends
- *  the window by whole turns, so a five-thousand-entry history stops costing
- *  a five-thousand-node DOM on every open. */
-const EARLIER_MIN_ENTRIES = 240;
-const EARLIER_STEP_GROUPS = 6;
-/** 1.6 万条时间线不能在首帧一次性分组；先只取尾部一段，滚动到顶再扩。 */
-const INITIAL_HISTORY_ENTRIES = 600;
-const HISTORY_STEP_ENTRIES = 600;
-
-
-function timeText(iso: string): string {
-  const parsed = new Date(iso);
-  return Number.isNaN(parsed.valueOf()) ? iso : parsed.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-}
-
-/** "10-13 12:30" — short, absolute, the way a row's info line reads it. */
-function stampText(iso: string): string {
-  const at = new Date(iso);
-  if (Number.isNaN(at.valueOf())) return '—';
-  const pad = (value: number) => String(value).padStart(2, '0');
-  return `${pad(at.getMonth() + 1)}-${pad(at.getDate())} ${pad(at.getHours())}:${pad(at.getMinutes())}`;
-}
-
-const modeLabels: Record<ModelMode, string> = { live: 'DeepSeek 直连', dsh: '小鲸引擎 + DeepSeek' };
-
-/** First line of a user message, trimmed for the turn menu's title. */
-function turnMenuTitle(entry: TimelineEntry): string {
-  const line = entry.text.replace(/\s+/g, ' ').trim();
-  return line.length > 28 ? `${line.slice(0, 28)}…` : line || '这一轮对话';
-}
-
-/** Terminal colour codes (CSI/OSC escape sequences) leak into tool output
- *  verbatim — vitest paints its summary red and green. The row shows text,
- *  not a terminal, so strip them at display time. */
-function stripAnsi(text: string): string {
-  // eslint-disable-next-line no-control-regex
-  return text.replace(/\u001b(?:\[[0-9;?]*[ -/]*[@-~]|\][^\u0007]*(?:\u0007|\u001b\\)?)/g, '');
-}
-
-/** One message's body: attachment pictures, else the text — markdown for the
- *  model's own words and for the user's (where single newlines stay hard
- *  breaks, line for line what was typed), plain paragraphs for the rest.
- *  Shared by the standalone rows and by the list-like pieces of a split
- *  reply. */
-function MessageBody({ entry, running = false, onOpenImage }: { entry: TimelineEntry; running?: boolean; onOpenImage?: (name: string, url: string) => void }) {
-  const attachmentNote = entry.kind === 'user' ? splitAttachmentNote(entry.text) : null;
-  return <>
-    {attachmentNote
-      ? <EventImages note={attachmentNote} prompt={attachmentNote.prompt} images={entry.images} onOpen={onOpenImage ?? noopOpenImage} />
-      : entry.kind === 'assistant' ? <MessageMarkdown text={entry.text} streaming={running} />
-      : entry.kind === 'user' ? <MessageMarkdown text={entry.text} breaks />
-      : <p>{entry.text}</p>}
-  </>;
-}
-
-/** One piece of a split reply: a list-like paragraph whose dot is its own
- *  pseudo-element, so the alignment can never drift again. */
-const RunParagraph = memo(function RunParagraph({ entry, onOpenImage }: { entry: TimelineEntry; onOpenImage?: (name: string, url: string) => void }) {
-  return <div className="panel-run-item"><MessageBody entry={entry} onOpenImage={onOpenImage} /></div>;
-});
-
-/** 把工作区绝对路径缩成 `~/…`，工具行才看得见改的是哪个文件。 */
-function abbreviateWorkspace(text: string, root?: string): string {
-  if (!root || !text) return text
-  const variants = new Set([
-    root,
-    root.replace(/\\/gu, '/'),
-    root.replace(/\\/gu, '\\\\'),
-    root.replace(/\\/gu, '\\/')
-  ])
-  let next = text
-  for (const variant of variants) {
-    if (!variant) continue
-    next = next.split(variant).join('~')
-  }
-  return next
-}
-
-/** 读图工具的原始文件路径：优先用结果里的 images，其次从参数里的
- *  file_path / path 或输出里的 <path> 取。只认图片扩展名，普通文件不挂按钮。 */
-function toolImagePath(tool?: { input?: unknown; output?: string; images?: Array<{ path: string }> }): string | null {
-  const fromImages = tool?.images?.[0]?.path;
-  if (fromImages) return fromImages;
-  const candidates: string[] = [];
-  let parsed: unknown = tool?.input;
-  if (typeof parsed === 'string') {
-    try { parsed = JSON.parse(parsed); } catch { parsed = null; }
-  }
-  if (parsed && typeof parsed === 'object') {
-    for (const key of ['file_path', 'filePath', 'path', 'file']) {
-      const value = (parsed as Record<string, unknown>)[key];
-      if (typeof value === 'string') candidates.push(value);
-    }
-  }
-  if (typeof tool?.output === 'string') {
-    const inOutput = /<path>([^<]+)<\/path>/u.exec(tool.output)?.[1];
-    if (inOutput) candidates.push(inOutput);
-  }
-  const isImage = (value: string): boolean => /\.(?:png|jpe?g|webp|gif|bmp)$/iu.test(value.trim());
-  return candidates.map((value) => value.trim()).find(isImage) ?? null;
-}
-
-export const TimelineItem = memo(function TimelineItem({ entry, running = false, onOpenImage, onAvatarMenu, onKill, display }: { entry: TimelineEntry; running?: boolean; onOpenImage?: (name: string, url: string) => void; onAvatarMenu?: (event: MouseEvent<HTMLElement>) => void; onKill?: () => void; display: RowDisplay }) {
-  const timeLabel = timeText(entry.time);
-  const toolPreview = entry.kind === 'tool' ? (entry.text.trim().split(/\r?\n/, 1)[0] || '工具活动') : '';
-  const legacyToolDetail = entry.kind === 'tool' ? entry.text.trim().split(/\r?\n/).slice(1).join('\n').trim() : '';
-  const toolName = entry.kind === 'tool' ? (entry.tool?.name ?? toolPreview.split(' · ')[0].split('（')[0]) : '';
-  // The line diff is an LCS over the edit's strings: recompute it only when the
-  // edit itself changes, not on every streaming frame that re-renders this row.
-  const toolDiff = useMemo(
-    () => entry.kind === 'tool' ? toolDiffPreview(toolName, entry.tool?.input) : null,
-    [entry.kind, toolName, entry.tool?.input]);
-  // A tool that has been running past the minute mark can be killed from its
-  // own row. One timeout for the remainder of that minute: the switch arrives
-  // exactly at the mark, and a row that remounts for any reason just schedules
-  // a fresh timeout for whatever is left — toggling the row can neither
-  // summon the switch early nor keep it away.
-  const [killable, setKillable] = useState(false);
-  useEffect(() => {
-    if (entry.kind !== 'tool' || !running || entry.tool?.status !== 'running') { setKillable(false); return; }
-    const started = Date.parse(entry.time);
-    if (!Number.isFinite(started)) return;
-    const remaining = KILL_AFTER_MS - (Date.now() - started);
-    if (remaining <= 0) { setKillable(true); return; }
-    const timer = window.setTimeout(() => setKillable(true), remaining);
-    return () => window.clearTimeout(timer);
-  }, [entry.kind, entry.time, entry.tool?.status, running]);
-  // The card body (diff preview, long output) mounts on first expand only.
-  // Edit-like rows may start open when the reader asked for that.
-  const editTool = entry.kind === 'tool' && ['Edit', 'Write', 'MultiEdit'].includes(toolName);
-  const [toolOpened, setToolOpened] = useState(() => Boolean(display.expandEditsByDefault && editTool));
-  if (entry.kind === 'tool') {
-    const status = entry.tool?.status ?? 'done';
-    const name = entry.tool?.name ?? toolPreview.split(' · ')[0].split('（')[0];
-    const label = toolLabel(name);
-    const mcp = mcpToolRef(name);
-    const mcpToolLabel = mcp ? toolLabel(mcp.tool) : '';
-    const rowLabel = mcp
-      ? `${mcpServerLabel(mcp.server)} · ${mcpToolLabel === '外部工具' || mcpToolLabel === '工具' ? mcp.tool : mcpToolLabel}`
-      : label;
-    const rowDetail = display.toolRowDetail ?? 'brief';
-    const rawArgument = abbreviateWorkspace(toolArgumentPreview(entry.tool?.input), display.workspace);
-    // 简略档截一小截；完整档保留全部。命令没有中文说明时，命令本身也会显示。
-    const argument = rowDetail === 'name' ? ''
-      : rowDetail === 'brief'
-        ? (Array.from(rawArgument).length > 28 ? `${Array.from(rawArgument).slice(0, 28).join('')}…` : rawArgument)
-        : rawArgument;
-    const diff = toolDiff;
-    // A plan lives in the call's input; its output is only "approved". Showing
-    // the plan itself is the whole point of plan mode.
-    const plan = toolPlanText(name, entry.tool?.input);
-    const detail = entry.tool?.output?.trim() ? entry.tool.output : legacyToolDetail;
-    const images = entry.tool?.images ?? [];
-    // 读取图片的工具没有 images 数组，路径只在参数里；右上角给一个直接入口。
-    const openImagePath = toolImagePath(entry.tool);
-    const imageDetail = images.length && detail
-      ? stripAnsi(detail).replace(/^\[图片结果\]\s*$/gm, '').trim()
-      : '';
-    // A failed edit never touched the file, so the error is the only honest body
-    // to show; a successful one answers "what actually changed" with its lines.
-    const body = images.length
-      ? <ToolImageOutput images={images} detail={imageDetail || undefined} />
-      : plan
-      ? <pre className="panel-tool-output panel-tool-plan">{plan}</pre>
-      : diff && status !== 'error'
-      ? <ToolDiffBody preview={diff} />
-      : detail ? <pre className="panel-tool-output">{stripAnsi(detail)}</pre>
-      : <div className="panel-tool-empty">{status === 'running' ? '正在运行…' : '没有输出'}</div>;
-    return <details className={`panel-tool-activity${status === 'running' ? ' is-running' : ''}`}
-      open={toolOpened} onToggle={(event) => setToolOpened(event.currentTarget.open)}>
-      <summary aria-label={`${rowLabel}${argument ? ` ${argument}` : ''}${diff && rowDetail !== 'name' ? `，新增 ${diff.added} 行，删除 ${diff.removed} 行` : ''}，${status === 'error' ? '失败' : status === 'running' ? '执行中' : '已完成'}`}>
-        <ToolIcon name={name} />
-        <code className={status === 'running' ? 'panel-live-label' : undefined} title={mcp ? `MCP：${mcp.server} / ${mcp.tool}` : undefined}>{rowLabel}</code>
-        {argument && <span className="panel-tool-argument">{argument}</span>}
-        {diff && rowDetail !== 'name' && <span className="panel-tool-diff" aria-hidden="true">
-          <span className="panel-tool-diff-add">+{diff.added}</span>
-          {diff.removed > 0 && <span className="panel-tool-diff-del">−{diff.removed}</span>}
-        </span>}
-        {openImagePath && <button type="button" className="panel-tool-open-image" title="用系统默认程序打开原图" aria-label="查看原图"
-          onClick={(event) => { event.preventDefault(); event.stopPropagation(); void petBridge().openPath(openImagePath); }}>查看原图</button>}
-        <span className={`panel-tool-result is-${status}`} aria-hidden="true">{status === 'error' ? '×' : status === 'running' ? '…' : '✓'}</span>
-        {killable && <button type="button" className="panel-tool-kill" aria-label="中断当前任务" title="中断当前任务（Esc）"
-          onClick={(event) => { event.preventDefault(); event.stopPropagation(); onKill?.(); }}>×</button>}
-      </summary>
-      {toolOpened && body}
-      {toolOpened && <ToolInputDetails input={entry.tool?.input} />}
-    </details>;
-  }
-  if (entry.kind === 'system') {
-    // A notice has no speaker: no glyph, no clock — the hairlines and the
-    // centered, muted line set it apart from the dialogue instead. Errors
-    // take the same row but a warning tone and a leading mark.
-    const failed = entry.tone === 'error';
-    return <article className={`panel-event panel-event-system${failed ? ' is-error' : ''}`} aria-label={`${kindLabels.system}${failed ? '，错误' : ''}`}>
-      <div className="panel-event-body">
-        {failed && <span className="panel-event-system-mark" aria-hidden="true">!</span>}
-        {entry.tag && <span className="panel-event-tag">{entry.tag}</span>}
-        <p>{entry.text}</p>
-        {entry.retryText && <button type="button" className="panel-event-retry"
-          onClick={() => { void petBridge().sendMessage(entry.retryText!).catch(() => undefined) }}>重试</button>}
-      </div>
-    </article>;
-  }
-  // Conversation-to-conversation messages carry their source title in the
-  // body so the model sees it. The row turns that prefix into a visible
-  // sender identity (name + first-character badge) instead of showing it as
-  // ordinary prose.
-  const sourceMatch = entry.kind === 'user'
-    ? /^【(?:来自对话「([^」]{1,40})」|(定时任务|自动恢复|上下文压缩|重启恢复))】\r?\n?/u.exec(entry.text)
-    : null;
-  const sourceName = sourceMatch ? (sourceMatch[1] ?? sourceMatch[2] ?? '').trim() : '';
-  const labelOnly = ['定时任务', '自动恢复', '上下文压缩', '重启恢复'].includes(sourceName);
-  const sender = entry.kind === 'user'
-    ? entry.sender ?? (sourceName ? { name: sourceName, badge: senderBadge(sourceName), ...(labelOnly ? { keepAvatar: true } : {}) } : undefined)
-    : undefined;
-  const senderFace = sender?.keepAvatar ? undefined : sender;
-  const bodyEntry = sourceMatch ? { ...entry, text: entry.text.slice(sourceMatch[0].length) } : entry;
-  return (
-    <article className={`panel-event panel-event-${entry.kind}`} data-entry-id={entry.id} aria-label={`${sender ? sender.name : kindLabels[entry.kind]}，${timeLabel}`}>
-      <div className="panel-event-avatar" aria-hidden="true" onContextMenu={onAvatarMenu}>
-        {entry.kind === 'user' || entry.kind === 'assistant'
-          ? <AvatarGlyph kind={entry.kind}
-              fallback={senderFace?.badge ?? (entry.kind === 'user' ? '你' : '鲸')}
-              name={senderFace ? null : entry.kind === 'user' ? display.avatars.user : display.avatars.assistant}
-              presetSrc={entry.kind === 'user' ? null : display.personaAvatar} />
-          : <span className="panel-event-glyph">系</span>}
-        {display.showTimestamps && <time className="panel-event-time" dateTime={entry.time}>{timeLabel}</time>}
-      </div>
-      <div className="panel-event-body">
-        {sender && <span className="panel-event-sender">{sender.name}</span>}
-        <MessageBody entry={bodyEntry} running={running} onOpenImage={onOpenImage} />
-      </div>
-    </article>
-  );
-}, (prev, next) => prev.running === next.running && sameTimelineEntry(prev.entry, next.entry) &&
-  prev.display.showTimestamps === next.display.showTimestamps &&
-  (prev.display.avatars.user ?? null) === (next.display.avatars.user ?? null) &&
-  (prev.display.avatars.assistant ?? null) === (next.display.avatars.assistant ?? null) &&
-  (prev.display.personaAvatar ?? null) === (next.display.personaAvatar ?? null) &&
-  prev.display.expandEditsByDefault === next.display.expandEditsByDefault &&
-  prev.display.toolRowDetail === next.display.toolRowDetail &&
-  (prev.display.workspace ?? null) === (next.display.workspace ?? null));
-
-
-/** The display preferences a row needs beyond its entry itself. */
-interface RowDisplay {
-  showTimestamps: boolean
-  avatars: { user: string | null; assistant: string | null }
-  /** Built-in avatar of the current persona, used when no custom one exists. */
-  personaAvatar?: string | null
-  /** Open Edit/Write/MultiEdit rows on first render. */
-  expandEditsByDefault?: boolean
-  /** 工具行右侧显示多少信息。 */
-  toolRowDetail?: ToolRowDetail
-  /** 工作区绝对路径：工具行里的长路径缩成 `~/…`。 */
-  workspace?: string
-}
-
-/** Thinking entries get their own expandable row; everything else keeps the message layout. */
-export function EntryItem({ entry, running, onOpenImage, onKill, display }: { entry: TimelineEntry; running: boolean; onOpenImage?: (name: string, url: string) => void; onKill?: () => void; display: RowDisplay }) {
-  return entry.kind === 'thinking'
-    ? <ThinkingItem entry={entry} running={running} />
-    : <TimelineItem entry={entry} running={running} onOpenImage={onOpenImage} onKill={onKill} display={display} />;
-}
-
-/** Data URLs per avatar file name — a new upload gets a new name, so entries
- *  never go stale. */
-const avatarCache = new Map<string, string | null>();
-
-function AvatarGlyph({ kind, name, fallback, presetSrc }: { kind: 'user' | 'assistant'; name: string | null; fallback: string; presetSrc?: string | null }) {
-  const [url, setUrl] = useState<string | null>(() => name ? avatarCache.get(name) ?? null : presetSrc ?? null);
-  useEffect(() => {
-    if (!name) { setUrl(presetSrc ?? null); return; }
-    let cancelled = false;
-    void petBridge().readAvatar(kind).then((data) => {
-      avatarCache.set(name, data);
-      if (!cancelled) setUrl(data);
-    }).catch(() => { if (!cancelled) setUrl(null); });
-    return () => { cancelled = true; };
-  }, [kind, name, presetSrc]);
-  return (
-    <span className="panel-avatar-shell">
-      <span className="panel-event-glyph">{fallback}</span>
-      {url && (
-        <img
-          className="panel-avatar-img"
-          src={url}
-          alt=""
-          onError={() => setUrl(null)}
-        />
-      )}
-    </span>
-  );
-}
-
 /** Module scope on purpose: a work cluster re-renders only when this identity is stable.
  *  The image viewer callback rides a ref so that identity survives. */
 const openImageViewerRef: { current?: (name: string, url: string) => void } = {};
-
-function ApprovalCard({ proposal, busy, onApprove, onReject }: {
-  proposal: ProposedAction;
-  busy: boolean;
-  onApprove: () => void;
-  onReject: () => void;
-}) {
-  const note = proposal.tool === 'write_test_note';
-  const riskLabel = proposal.risk === 'execute' ? '命令' : proposal.risk === 'read' ? '读取' : '写入';
-  return (
-    <section className="panel-approval" aria-labelledby="approval-heading">
-      <div className="panel-approval-heading">
-        <span className="panel-approval-symbol" aria-hidden="true">!</span>
-        <div>
-          <span className="panel-eyebrow">需要你的决定</span>
-          <h3 id="approval-heading">{note ? '批准后才会写入文件' : '允许这一步电脑操作？'}</h3>
-        </div>
-        <span className="panel-risk">{riskLabel}</span>
-      </div>
-      <p className="panel-approval-description">{proposal.description}</p>
-      <dl className="panel-approval-detail">
-        <div><dt>操作</dt><dd>{note ? '写入测试笔记' : '小鲸工具请求'}</dd></div>
-        <div><dt>目标</dt><dd className="panel-path">{proposal.target}</dd></div>
-      </dl>
-      <div className="panel-preview-label">{note ? '将写入的内容' : '完整参数'}</div>
-      <pre className="panel-preview">{proposal.content}</pre>
-      <div className="panel-approval-actions">
-        <button type="button" className="panel-button panel-button-quiet" onClick={onReject} disabled={busy}>拒绝</button>
-        <button type="button" className="panel-button panel-button-primary" onClick={onApprove} disabled={busy}>{busy ? '处理中…' : note ? '批准写入' : '允许一次'}</button>
-      </div>
-    </section>
-  );
-}
-
-/** Fallback one-line height for the smallest type scale (13px × 1.45 plus the
- *  4px of padding). The live bounds are measured from the editor's computed
- *  style so a larger UI scale cannot squeeze the placeholder out. */
-export const EDITOR_ONE_LINE = 23;
-/** Fallback eight-line cap for the smallest type scale. */
-export const EDITOR_MAX_HEIGHT = 155;
-
-export interface EditorHeightBounds {
-  min: number;
-  max: number;
-}
-
-/** One and eight lines at the editor's actual line height, padding included.
- *  Falls back to the 13px metrics when a computed value is unavailable. */
-export function editorHeightBounds(style: Pick<CSSStyleDeclaration, 'lineHeight' | 'paddingTop' | 'paddingBottom'>): EditorHeightBounds {
-  const lineHeight = Number.parseFloat(style.lineHeight);
-  const line = Number.isFinite(lineHeight) && lineHeight > 0 ? lineHeight : 18.85;
-  const padding = (Number.parseFloat(style.paddingTop) || 0) + (Number.parseFloat(style.paddingBottom) || 0);
-  const min = Math.ceil(line + padding);
-  const max = Math.max(min, Math.ceil(line * 8 + padding));
-  return { min, max };
-}
-
-/** Keeps a measured height sane: never a sliver (a zero-height pass squeezed
- *  the placeholder out and the box then stayed collapsed), never past eight
- *  lines at the current type scale. */
-export function clampEditorHeight(measured: number, bounds: EditorHeightBounds = { min: EDITOR_ONE_LINE, max: EDITOR_MAX_HEIGHT }): number {
-  return Math.min(bounds.max, Math.max(bounds.min, measured));
-}
-
-/** The editor's content height, or null when the measurement means nothing —
- *  a hidden panel or a zero-width pass reports 0, and writing that back froze
- *  the composer at a sliver until something else happened to re-measure it. */
-function fitEditorHeight(editor: HTMLTextAreaElement): number | null {
-  if (editor.clientWidth === 0) return null;
-  const bounds = editorHeightBounds(getComputedStyle(editor));
-  editor.style.height = 'auto';
-  const nextHeight = clampEditorHeight(editor.scrollHeight, bounds);
-  editor.style.height = `${nextHeight}px`;
-  return nextHeight;
-}
-
-async function fileToBase64(file: File): Promise<string> {
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  let binary = '';
-  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
-    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
-  }
-  return btoa(binary);
-}
-
-async function prepareFileAttachment(bridge: PetAPI, file: File): Promise<UserAttachment> {
-  let filePath = '';
-  // 剪贴板里的图片没有磁盘路径，webUtils 有时会直接抛错；抛错时走下面的
-  // base64 暂存，不能让它把整个粘贴流程打断。
-  try {
-    filePath = bridge.getPathForFile(file);
-  } catch {
-    filePath = '';
-  }
-  if (filePath) return bridge.prepareDroppedFile(filePath);
-  if (file.size > 5 * 1024 * 1024) throw new Error('粘贴的文件不能超过 5 MB。');
-  return bridge.preparePastedFile({ name: pastedFileName(file), data: await fileToBase64(file) });
-}
 
 interface PanelBubbleProps {
   visible: boolean;
@@ -637,57 +116,26 @@ interface PanelBubbleProps {
   placement?: PanelPlacement;
 }
 
-/** Runs a box's exit animation. `closing` stays true from beginClose until the
- *  element's own animationend or a backstop timer (a timer is all a
- *  reduced-motion environment leaves us with, where the animation never
- *  fires); the element stays mounted while it is true. */
-function useExitAnimation(durationMs: number) {
-  const [closing, setClosing] = useState(false);
-  const timer = useRef<number | undefined>(undefined);
-  const beginClose = useCallback(() => {
-    setClosing(true);
-    window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => setClosing(false), durationMs + 80);
-  }, [durationMs]);
-  const endClose = useCallback((event: AnimationEvent<HTMLElement>) => {
-    if (event.target === event.currentTarget) setClosing(false);
-  }, []);
-  useEffect(() => () => window.clearTimeout(timer.current), []);
-  return { closing, beginClose, endClose };
+const COMPOSER_OPEN_KEY = 'whale.composer-open'
+
+/** 每个会话记住输入框是展开还是收起：只有手动操作才写，切换时恢复。 */
+function readComposerOpenPrefs(): Map<string, boolean> {
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(COMPOSER_OPEN_KEY) ?? '{}')
+    if (!parsed || typeof parsed !== 'object') return new Map()
+    return new Map(Object.entries(parsed as Record<string, boolean>).filter((entry): entry is [string, boolean] => typeof entry[1] === 'boolean'))
+  } catch {
+    return new Map()
+  }
 }
 
-/** Stable empty arrangement for the `?? []` fallback: a fresh array on every
- *  render would defeat the memo comparisons downstream. */
-const EMPTY_TAB_ORDER: string[] = [];
+function writeComposerOpenPrefs(prefs: Map<string, boolean>): void {
+  try { localStorage.setItem(COMPOSER_OPEN_KEY, JSON.stringify(Object.fromEntries(prefs))) } catch { /* 存不了就只记在内存。 */ }
+}
 
 export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direction = 'up', placement = 'top' }: PanelBubbleProps) {
-  // 独立面板窗口里，body 决定面板贴窗口顶还是底、小三角朝上还是朝下。
-  useEffect(() => {
-    if (!document.body.classList.contains('panel-window')) return;
-    document.body.classList.toggle('panel-direction-down', direction === 'down');
-    return () => { document.body.classList.remove('panel-direction-down'); };
-  }, [direction]);
-  // 贴左/贴右时，面板填满窗口高度，侧边用不同的对齐方式。
-  useEffect(() => {
-    if (!document.body.classList.contains('panel-window')) return;
-    document.body.classList.toggle('panel-placement-left', placement === 'left');
-    document.body.classList.toggle('panel-placement-right', placement === 'right');
-    return () => {
-      document.body.classList.remove('panel-placement-left');
-      document.body.classList.remove('panel-placement-right');
-    };
-  }, [placement]);
-  // 尾巴指向人物：主进程按人物中心算好相对面板窗口的左缘距离。
-  useEffect(() => {
-    if (!document.body.classList.contains('panel-window')) return;
-    const unsubscribe = window.pet.onPanelTailX((x) => {
-      document.body.style.setProperty('--panel-tail-x', `${x}px`);
-    });
-    return () => {
-      unsubscribe();
-      document.body.style.removeProperty('--panel-tail-x');
-    };
-  }, []);
+  usePanelWindowChrome(direction, placement);
+
   // 主题只作用于聊天面板；状态色在 CSS 里单独成组，不跟主题覆盖。
   const panelTheme = mainSnapshot?.conversationLibrary?.settings.panelTheme ?? 'dark';
   useEffect(() => {
@@ -714,12 +162,44 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
   const resizePending = useRef(false);
   const drawerExit = useExitAnimation(190);
   const [libraryOpen, setLibraryOpenRaw] = useState(false);
+  // 右栏：closed 收起、overlay 覆盖在消息流上。和左侧会话库同一套抽屉。
+  const [rightRail, setRightRail] = useState<'closed' | 'overlay'>('closed');
+  // 右栏的代码预览：只读，最多 200KB，由主进程截断。
+  const [preview, setPreview] = useState<{ path: string; text: string; truncated: boolean } | null>(null);
+  // 左栏分区：会话 / 拓展（插件、技能、MCP 都来自库索引）。
+  const [libraryTab, setLibraryTab] = useState<'sessions' | 'market'>('sessions');
+  // 右栏分区：目标 / 预览。
+  const [railTab, setRailTab] = useState<'plan' | 'preview'>('plan');
+  const [railLibraries, setRailLibraries] = useState<LibraryItem[]>([]);
+  const [railMarketKind, setRailMarketKind] = useState<'plugin' | 'skill' | 'mcp'>('plugin');
+  // 右栏里直接改目标条件：提交时仍走 CLI 的 /goal 命令。
+  const [goalDraft, setGoalDraft] = useState('');
+  useEffect(() => {
+    setGoalDraft(snapshot?.goal?.condition ?? '');
+  }, [snapshot?.goal?.condition]);
+  // 工具行里的文件路径点一下，就把内容送进右栏预览。
+  useEffect(() => {
+    const handler = (event: Event): void => {
+      const detail = (event as CustomEvent<string>).detail;
+      if (!detail) return;
+      setRightRail((current) => current === 'closed' ? 'overlay' : current);
+      void window.pet.previewFile(detail).then(setPreview).catch(() => setPreview({ path: detail, text: '读取失败', truncated: false }));
+    };
+    window.addEventListener('pet-preview-path', handler);
+    return () => window.removeEventListener('pet-preview-path', handler);
+  }, []);
+  useEffect(() => {
+    if (libraryTab !== 'market') return;
+    void window.pet.listLibraries().then((items) => { if (Array.isArray(items)) setRailLibraries(items) }).catch(() => undefined);
+  }, [libraryTab]);
   // The 534px expanded bubble can hold a 190px library and a 320px chat.
   // Smaller displays keep the overlay drawer so the composer remains usable.
   // Date headings ("今天/昨天/更早") only pay off in the wide shape. The drawer
   // itself is always a floating pane over the bubble — never a column that
   // squeezes the conversation beside it.
   const libraryGrouped = expanded && bubbleWidth >= 510 && (libraryOpen || drawerExit.closing);
+  // 左栏只展示已安装条目；市场统一在设置窗口的「库」里。
+  const installedExtended = railLibraries.filter((item) => item.kind === railMarketKind);
   // Closing plays the drawer's exit animation first: the raw setter flips the
   // state, the wrapper starts the animation that keeps the drawer mounted
   // until it has slid away.
@@ -737,6 +217,13 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
   const [drawerBottom, setDrawerBottom] = useState<number | null>(null);
   const [libraryArchived, setLibraryArchived] = useState(false);
   const [libraryQuery, setLibraryQuery] = useState('');
+  // 左栏收起再打开时，下级列表的滚动位置也要回到原处。
+  const sessionListRef = useRef<HTMLDivElement>(null);
+  const sessionScrollRef = useRef(0);
+  useLayoutEffect(() => {
+    if (!libraryOpen || libraryTab !== 'sessions' || !sessionListRef.current) return;
+    sessionListRef.current.scrollTop = sessionScrollRef.current;
+  }, [libraryOpen, libraryTab]);
   const [librarySearch, setLibrarySearch] = useState<{
     key: string; status: 'idle' | 'loading' | 'done' | 'error'; results: ConversationSummary[];
   }>({ key: '', status: 'idle', results: [] });
@@ -768,13 +255,22 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
   const [sendingConversationIds, setSendingConversationIds] = useState<Set<string | null>>(() => new Set());
   const composerExit = useExitAnimation(150);
   const [composerOpen, setComposerOpenRaw] = useState(false);
+  const composerOpenByConversation = useRef<Map<string, boolean>>(readComposerOpenPrefs());
+  const [autoCompactPreview, setAutoCompactPreview] = useState<number | null>(null);
   function setComposerOpen(open: boolean) {
     if (!open) composerExit.beginClose();
     if (destinationRef.current === 'side') {
       const id = sideChatRef.current?.sessionId;
       if (id) sideComposerOpenRef.current.set(id, open);
     }
-    else mainComposerOpenRef.current = open;
+    else {
+      mainComposerOpenRef.current = open;
+      const id = activeConversationIdRef.current;
+      if (id) {
+        composerOpenByConversation.current.set(id, open);
+        writeComposerOpenPrefs(composerOpenByConversation.current);
+      }
+    }
     setComposerOpenRaw(open);
   }
   // One-line fallback until fitEditorHeight measures the editor; the same
@@ -804,8 +300,10 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
     return () => observer.disconnect();
   }, [expanded]);
   const composeDockRef = useRef<HTMLDivElement>(null);
+  // 输入区实际高度：窗口底边要按它算，不能再用固定估值，否则按钮下半截
+  // 会落到窗口外，看起来就是“点不到”。
+  const composeDockHeight = useComposeDockHeight(composeDockRef, [composerOpen, attachments.length, composerHeight]);
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
-  const [effortMenuOpen, setEffortMenuOpen] = useState(false);
   const [approvalMenuOpen, setApprovalMenuOpen] = useState(false);
   const [bypassConfirmOpen, setBypassConfirmOpen] = useState(false);
   const [evolveConfirmOpen, setEvolveConfirmOpen] = useState(false);
@@ -827,6 +325,8 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
   // pointer carries a tab around; the drop commits it and the store's own
   // `tabOrder` takes over.
   const [tabDragOrder, setTabDragOrder] = useState<string[] | null>(null);
+  // 单个标签挤到 44px 以下时缩成序号；宽度变化由下面的 ResizeObserver 重算。
+  const [tabCompact, setTabCompact] = useState(false)
   const tabDragRef = useRef<{ id: string; startX: number; moved: boolean } | null>(null);
   // 拖拽开始时各标签的静态中心：拖拽中不再随 DOM 重排重算，否则目标槽位会在
   // 两个位置之间来回跳，表现为标签不断切换。
@@ -839,6 +339,7 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
   const startupScrollRef = useRef(true);
   /** 切换对话后的短时间窗里，程序滚动不能被 onScroll 当成“用户离开底部”。 */
   const switchJumpRef = useRef(false);
+  const onFeedScroll = useFeedScroll({ switchJumpRef, followFeedRef, setFeedAtBottom, loadEarlier });
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
   const feedWrapRef = useRef<HTMLDivElement>(null);
@@ -849,42 +350,17 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
   const composerStateRef = useRef({ draft, attachments });
   composerStateRef.current = { draft, attachments };
   const modelPickerRef = useRef<HTMLDivElement>(null);
-  const effortMenuRef = useRef<HTMLDivElement>(null);
   const approvalMenuRef = useRef<HTMLDivElement>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const composeTriggerRef = useRef<HTMLButtonElement>(null);
   const voiceManagerRef = useRef<VoiceManager | null>(null);
   const submitLockRef = useRef<Set<string | null>>(new Set());
-  const workflowCacheRef = useRef<ClaudeWorkflowOption[] | null>(null);
+  const workflowCacheRef = useRef<AppCommandOption[] | null>(null);
   const pendingNewConversationRef = useRef(false);
   const library = mainSnapshot?.conversationLibrary;
   const activeConversationIdRef = useRef<string | null>(library?.activeConversationId ?? null);
-  function sideSessionExists(sessionId: string): boolean {
-    return [...sideSnapshots.current.values()].some((item) => item.sessionId === sessionId);
-  }
-  function forgetSideSession(sessionId: string | null | undefined): void {
-    if (!sessionId) return;
-    sideComposerStash.current.delete(sessionId);
-    sideComposerOpenRef.current.delete(sessionId);
-  }
-  function forgetParentSide(parentId: string): void {
-    const saved = sideSnapshots.current.get(parentId);
-    if (!saved) return;
-    if (activeConversationIdRef.current === parentId) {
-      applySideSnapshotRef.current({ sessionId: null, parentConversationId: parentId, expanded: false,
-        queuePaused: false, snapshot: null, pendingMessages: [] });
-    }
-    sideSnapshots.current.delete(parentId);
-    forgetSideSession(saved.sessionId);
-  }
-  function rememberVisibleSide(): void {
-    if (destinationRef.current !== 'side') return;
-    const sessionId = sideChatRef.current?.sessionId;
-    if (!sessionId || !sideSessionExists(sessionId)) return;
-    const current = composerStateRef.current;
-    stashComposerState(sideComposerStash.current, sessionId, current.draft, current.attachments);
-    sideComposerOpenRef.current.set(sessionId, composerOpen);
-  }
+  const sideSessionExists = (sessionId: string): boolean => sideSessionExistsUtil(sessionId, sideSnapshots);
+  const rememberVisibleSide = (): void => rememberVisibleSideUtil({ destinationRef, sideChatRef, sideSnapshots, composerStateRef, sideComposerStash, sideComposerOpenRef, composerOpen });
   useLayoutEffect(() => {
     const nextId = library?.activeConversationId ?? null;
     const previousId = activeConversationIdRef.current;
@@ -893,13 +369,16 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
       for (const [parentId, saved] of sideSnapshots.current) {
         if (valid.has(parentId)) continue;
         sideSnapshots.current.delete(parentId);
-        forgetSideSession(saved.sessionId);
+        forgetSideSession(saved.sessionId, sideComposerStash, sideComposerOpenRef);
       }
     }
     if (previousId !== nextId) {
       rememberVisibleSide();
       const carryNewDraft = pendingNewConversationRef.current && previousId === null && nextId !== null && destinationRef.current === 'main';
       if (destinationRef.current === 'main' && previousId) {
+        // 切走前记下这个会话的输入框开合，回来时原样恢复。
+        composerOpenByConversation.current.set(previousId, mainComposerOpenRef.current);
+        writeComposerOpenPrefs(composerOpenByConversation.current);
         if (library?.conversations.some((item) => item.id === previousId)) {
           const current = composerStateRef.current;
           stashComposerState(composerStash.current, previousId, current.draft, current.attachments);
@@ -924,13 +403,18 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
         setCaretIndex(restored.draft.length);
         const goalDraftOpen = Boolean(nextId && goalPromptStash.current.get(nextId));
         setGoalPrompting(goalDraftOpen);
-        mainComposerOpenRef.current = Boolean(restored.draft || restored.attachments.length || goalDraftOpen);
+        const rememberedOpen = nextId ? composerOpenByConversation.current.get(nextId) : undefined;
+        mainComposerOpenRef.current = rememberedOpen ?? Boolean(restored.draft || restored.attachments.length || goalDraftOpen);
         setComposerOpenRaw(mainComposerOpenRef.current);
+        // 切到正在思考或运行的会话时，直接落到最新一条。
+        const targetRunning = nextId
+          ? library?.conversations.find((item) => item.id === nextId)?.taskStatus !== 'idle'
+          : false;
+        if (targetRunning) window.requestAnimationFrame(() => scrollToBottom());
       }
       setAttachmentError(null);
       setDismissedSuggestion(null);
       setModelPickerOpen(false);
-      setEffortMenuOpen(false);
       setContextMenuOpen(false);
       pendingNewConversationRef.current = false;
       draftRestoredRef.current = false;
@@ -946,7 +430,7 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
     const saved = sideSnapshots.current.get(parentId);
     if (next.sessionId && saved?.sessionId === next.sessionId && next.snapshot &&
         saved.snapshot && next.snapshot.timelineRevision < saved.snapshot.timelineRevision) return;
-    if (saved?.sessionId && saved.sessionId !== next.sessionId) forgetSideSession(saved.sessionId);
+    if (saved?.sessionId && saved.sessionId !== next.sessionId) forgetSideSession(saved.sessionId, sideComposerStash, sideComposerOpenRef);
     sideSnapshots.current.set(parentId, next);
     if (parentId !== activeConversationIdRef.current) return;
     const previousSide = sideChatRef.current;
@@ -978,7 +462,6 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
       setAttachmentError(null);
       setDismissedSuggestion(null);
       setModelPickerOpen(false);
-      setEffortMenuOpen(false);
       setContextMenuOpen(false);
       setGoalPrompting(nextDestination === 'main' && Boolean(goalPromptStash.current.get(activeConversationIdRef.current ?? '')));
       setComposerOpenRaw(nextDestination === 'side'
@@ -1003,6 +486,18 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
     }).catch(() => undefined);
     return () => { mounted = false; unsubscribe(); };
   }, []);
+  // 头像一挂载就去读一遍并缓存：发送新消息时 AvatarGlyph 初始 state 能直接
+  // 命中，不会先闪一个占位字再换图。
+  useEffect(() => {
+    const preload = (kind: 'user' | 'assistant', name: string | null | undefined): void => {
+      if (!name || avatarCache.has(name)) return;
+      try {
+        void petBridge().readAvatar(kind).then((data) => avatarCache.set(name, data)).catch(() => undefined);
+      } catch { /* 静态预览无桥。 */ }
+    };
+    preload('user', library?.settings.userAvatar);
+    preload('assistant', library?.settings.assistantAvatar);
+  }, [library?.settings.userAvatar, library?.settings.assistantAvatar]);
   const rowDisplay: RowDisplay = {
     showTimestamps: library?.settings.showMessageTimestamps ?? true,
     avatars: { user: library?.settings.userAvatar ?? null, assistant: library?.settings.assistantAvatar ?? null },
@@ -1039,11 +534,12 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
   const sendingCurrent = sideExpanded ? sideSendingIds.has(sideSessionId!) : sendingConversationIds.has(library?.activeConversationId ?? null);
   const contextUsage = snapshot?.contextUsage;
   const contextCompacting = compactBusy || Boolean(snapshot?.contextCompacting);
-  const recentSessions = (library?.conversations ?? []).filter((item) => !item.archivedAt);
+  const recentSessions = useMemo(() => (library?.conversations ?? []).filter((item) => !item.archivedAt), [library?.conversations]);
+  const hiddenTabs = library?.settings.hiddenTabIds ?? EMPTY_TAB_ORDER;
   const tabLimit = quickTabLimit(library?.settings.visibleConversationTabs);
   // While a drag is in flight the preview order wins, so the tab under the
   // pointer sits where the user has carried it; the drop commits the order.
-  const orderedSessions = orderConversationTabs(recentSessions, tabDragOrder ?? library?.settings.tabOrder ?? EMPTY_TAB_ORDER);
+  const orderedSessions = useMemo(() => orderConversationTabs(recentSessions.filter((item) => !hiddenTabs.includes(item.id)), tabDragOrder ?? library?.settings.tabOrder ?? EMPTY_TAB_ORDER), [recentSessions, hiddenTabs, tabDragOrder, library?.settings.tabOrder]);
   const orderedSessionsRef = useRef(orderedSessions);
   orderedSessionsRef.current = orderedSessions;
   const tabDragOrderRef = useRef(tabDragOrder);
@@ -1051,9 +547,28 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
   const quickTabs = orderedSessions.slice(0, tabLimit);
   const selectedSession = recentSessions.find((item) => item.id === library?.activeConversationId);
   if (selectedSession && !quickTabs.some((item) => item.id === selectedSession.id)) quickTabs.splice(Math.max(0, tabLimit - 1), 1, selectedSession);
+  // 单个标签的实际宽度决定要不要缩成序号：窗口或标签数一变就重算。
+  useEffect(() => {
+    const nav = quickTabsRef.current
+    if (!nav) return
+    const update = (): void => {
+      const count = nav.querySelectorAll('.panel-quick-tab[data-tab-id]').length
+      if (!count) return
+      // 44px 是「序号 + 内边距 + 关闭键」还能读得下的下限。
+      const next = nav.clientWidth / count < 44
+      setTabCompact((current) => (current === next ? current : next))
+    }
+    update()
+    // jsdom 里没有 ResizeObserver；真实 Electron 里一定有。
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(update)
+    observer.observe(nav)
+    return () => observer.disconnect()
+  }, [quickTabs.length, expanded, libraryRevision])
   const suggestionTrigger = detectComposerTrigger(draft, caretIndex);
   const suggestionKey = suggestionTrigger ? `${suggestionTrigger.kind}:${suggestionTrigger.start}:${suggestionTrigger.query}` : null;
   const suggestionOpen = Boolean(suggestionKey && suggestionKey !== dismissedSuggestion && composerOpen);
+  const composerKeys = useComposerKeys({ setDraft, setCaretIndex, setDismissedSuggestion, suggestionOpen, suggestionItems, suggestionSelected, setSuggestionSelected, suggestionKey, acceptSuggestion, goalPrompting, editorRef, addFiles, send });
   useEffect(() => {
     if (!visible) return;
     let active = true;
@@ -1134,7 +649,7 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
     if (suggestionTrigger.kind === 'workflow' || suggestionTrigger.kind === 'skill') {
       const fetchOptions = workflowCacheRef.current
         ? Promise.resolve(workflowCacheRef.current)
-        : bridge.listClaudeWorkflows().then((options) => { workflowCacheRef.current = options; return options; });
+        : bridge.listAppCommands().then((options) => { workflowCacheRef.current = options; return options; });
       void fetchOptions.then((options) => {
         if (cancelled) return;
         const available = sideExpanded
@@ -1165,73 +680,11 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
     return () => { cancelled = true; if (timer !== undefined) window.clearTimeout(timer); };
   }, [suggestionKey, suggestionOpen, libraryRevision, sideExpanded, installedLibraries]);
 
-  useEffect(() => {
-    if (!sessionMenuOpen) return;
-    const closeOnOutsideClick = (event: PointerEvent) => {
-      if (!sessionHeaderRef.current?.contains(event.target as Node)) setSessionMenuOpen(false);
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setSessionMenuOpen(false);
-    };
-    document.addEventListener('pointerdown', closeOnOutsideClick);
-    document.addEventListener('keydown', closeOnEscape);
-    return () => {
-      document.removeEventListener('pointerdown', closeOnOutsideClick);
-      document.removeEventListener('keydown', closeOnEscape);
-    };
-  }, [sessionMenuOpen]);
+  useDismissable({ open: sessionMenuOpen, onClose: () => setSessionMenuOpen(false), ignoreRef: sessionHeaderRef });
 
-  useEffect(() => {
-    if (!modelPickerOpen) return;
-    const closeOnOutsideClick = (event: PointerEvent) => {
-      if (!modelPickerRef.current?.contains(event.target as Node)) setModelPickerOpen(false);
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setModelPickerOpen(false);
-    };
-    const closeOnWindowBlur = () => setModelPickerOpen(false);
-    document.addEventListener('pointerdown', closeOnOutsideClick, true);
-    document.addEventListener('keydown', closeOnEscape);
-    window.addEventListener('blur', closeOnWindowBlur);
-    refreshContextUsage();
-    return () => {
-      document.removeEventListener('pointerdown', closeOnOutsideClick, true);
-      document.removeEventListener('keydown', closeOnEscape);
-      window.removeEventListener('blur', closeOnWindowBlur);
-    };
-  }, [modelPickerOpen, library?.activeConversationId, snapshot?.mode, sideSessionId, sideExpanded]);
+  useDismissable({ open: modelPickerOpen, onClose: () => setModelPickerOpen(false), ignoreRef: modelPickerRef, capture: true, closeOnBlur: true, onOpen: refreshContextUsage, extraDeps: [library?.activeConversationId, snapshot?.mode, sideSessionId, sideExpanded] });
 
-  useEffect(() => {
-    if (!effortMenuOpen) return;
-    const closeOnOutsideClick = (event: PointerEvent) => {
-      if (!effortMenuRef.current?.contains(event.target as Node)) setEffortMenuOpen(false);
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setEffortMenuOpen(false);
-    };
-    document.addEventListener('pointerdown', closeOnOutsideClick, true);
-    document.addEventListener('keydown', closeOnEscape);
-    return () => {
-      document.removeEventListener('pointerdown', closeOnOutsideClick, true);
-      document.removeEventListener('keydown', closeOnEscape);
-    };
-  }, [effortMenuOpen]);
-
-  useEffect(() => {
-    if (!approvalMenuOpen) return;
-    const closeOnOutsideClick = (event: PointerEvent) => {
-      if (!approvalMenuRef.current?.contains(event.target as Node)) setApprovalMenuOpen(false);
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setApprovalMenuOpen(false);
-    };
-    document.addEventListener('pointerdown', closeOnOutsideClick, true);
-    document.addEventListener('keydown', closeOnEscape);
-    return () => {
-      document.removeEventListener('pointerdown', closeOnOutsideClick, true);
-      document.removeEventListener('keydown', closeOnEscape);
-    };
-  }, [approvalMenuOpen]);
+  useDismissable({ open: approvalMenuOpen, onClose: () => setApprovalMenuOpen(false), ignoreRef: approvalMenuRef });
 
   useEffect(() => {
     if (!bypassConfirmOpen && !evolveConfirmOpen) return;
@@ -1246,32 +699,9 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
     return () => document.removeEventListener('keydown', closeOnEscape, true);
   }, [bypassConfirmOpen, evolveConfirmOpen]);
 
-  useEffect(() => {
-    if (!imageViewer) return;
-    const closeOnEscape = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') { event.stopPropagation(); setImageViewer(null); }
-    };
-    document.addEventListener('keydown', closeOnEscape);
-    return () => document.removeEventListener('keydown', closeOnEscape);
-  }, [imageViewer]);
+  useDismissable({ open: Boolean(imageViewer), onClose: () => setImageViewer(null), stopPropagation: true });
 
-  useEffect(() => {
-    if (!contextMenuOpen) return;
-    // The panel shows the freshest reading, the same way the model menu does.
-    refreshContextUsage();
-    const closeOnOutsideClick = (event: PointerEvent) => {
-      if (!contextMenuRef.current?.contains(event.target as Node)) setContextMenuOpen(false);
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setContextMenuOpen(false);
-    };
-    document.addEventListener('pointerdown', closeOnOutsideClick, true);
-    document.addEventListener('keydown', closeOnEscape);
-    return () => {
-      document.removeEventListener('pointerdown', closeOnOutsideClick, true);
-      document.removeEventListener('keydown', closeOnEscape);
-    };
-  }, [contextMenuOpen, sideSessionId, sideExpanded]);
+  useDismissable({ open: contextMenuOpen, onClose: () => setContextMenuOpen(false), ignoreRef: contextMenuRef, capture: true, onOpen: refreshContextUsage, extraDeps: [sideSessionId, sideExpanded] });
 
   // The meter has to be right the moment a conversation appears, not only after a
   // turn finishes: loading a conversation resets it to "unreadable", and waiting
@@ -1314,7 +744,7 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
   // whenever either box resizes, so the drawer follows the composer through
   // collapses, expansions, and every added line.
   useLayoutEffect(() => {
-    if (!libraryOpen) {
+    if (!libraryOpen && rightRail === 'closed') {
       // Closing: keep the frozen offset so the exit plays where it was.
       if (!drawerExit.closing) setDrawerBottom(null);
       return;
@@ -1329,7 +759,7 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
     observer.observe(workspace);
     observer.observe(dock);
     return () => observer.disconnect();
-  }, [libraryOpen, drawerExit.closing]);
+  }, [libraryOpen, rightRail, drawerExit.closing]);
 
   useEffect(() => {
     if (!voiceError) return
@@ -1345,6 +775,11 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
       setTabMenu(null);
       setLibraryOpen(false);
       voiceManagerRef.current?.stop();
+      return;
+    }
+    // 打开窗口时如果会话正在思考或运行，直接落到最新一条。
+    if (snapshot?.taskStatus && snapshot.taskStatus !== 'idle') {
+      window.requestAnimationFrame(() => scrollToBottom());
     }
   }, [visible]);
 
@@ -1686,86 +1121,38 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
     } catch { requestedPreviews.current.delete(target); }
   }
 
-  function showAttachmentPreview(attachment: UserAttachment, chip: HTMLElement) {
-    const composer = composerRef.current?.getBoundingClientRect();
-    if (!composer || !isImageAttachmentName(attachment.name)) return;
-    requestAttachmentPreview(attachment);
-    if (attachment.path) setPreviewCard({ path: attachment.path, name: attachment.name, placement: previewPlacement(composer, chip.getBoundingClientRect()) });
+  function showAttachmentPreview(attachment: UserAttachment, chip: HTMLElement): void {
+    showAttachmentPreviewImpl({ attachment, chip, composerRef, requestPreview: requestAttachmentPreview, setPreviewCard });
   }
-
-  /** A chip click opens the same full-screen viewer the timeline images use;
-   *  the bytes are fetched on demand when no hover preview ran before. */
   async function openAttachmentImage(attachment: UserAttachment): Promise<void> {
-    const target = attachment.path;
-    if (!target || !isImageAttachmentName(attachment.name)) return;
-    let url: string | undefined = attachmentPreviews[target];
-    if (!url) {
-      try { url = (await petBridge().readImagePreview(target)) ?? undefined; } catch { url = undefined; }
-    }
-    if (url) {
-      const resolved = url;
-      setAttachmentPreviews((current) => ({ ...current, [target]: resolved }));
-      setPreviewCard(null);
-      openImageViewer(attachment.name, resolved);
-    }
+    await openAttachmentImageImpl({ attachment, previews: attachmentPreviews, setPreviews: setAttachmentPreviews, setPreviewCard, openViewer: openImageViewer });
   }
-
-  async function chooseEffort(level: EffortLevel) {
-    if (destinationRef.current === 'side') return;
-    if (snapshot?.effort === level) return;
-    await run((bridge) => bridge.setEffort(level));
+  async function chooseEffort(level: EffortLevel): Promise<void> {
+    await chooseEffortImpl({ level, current: snapshot?.effort, destination: destinationRef.current, run });
   }
-
-  /** 上下文弹窗里的阈值行：滚轮一格改一个百分点，限制在 50–90。 */
-  function nudgeAutoCompact(delta: number) {
-    const current = library?.settings.autoCompactPercent ?? AUTO_COMPACT_DEFAULT_PERCENT;
-    const next = Math.min(AUTO_COMPACT_MAX_PERCENT, Math.max(AUTO_COMPACT_MIN_PERCENT, current + delta));
-    if (next === current) return;
-    void run((bridge) => bridge.setAutoCompactPercent(next));
+  /** 上下文弹窗里的阈值行：一格 5%，滚动只改预览，停下才提交。 */
+  function nudgeAutoCompact(delta: number): void {
+    nudgeAutoCompactImpl({
+      delta,
+      current: autoCompactPreview ?? library?.settings.autoCompactPercent,
+      run,
+      onPreview: setAutoCompactPreview
+    });
   }
-
-  async function choosePlanMode(on: boolean) {
-    if (Boolean(snapshot?.planMode) === on) return;
-    const sideId = destinationRef.current === 'side' ? sideChatRef.current?.sessionId : null;
-    await run((bridge) => sideId ? bridge.setSideChatPlanMode(sideId, on) : bridge.setPlanMode(on));
+  async function choosePlanMode(on: boolean): Promise<void> {
+    await choosePlanModeImpl({ on, current: snapshot?.planMode, destination: destinationRef.current, sideSessionId: sideChatRef.current?.sessionId, run });
   }
-
-  async function applyApprovalMode(mode: ApprovalMode) {
-    if (normalizeApprovalMode(snapshot?.approvalMode) === mode) {
-      setApprovalMenuOpen(false);
-      setBypassConfirmOpen(false);
-      return;
-    }
-    // Side chats inherit the main conversation's permission mode.
-    if (destinationRef.current === 'side') { setApprovalMenuOpen(false); return; }
-    const accepted = await run((bridge) => bridge.setApprovalMode(mode));
-    if (accepted) {
-      setApprovalMenuOpen(false);
-      setBypassConfirmOpen(false);
-      setEvolveConfirmOpen(false);
-      setEvolveAuthorizeText('');
-    }
+  const approvalDeps = (): ApprovalModeActionsDeps => ({
+    approvalMode: snapshot?.approvalMode, destination: destinationRef.current, run,
+    closeMenu: () => setApprovalMenuOpen(false), setBypassOpen: setBypassConfirmOpen,
+    setEvolveOpen: setEvolveConfirmOpen, resetEvolveText: () => setEvolveAuthorizeText('')
+  });
+  async function applyApprovalMode(mode: ApprovalMode): Promise<void> {
+    await applyApprovalModeImpl(mode, approvalDeps());
   }
-
-  async function chooseApprovalMode(mode: ApprovalMode) {
-    // Full access and self-evolution ask once, in words, before taking effect.
-    // The menu closes first so the warning is the only thing left on screen.
-    if (mode === 'danger-full-access' && normalizeApprovalMode(snapshot?.approvalMode) !== 'danger-full-access') {
-      // 从自动计划/工作区写入升到完全访问不再二次确认。
-      if (normalizeApprovalMode(snapshot?.approvalMode) === 'workspace-write') { void applyApprovalMode(mode); return; }
-      setApprovalMenuOpen(false);
-      setBypassConfirmOpen(true);
-      return;
-    }
-    if (mode === 'selfEvolve' && normalizeApprovalMode(snapshot?.approvalMode) !== 'selfEvolve') {
-      setApprovalMenuOpen(false);
-      setEvolveAuthorizeText('');
-      setEvolveConfirmOpen(true);
-      return;
-    }
-    await applyApprovalMode(mode);
+  async function chooseApprovalMode(mode: ApprovalMode): Promise<void> {
+    await chooseApprovalModeImpl(mode, approvalDeps());
   }
-
   /** Goal mode is the CLI's own /goal: the command starts the stop-hook loop.
    *  Setting it is an ordinary queued turn; clearing it goes through clearGoal
    *  instead — steered into the running loop the command never reaches the CLI
@@ -1828,40 +1215,33 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
     setModelPickerOpen(false);
   }
 
-  async function decide(approved: boolean) {
-    const id = snapshot?.proposal?.id;
-    if (!id || busy || sendingCurrent) return;
-    setBusy(approved ? 'approve' : 'reject');
-    const sideId = destinationRef.current === 'side' ? sideChatRef.current?.sessionId : null;
-    await run((bridge) => sideId
-      ? approved ? bridge.approveSideChatAction(sideId, id) : bridge.rejectSideChatAction(sideId, id)
-      : approved ? bridge.approveAction(id) : bridge.rejectAction(id));
-    setBusy(null);
+  async function decide(approved: boolean): Promise<void> {
+    await decideAction({ approved, proposalId: snapshot?.proposal?.id, busy, sending: sendingCurrent, setBusy, destination: destinationRef.current, sideSessionId: sideChatRef.current?.sessionId, run });
   }
-
-  async function stop() {
-    if (busy) return;
-    setBusy('stop');
-    voiceManagerRef.current?.stopSpeaking();
-    const sideId = destinationRef.current === 'side' ? sideChatRef.current?.sessionId : null;
-    await run((bridge) => sideId ? bridge.stopSideChat(sideId) : bridge.stop());
-    setBusy(null);
+  async function stop(): Promise<void> {
+    await stopAction({ busy, setBusy, destination: destinationRef.current, sideSessionId: sideChatRef.current?.sessionId, stopSpeaking: () => voiceManagerRef.current?.stopSpeaking(), run });
   }
-
-  // The tool row's kill switch stops the whole turn (the same action as the
-  // composer's stop button), not just the running command.
-  killTurnRef.current = () => { void stop(); };
+  // 工具行的叉先尝试只结束当前命令进程：命令退出后 DSH 会继续这一轮，
+  // 思考不被打断。找不到对应进程时才退回整轮停止。
+  killTurnRef.current = () => {
+    void (async () => {
+      let stopped = false
+      try { stopped = await petBridge().stopCommand() } catch { stopped = false }
+      if (!stopped) await stop()
+    })()
+  };
 
   async function setSideExpanded(expanded: boolean): Promise<void> {
-    const sessionId = sideChatRef.current?.sessionId;
-    if (!sessionId) return;
-    await run(async (bridge) => { await bridge.setSideChatExpanded(sessionId, expanded); });
+    await setSideExpandedImpl({ expanded, sideSessionId: sideChatRef.current?.sessionId, run });
   }
-
   async function discardSide(): Promise<void> {
-    const sessionId = sideChatRef.current?.sessionId;
-    if (!sessionId) return;
-    await run((bridge) => bridge.discardSideChat(sessionId));
+    await discardSideImpl({ sideSessionId: sideChatRef.current?.sessionId, run });
+  }
+  async function moveQueuedMessage(messageId: string, beforeId: string | null) {
+    const sessionId = sideExpanded ? sideChatRef.current?.sessionId : null;
+    await run((bridge) => sessionId
+      ? bridge.moveSideQueuedMessage(sessionId, messageId, beforeId)
+      : bridge.moveQueuedMessage(messageId, beforeId));
   }
 
   async function editQueuedMessage(message: PendingMessage) {
@@ -1932,7 +1312,10 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
     manager.toggle();
   }
 
-  function openLibrary() {
+  async function openLibrary() {
+    await expandPanel();
+    // 左右栏各占一半；面板不够宽时不允许同时打开，先收起右栏。
+    if (rightRail !== 'closed' && bubbleWidth < 380) setRightRail('closed');
     setLibraryOpen(true);
     setModelPickerOpen(false);
     setSessionMenuOpen(false);
@@ -1971,28 +1354,7 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
   // its own, so the old x is captured and replayed as a one-off transform
   // (the FLIP pass), skipped under reduced motion.
   const tabPositionsRef = useRef(new Map<string, number>());
-  useLayoutEffect(() => {
-    const tabs = quickTabsRef.current;
-    if (!tabs) return;
-    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-    const next = new Map<string, number>();
-    for (const button of tabs.querySelectorAll<HTMLElement>('.panel-quick-tab[data-tab-id]')) {
-      const id = button.dataset.tabId!;
-      const x = button.getBoundingClientRect().left;
-      next.set(id, x);
-      const before = tabPositionsRef.current.get(id);
-      if (reduceMotion || before === undefined || Math.abs(before - x) < 1) continue;
-      for (const animation of button.getAnimations()) {
-        if (animation.id === 'tab-flip') animation.cancel();
-      }
-      const flip = button.animate(
-        [{ transform: `translateX(${before - x}px)` }, { transform: 'none' }],
-        { duration: 160, easing: 'ease-out' }
-      );
-      flip.id = 'tab-flip';
-    }
-    tabPositionsRef.current = next;
-  }, [tabDragOrder, libraryRevision, tabLimit, expanded, quickTabs.length, library?.activeConversationId]);
+  useTabFlip({ tabsRef: quickTabsRef, positionsRef: tabPositionsRef, deps: [tabDragOrder, libraryRevision, tabLimit, expanded, quickTabs.length, library?.activeConversationId] });
 
   // A press on a tab becomes a drag after five pixels; the row reorders under
   // the pointer and the drop commits the arrangement. Pointer events (not
@@ -2090,7 +1452,7 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
       const resolved = new Set(outcomes.filter((item) => item.status === 'updated' || !unresolved.includes(item)).map((item) => item.id));
       setSelectedSessionIds((current) => new Set([...current].filter((id) => !resolved.has(id))));
       if (action === 'delete' || action === 'archive') for (const item of updated) {
-        forgetParentSide(item.id);
+        forgetParentSide(item.id, { sideSnapshots, activeConversationIdRef, applySideSnapshotRef, sideComposerStash, sideComposerOpenRef });
         if (action === 'delete') composerStash.current.delete(item.id);
       }
       if (unresolved.length === 0) {
@@ -2106,6 +1468,10 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
   }
 
   async function createConversation() {
+    if (recentSessions.length >= UNARCHIVED_LIMIT) {
+      setLibraryError(`未归档最多 ${UNARCHIVED_LIMIT} 个会话，先归档一个再新建。`);
+      return;
+    }
     const currentId = activeConversationIdRef.current;
     const mainComposer = destinationRef.current === 'main'
       ? composerStateRef.current : restoreComposerState(composerStash.current, currentId);
@@ -2135,23 +1501,7 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
 
   /** A draft write that must never surface an error: it runs on a debounce
    *  and on every switch, and a failed save must not bother the writer. */
-  function flushDraft(id: string | null, text: string): void {
-    if (!id) return;
-    try { void petBridge().saveDraft(id, text).catch(() => undefined); } catch { /* 静态预览无桥。 */ }
-  }
-
-  // 输入停一下即落盘：关窗或关机不会丢半句话。附件不存——它们的临时文件不跨重启。
-  useEffect(() => {
-    if (destinationRef.current !== 'main') return;
-    const id = library?.activeConversationId;
-    if (!id || activeConversationIdRef.current !== id || composerStateRef.current.draft !== draft) return;
-    const timer = window.setTimeout(() => {
-      if (destinationRef.current === 'main' && activeConversationIdRef.current === id && composerStateRef.current.draft === draft) {
-        flushDraft(id, draft);
-      }
-    }, 800);
-    return () => window.clearTimeout(timer);
-  }, [draft, library?.activeConversationId]);
+  const { flushDraft } = useDraftPersist({ destinationRef, conversationId: library?.activeConversationId, activeConversationIdRef, composerStateRef, draft });
 
   // 应用重启后第一次进入：当前会话的草稿从会话记录里拿回来。内存里的 stash
   // 优先（它是这次运行中最新的），只有它没有记录时才碰磁盘。
@@ -2177,7 +1527,28 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
     }).catch(() => undefined);
   }, [library?.activeConversationId, sideExpanded]);
 
+  /** 关闭顶部标签：只从标签条移除，会话仍留在未归档列表。 */
+  async function closeQuickTab(item: ConversationSummary) {
+    // 关掉的是当前标签时，先把视图切到下一个可见标签，否则当前会话会被
+    // 「当前标签必须显示」的规则又插回来。
+    if (item.id === library?.activeConversationId) {
+      const next = quickTabs.find((tab) => tab.id !== item.id)
+      if (next) await selectConversation(next)
+    }
+    const hidden = new Set(library?.settings.hiddenTabIds ?? []);
+    hidden.add(item.id);
+    await run((bridge) => bridge.setHiddenTabs([...hidden]));
+  }
+
   async function selectConversation(item: ConversationSummary) {
+    if (item.archivedAt !== null && recentSessions.length >= UNARCHIVED_LIMIT) {
+      setLibraryError(`未归档最多 ${UNARCHIVED_LIMIT} 个会话，先归档一个再恢复。`);
+      return;
+    }
+    const hidden = library?.settings.hiddenTabIds ?? [];
+    if (hidden.includes(item.id)) {
+      void run((bridge) => bridge.setHiddenTabs(hidden.filter((id) => id !== item.id))).catch(() => undefined);
+    }
     const currentId = activeConversationIdRef.current;
     const mainComposer = destinationRef.current === 'main'
       ? composerStateRef.current : restoreComposerState(composerStash.current, currentId);
@@ -2263,10 +1634,27 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
       return remaining.length === current.size ? current : new Set(remaining);
     });
   }, [visibleSessionKey, searchStatus]);
-  const displayedGroups: Array<{ key: string; label: string | null; conversations: ConversationSummary[] }> =
-    libraryGrouped
-      ? groupSessionSummaries(visibleConversations, libraryArchived, Date.now())
-      : [{ key: 'all', label: null, conversations: visibleConversations }];
+  const tabbedIds = new Set(quickTabs.map((tab) => tab.id));
+  // 未归档列表分两段：标签页里显示的按标签顺序，其余按最近活动时间。
+  const tabbedConversations = !libraryArchived && !searchActive
+    ? quickTabs
+      .map((tab) => visibleConversations.find((item) => item.id === tab.id))
+      .filter((item): item is ConversationSummary => Boolean(item))
+    : [];
+  const untabbedConversations = !libraryArchived && !searchActive
+    ? visibleConversations
+      .filter((item) => !tabbedIds.has(item.id))
+      .sort((left, right) => (Date.parse(right.lastActivityAt || right.updatedAt) || 0) - (Date.parse(left.lastActivityAt || left.updatedAt) || 0))
+    : [];
+  const displayedGroups: Array<{ key: string; label: string | null; conversations: ConversationSummary[]; dividerBefore?: boolean }> =
+    !libraryArchived && !searchActive
+      ? [
+          { key: 'tabbed', label: null, conversations: tabbedConversations },
+          { key: 'untabbed', label: null, conversations: untabbedConversations, dividerBefore: tabbedConversations.length > 0 }
+        ]
+      : libraryGrouped
+        ? groupSessionSummaries(visibleConversations, libraryArchived, Date.now())
+        : [{ key: 'all', label: null, conversations: visibleConversations }];
 
   // A parked plan, question or permission is waiting on the user; the turn is
   // not executing, even if the runtime's last coarse status said so.
@@ -2277,8 +1665,6 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
     : 'idle';
   // Live per-conversation statuses arrive through the library summaries now,
   // so every tab dot is truthful — the displayed conversation included.
-  const conversationStatus = (item: ConversationSummary): TaskStatus => item.taskStatus;
-  const statusRunning = (item: ConversationSummary): boolean => ['planning', 'awaiting_approval', 'executing', 'verifying'].includes(conversationStatus(item));
   const active = ['planning', 'awaiting_approval', 'executing', 'verifying'].includes(status);
   const statusLive = status === 'planning' || status === 'executing' || status === 'verifying';
   const pendingMessages = sideExpanded ? sideChat?.pendingMessages ?? [] : snapshot?.pendingMessages ?? [];
@@ -2289,7 +1675,7 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
   // what the owner wants to do next.
   const compactEmpty = empty && !sideSessionId && !expanded && !modelPickerOpen && !suggestionOpen && recentSessions.length > 0;
   const layout: BubbleLayout = !compactEmpty ? 'full' : !composerOpen ? 'empty' : attachments.length ? 'composer_attachments' : 'composer';
-  const compactComposerHeight = 112 + composerHeight + (attachments.length ? 26 : 0);
+  const compactComposerHeight = Math.max(112, composeDockHeight || (112 + composerHeight + (attachments.length ? 26 : 0)));
   // 30fps 的呼吸式动效：扫光与脉冲点改用 CSS 变量推进，值每 1/30 秒走一步——
   // 合成器只在步进的帧上提交新内容（60fps 时是每帧），dwm 的合成次数减半。
   // 没有动效在跑时这个计时器根本不启动，变量停在各自的静止位。
@@ -2303,8 +1689,9 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
     const tick = (): void => {
       const now = performance.now();
       const root = document.documentElement.style;
+      // 状态灯和三个等待点都保持静止：不再逐帧改 pulse/bounce 变量。
       root.setProperty('--panel-sweep-p', tri(now, 3400, 0).toFixed(3));
-      root.setProperty('--panel-pulse-p', tri(now, 1200, 0).toFixed(3));
+      // 只有底部「正在执行」这一行的三点跳动；分组标题的圆点仍保持静止。
       root.setProperty('--panel-bounce-p1', tri(now, 1200, 0).toFixed(3));
       root.setProperty('--panel-bounce-p2', tri(now, 1200, -180).toFixed(3));
       root.setProperty('--panel-bounce-p3', tri(now, 1200, -360).toFixed(3));
@@ -2318,13 +1705,21 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
   // every render that doesn't touch the timeline reuse the last result.
   const timeline = snapshot?.timeline ?? EMPTY_TIMELINE;
   const activeSummary = library?.conversations.find((item) => item.id === (library?.activeConversationId ?? snapshot?.conversationId));
-  const historyLoading = !snapshot || (timeline.length === 0 && (activeSummary?.messageCount ?? 0) > 0);
+  // 不再用“时间线为空”判断加载：首帧可能先到会话摘要、后到 timeline，
+  // 那会把面板挂在“正在加载历史”上。数据由 usePetState 重试补齐。
   const [historyEntries, setHistoryEntries] = useState(INITIAL_HISTORY_ENTRIES);
   useEffect(() => { setHistoryEntries(INITIAL_HISTORY_ENTRIES) }, [snapshot?.conversationId]);
+  // 主进程全量只发尾部一段；更早的历史按需拉回来，拼在这里。
+  const [olderEntries, setOlderEntries] = useState<typeof timeline>([]);
+  useEffect(() => { setOlderEntries([]) }, [snapshot?.conversationId]);
+  const mergedTimeline = useMemo(
+    () => olderEntries.length ? [...olderEntries, ...timeline] : timeline,
+    [olderEntries, timeline]
+  );
   // 首帧只 group 尾部，避免 1.6 万条历史在打开会话时一次性分组。
   const timelineForRender = useMemo(
-    () => timeline.length > historyEntries ? timeline.slice(-historyEntries) : timeline,
-    [timeline, historyEntries]
+    () => mergedTimeline.length > historyEntries ? mergedTimeline.slice(-historyEntries) : mergedTimeline,
+    [mergedTimeline, historyEntries]
   );
   // While a turn runs, its start marks the live window: a user line past it
   // was steered into the running turn. New records carry the flag on the entry
@@ -2334,7 +1729,9 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
   const liveTurnStartMs = Number.isFinite(liveTurnStart) ? liveTurnStart : undefined;
   const timelineGroups = useMemo(() => groupTimeline(timelineForRender, liveTurnStartMs), [timelineForRender, liveTurnStartMs]);
   const tasks = useMemo(() => agentTasks(timelineForRender), [timelineForRender]);
-  const navMarkList = useMemo(() => navMarks(timelineGroups), [timelineGroups]);
+  // 刻度按整段对话生成：渲染可以分页，左侧条的条数不能跟着缩水。
+  // 跳到未渲染的条目时 jumpToEntry 会先扩大渲染窗口，再滚动过去。
+  const navMarkList = useMemo(() => navMarks(groupTimeline(mergedTimeline, liveTurnStartMs)), [mergedTimeline, liveTurnStartMs]);
   const [earlierGroups, setEarlierGroups] = useState(0);
   const earlierAnchorRef = useRef<{ height: number } | null>(null);
   const pendingJumpRef = useRef<string | null>(null);
@@ -2342,18 +1739,29 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
     () => tailWindow(timelineGroups, EARLIER_MIN_ENTRIES, earlierGroups),
     [timelineGroups, earlierGroups]
   );
-  const hasEarlier = timeline.length > timelineForRender.length || visibleGroups.length < timelineGroups.length;
+  const totalEntries = snapshot?.timelineTotal ?? mergedTimeline.length;
+  const hasUnloadedOlder = mergedTimeline.length < totalEntries;
+  const hasEarlier = mergedTimeline.length > timelineForRender.length ||
+    visibleGroups.length < timelineGroups.length || hasUnloadedOlder;
   // Reaching the top of the feed pulls in the next stretch of older history,
   // keeping the reader's place by the height the new rows added above.
   function loadEarlier(): void {
     const feed = feedRef.current;
     if (!feed || !hasEarlier) return;
     earlierAnchorRef.current = { height: feed.scrollHeight };
-    if (timeline.length > timelineForRender.length) {
-      setHistoryEntries((count) => Math.min(timeline.length, count + HISTORY_STEP_ENTRIES));
+    if (hasUnloadedOlder) {
+      void loadOlderPage();
+      return;
+    }
+    if (mergedTimeline.length > timelineForRender.length) {
+      setHistoryEntries((count) => Math.min(mergedTimeline.length, count + HISTORY_STEP_ENTRIES));
       return;
     }
     setEarlierGroups((count) => count + EARLIER_STEP_GROUPS);
+  }
+  const loadingOlderRef = useRef(false);
+  async function loadOlderPage(): Promise<void> {
+    await loadOlderPageImpl({ conversationId: snapshot?.conversationId, total: snapshot?.timelineTotal, loaded: mergedTimeline.length, loadingRef: loadingOlderRef, onPage: (page) => setOlderEntries((previous) => [...page, ...previous]), pageSize: HISTORY_STEP_ENTRIES });
   }
   /** The rail's click: scroll to a message, widening the rendered window to
    *  include it first when it lies in the folded history above. */
@@ -2364,11 +1772,22 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
       target.scrollIntoView({ block: 'start' });
       return;
     }
-    const groupIndex = timelineGroups.findIndex((group) => group.kind === 'turn'
+    // 刻度按全量对话生成，目标可能还没渲染：先用全量分组定位，再折算
+    // 需要多展开多少组，交给 pendingJump 的 effect 滚过去。
+    const allGroups = groupTimeline(timeline, liveTurnStartMs);
+    const fullIndex = allGroups.findIndex((group) => group.kind === 'turn'
       ? group.user.id === id || group.items.some((item) => item.id === id)
       : group.entry.id === id);
-    if (groupIndex < 0) return;
-    const visibleStart = timelineGroups.length - visibleGroups.length;
+    if (fullIndex < 0) return;
+    const renderedGroups = timelineGroups.length;
+    const missing = Math.max(0, allGroups.length - renderedGroups);
+    if (fullIndex < missing) {
+      pendingJumpRef.current = id;
+      setEarlierGroups((count) => count + (missing - fullIndex));
+      return;
+    }
+    const groupIndex = fullIndex - missing;
+    const visibleStart = renderedGroups - visibleGroups.length;
     if (groupIndex >= visibleStart) return; // Rendered but somehow not found; leave it be.
     pendingJumpRef.current = id;
     setEarlierGroups((count) => count + (visibleStart - groupIndex));
@@ -2387,59 +1806,9 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
     if (entry.kind === 'tool' && entry.tool?.status === 'running') { runningTool = entry.tool.name; break; }
   }
 
-  useLayoutEffect(() => {
-    const feed = feedRef.current;
-    const anchor = earlierAnchorRef.current;
-    if (!feed || !anchor) return;
-    earlierAnchorRef.current = null;
-    // Keep the reader's place: the taller history must not push the viewport.
-    feed.scrollTop += feed.scrollHeight - anchor.height;
-  }, [earlierGroups]);
+  useFeedAnchors({ feedRef, earlierAnchorRef, pendingJumpRef, followFeedRef, earlierGroups, olderEntriesLength: olderEntries.length, historyEntries, visibleGroups });
 
-  useLayoutEffect(() => {
-    const feed = feedRef.current;
-    const id = pendingJumpRef.current;
-    if (!feed || !id) return;
-    const target = feed.querySelector(`[data-entry-id="${id}"]`);
-    if (!target) return;
-    pendingJumpRef.current = null;
-    followFeedRef.current = false;
-    target.scrollIntoView({ block: 'start' });
-  }, [earlierGroups, historyEntries, visibleGroups]);
-
-  useLayoutEffect(() => {
-    const editor = editorRef.current;
-    if (!composerOpen || !editor) return;
-    const nextHeight = fitEditorHeight(editor);
-    if (nextHeight === null) return;
-    setComposerHeight((current) => current === nextHeight ? current : nextHeight);
-  }, [draft, composerOpen, expanded, compactEmpty, visible]);
-
-  useEffect(() => {
-    const editor = editorRef.current;
-    if (!composerOpen || !editor) return;
-    let width = editor.clientWidth;
-    const remeasure = (): void => {
-      const nextHeight = fitEditorHeight(editor);
-      if (nextHeight === null) return;
-      setComposerHeight((current) => current === nextHeight ? current : nextHeight);
-    };
-    const observer = new ResizeObserver(() => {
-      if (editor.clientWidth === width) return;
-      width = editor.clientWidth;
-      remeasure();
-    });
-    observer.observe(editor);
-    // UI scale is written straight to <html data-ui-size> by the preload; the
-    // React tree does not re-render, so watch the attribute to re-measure the
-    // one-line floor when the type scale changes.
-    const sizeObserver = new MutationObserver(remeasure);
-    sizeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-ui-size'] });
-    return () => {
-      observer.disconnect();
-      sizeObserver.disconnect();
-    };
-  }, [composerOpen]);
+  useEditorHeight({ editorRef, composerOpen, draft, expanded, compactEmpty, visible, setComposerHeight });
 
   // 选中消息文字后右键：弹系统菜单，选“引用”放进输入框，或在原地复制。
   useEffect(() => {
@@ -2480,7 +1849,7 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
   // A popover owns Escape while it is open: the first Esc closes the popover, a
   // second one stops the task. Without this guard the capture-phase listener
   // below would steal the key from an open menu and kill the running turn.
-  const escOwners = libraryOpen || modelPickerOpen || effortMenuOpen || contextMenuOpen || sessionMenuOpen || Boolean(tabMenu) || suggestionOpen || renameId !== null || deleteId !== null;
+  const escOwners = libraryOpen || modelPickerOpen || contextMenuOpen || sessionMenuOpen || Boolean(tabMenu) || suggestionOpen || renameId !== null || deleteId !== null;
   const escOwnersRef = useRef(escOwners);
   escOwnersRef.current = escOwners;
 
@@ -2515,6 +1884,10 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
     const closeOutside = (event: PointerEvent) => {
       const target = event.target as HTMLElement | null;
       if (!target || target.closest('.panel-library-drawer')) return;
+      // 顶栏空白处是拖动手柄：拖动窗口时不能把左栏关掉。
+      if (target.closest('.panel-chat-header')) return;
+      // 调窗口大小的手柄也在抽屉外面，拖动它不是在点抽屉外部。
+      if (target.closest('.panel-resize-grip')) return;
       if (target.closest('.panel-library-toggle, .panel-conversations-button, .panel-session-menu-all')) return;
       setLibraryOpen(false);
     };
@@ -2540,19 +1913,7 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
     return () => window.removeEventListener('keydown', closeOnEscape, true);
   }, [libraryOpen, renameId, deleteId]);
 
-  useEffect(() => {
-    if (!visible || !active) return;
-    const interruptOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || event.isComposing || event.keyCode === 229) return;
-      if (escOwnersRef.current) return;
-      if (document.querySelector('.panel-image-viewer')) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      void stop();
-    };
-    document.addEventListener('keydown', interruptOnEscape, true);
-    return () => document.removeEventListener('keydown', interruptOnEscape, true);
-  }, [visible, active, busy, run]);
+  useEscapeToStop({ visible, active, escOwnersRef, onStop: () => { void stop(); } });
 
   useEffect(() => {
     const tabs = quickTabsRef.current;
@@ -2564,11 +1925,19 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
     else if (right > tabs.scrollLeft + tabs.clientWidth) tabs.scrollLeft = right - tabs.clientWidth;
   }, [library?.activeConversationId, expanded, tabLimit, libraryRevision, compactEmpty]);
 
+  // 小窗没有抽屉；需要左栏或右栏时先把面板放大。
+  async function expandPanel(): Promise<void> {
+    if (expanded) return;
+    await petBridge().setBubbleExpanded(true).catch(() => undefined);
+    setExpanded(true);
+  }
+
   async function toggleExpanded() {
     if (resizePending.current) return;
     resizePending.current = true;
     const next = !expanded;
     try {
+      if (!next) setRightRail('closed');
       await petBridge().setBubbleExpanded(next);
       setSessionMenuOpen(false);
       setExpanded(next);
@@ -2586,133 +1955,26 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
     lastSent: number; lastWidth: number; lastHeight: number
   } | null>(null);
   const [resizingPanel, setResizingPanel] = useState(false);
+  // 待发送消息的拖拽排序：只记录被拖的 id 和目标位置，落点时再写回主进程。
+  const [queueDragId, setQueueDragId] = useState<string | null>(null);
+  const [queueDropBefore, setQueueDropBefore] = useState<string | null>(null);
   const resizeMovedRef = useRef(false);
   function beginPanelResize(event: ReactPointerEvent<HTMLDivElement>): void {
-    if (!expanded || event.button !== 0) return;
-    const rect = event.currentTarget.closest('.panel-bubble')?.getBoundingClientRect();
-    if (!rect) return;
-    event.preventDefault();
-    if (resizeSession.current) endPanelResize();
-    const grip = event.currentTarget;
-    grip.style.transition = 'none'
-    grip.setPointerCapture(event.pointerId);
-    resizeSession.current = {
-      pointerId: event.pointerId, grip,
-      startScreenX: event.screenX, startScreenY: event.screenY,
-      startW: rect.width, startH: rect.height, lastSent: 0,
-      lastWidth: Math.round(rect.width), lastHeight: Math.round(rect.height)
-    };
-    resizeMovedRef.current = false;
-    document.body.classList.add('is-resizing-panel');
-    setResizingPanel(true);
-    petBridge().resizeGhost({ x: event.screenX, y: event.screenY });
-  }
-  // 尾巴尖上的小白点：横向拖人物。y 固定为按下时的屏幕坐标，主进程把人物
-  // 限制在屏幕工作区内，左右不会出界。
-  const tailDrag = useRef<{ pointerId: number; screenY: number } | null>(null);
-  function beginTailDrag(event: ReactPointerEvent<HTMLDivElement>): void {
-    if (event.button !== 0) return;
-    event.preventDefault();
-    event.stopPropagation();
-    event.currentTarget.setPointerCapture(event.pointerId);
-    tailDrag.current = { pointerId: event.pointerId, screenY: event.screenY };
-    void petBridge().beginDrag({ x: event.screenX, y: event.screenY });
-  }
-  function moveTailDrag(event: ReactPointerEvent<HTMLDivElement>): void {
-    const session = tailDrag.current;
-    if (!session || session.pointerId !== event.pointerId) return;
-    void petBridge().dragMove({ x: event.screenX, y: session.screenY });
-  }
-  function endTailDrag(event: ReactPointerEvent<HTMLDivElement>): void {
-    const session = tailDrag.current;
-    if (!session) return;
-    tailDrag.current = null;
-    try { event.currentTarget.releasePointerCapture(session.pointerId); } catch { /* 已释放 */ }
-    void petBridge().endDrag();
+    beginPanelResizeImpl({ event, expanded, sessionRef: resizeSession, movedRef: resizeMovedRef, setResizing: setResizingPanel, onEnd: () => endPanelResize() });
   }
   function beginWindowDrag(event: ReactPointerEvent<HTMLElement>, fromHeader = false): void {
-    // 顶栏空白也允许拖整组窗口；按钮、标签、输入框都留给它们自己。
-    if (event.button !== 0 || (!fromHeader && event.target !== event.currentTarget)) return;
-    const bridge = petBridge();
-    void bridge.beginDrag({ x: event.screenX, y: event.screenY });
-    const move = (e: PointerEvent): void => { void bridge.dragMove({ x: e.screenX, y: e.screenY }); };
-    const up = (): void => {
-      void bridge.endDrag();
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
-    };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
+    beginWindowDragImpl(event, fromHeader);
   }
-
   function movePanelResize(event: ReactPointerEvent<HTMLDivElement>): void {
-    const session = resizeSession.current;
-    if (!session || event.pointerId !== session.pointerId) return;
-    // pointerup 偶尔会在窗口移动时丢掉；没有按键还留着会话的话，鼠标
-    // 再移回手柄就会继续改尺寸（表现为“自己往左上缩”）。
-    if ((event.buttons & 1) === 0) {
-      endPanelResize(event);
-      return;
-    }
-    const maxWidth = Math.max(PANEL_MIN_WIDTH, window.screen.availWidth - 20);
-    const maxHeight = Math.max(PANEL_MIN_HEIGHT, window.screen.availHeight);
-    const width = Math.round(Math.min(maxWidth, Math.max(PANEL_MIN_WIDTH, session.startW + (session.startScreenX - event.screenX))));
-    const heightDelta = direction === 'down'
-      ? event.screenY - session.startScreenY
-      : session.startScreenY - event.screenY;
-    const height = Math.round(Math.min(maxHeight, Math.max(PANEL_MIN_HEIGHT, session.startH + heightDelta)));
-    // 只记目标尺寸；窗口在松开鼠标时才变形。手柄和那圈 L 线先跟着鼠标走，
-    // 让人看清楚窗口会变到哪。
-    session.lastWidth = width;
-    session.lastHeight = height;
-    const dx = Math.round(session.startW - width);
-    const dy = Math.round(direction === 'down' ? height - session.startH : session.startH - height);
-    session.grip.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
-    petBridge().resizeGhost({ x: event.screenX, y: event.screenY });
+    movePanelResizeImpl({ event, sessionRef: resizeSession, direction: direction === 'down' ? 'down' : 'up', minWidth: PANEL_MIN_WIDTH, minHeight: PANEL_MIN_HEIGHT, onEnd: endPanelResize });
   }
   function endPanelResize(event?: ReactPointerEvent<HTMLDivElement>): void {
-    const session = resizeSession.current;
-    if (!session) return;
-    resizeSession.current = null;
-    resizeMovedRef.current = false;
-    setResizingPanel(false);
-    document.body.classList.remove('is-resizing-panel');
-    try { (event?.currentTarget ?? session.grip).releasePointerCapture(session.pointerId); } catch { /* 已释放 */ }
-    const grip = session.grip;
-    petBridge().resizeGhost(null);
-    const changed = session.lastWidth !== Math.round(session.startW) || session.lastHeight !== Math.round(session.startH);
-    // 先让窗口缩到目标尺寸；等它落定后再无动画地把手柄归位。若先清位移，
-    // 手柄会先弹回旧角、再被窗口带着跳到新角，看起来就是闪一下。
-    const settle = (): void => {
-      grip.style.transition = 'none';
-      grip.style.transform = '';
-      requestAnimationFrame(() => { grip.style.transition = ''; });
-    };
-    if (changed) {
-      void petBridge().setPanelSize(session.lastWidth, session.lastHeight)
-        .catch(() => undefined)
-        .finally(() => { window.setTimeout(settle, 30); });
-    } else {
-      settle();
-    }
+    endPanelResizeImpl({ event, sessionRef: resizeSession, movedRef: resizeMovedRef, setResizing: setResizingPanel });
   }
   // Pointer capture can be lost when the window itself moves under the cursor.
   // End the session from the window as well, so no ghost resize survives a
   // missing pointerup and the resize cursor cannot stick after release.
-  useEffect(() => {
-    if (!resizingPanel) return;
-    const finish = (): void => endPanelResize();
-    window.addEventListener('pointerup', finish);
-    window.addEventListener('pointercancel', finish);
-    window.addEventListener('blur', finish);
-    return () => {
-      window.removeEventListener('pointerup', finish);
-      window.removeEventListener('pointercancel', finish);
-      window.removeEventListener('blur', finish);
-      document.body.classList.remove('is-resizing-panel');
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resizingPanel]);
+  useResizeFinish({ resizing: resizingPanel, onFinish: () => endPanelResize() });
 
   useEffect(() => {
     try {
@@ -2730,16 +1992,14 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
   const approvalMode = normalizeApprovalMode(snapshot?.approvalMode);
 
   return (
-    <section className={`panel-bubble${compactEmpty ? ' is-empty' : ''}${expanded ? ' is-expanded' : ''}${sideExpanded ? ' is-side-chat' : ''}${composerOpen || composerExit.closing || ask || plan ? ' is-composing' : ''}${attachments.length ? ' has-attachments' : ''}${modelPickerOpen ? ' is-choosing-model' : ''}`} style={compactEmpty && (composerOpen || composerExit.closing) ? { height: compactComposerHeight } : undefined} aria-label="交互气泡" hidden={!visible} onPointerDown={beginWindowDrag} onDragOver={(event) => { if (event.dataTransfer.types.includes('Files')) event.preventDefault(); }} onDrop={(event) => {
-      if (!event.dataTransfer.files.length) return;
+    <section className={`panel-bubble${compactEmpty ? ' is-empty' : ''}${expanded ? ' is-expanded' : ''}${sideExpanded ? ' is-side-chat' : ''}${composerOpen || composerExit.closing || ask || plan ? ' is-composing' : ''}${attachments.length ? ' has-attachments' : ''}${modelPickerOpen ? ' is-choosing-model' : ''}`} style={compactEmpty && (composerOpen || composerExit.closing) ? { height: compactComposerHeight } : undefined} aria-label="交互气泡" hidden={!visible} onPointerDown={beginWindowDrag} onDragOver={(event) => { if (event.dataTransfer.types.includes('files')) event.preventDefault(); }} onDrop={(event) => {
+      if (!event.dataTransfer.files?.length) return;
       event.preventDefault();
       if (libraryOpen) return;
       setComposerOpen(true);
       void addFiles(Array.from(event.dataTransfer.files));
     }}>
       {expanded && <div className={`panel-resize-grip${resizingPanel ? ' is-resizing' : ''}`} role="separator" aria-label="调整面板大小" onPointerDown={beginPanelResize} onPointerMove={movePanelResize} onPointerUp={endPanelResize} onPointerCancel={endPanelResize} onLostPointerCapture={() => endPanelResize()} />}
-      {!compactEmpty && <div className="panel-tail-dot" role="separator" aria-label="左右拖动人物" title="左右拖动人物"
-        onPointerDown={beginTailDrag} onPointerMove={moveTailDrag} onPointerUp={endTailDrag} onPointerCancel={endTailDrag} />}
       {(!compactEmpty || composerOpen) && <button type="button" className="panel-expand-toggle panel-window-action" aria-label={expanded ? '还原对话气泡' : '放大对话气泡'} title={expanded ? '还原对话' : '放大对话'} onClick={() => { void toggleExpanded().catch(() => undefined); }}>
         {expanded ? <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 8h4V4M12 4v4h4M16 12h-4v4M8 16v-4H4" /></svg> : <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4H4v4M12 4h4v4M16 12v4h-4M4 12v4h4" /></svg>}
       </button>}
@@ -2759,7 +2019,8 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
         running={statusRunning(tabMenu.item)}
         current={tabMenu.item.id === library?.activeConversationId}
         onRename={() => { openLibrary(); setRenameDraft(tabMenu.item.title); setRenameId(tabMenu.item.id); }}
-        onArchive={() => { void libraryAction((bridge) => bridge.archiveConversation(tabMenu.item.id), () => forgetParentSide(tabMenu.item.id)); }}
+        onCloseTab={() => { void closeQuickTab(tabMenu.item); }}
+        onArchive={() => { void libraryAction((bridge) => bridge.archiveConversation(tabMenu.item.id), () => forgetParentSide(tabMenu.item.id, { sideSnapshots, activeConversationIdRef, applySideSnapshotRef, sideComposerStash, sideComposerOpenRef })); }}
         onDelete={() => { openLibrary(); setDeleteId(tabMenu.item.id); }}
         onClose={() => setTabMenu(null)}
       />}
@@ -2773,8 +2034,30 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
         onClose={() => setTurnMenu(null)}
       />}
       <section className="panel-workspace" ref={workspaceRef}>
-        {!compactEmpty && <header className={`panel-chat-header${expanded ? ' is-browser' : ' is-numeric'}`} ref={sessionHeaderRef} onPointerDown={(event) => { const target = event.target as HTMLElement; if (target.closest('button, a, nav, input, textarea, .panel-quick-tab')) return; beginWindowDrag(event, true); }}>
-          <button type="button" className="panel-library-toggle" aria-label={expanded ? '会话库' : '会话菜单'} title={expanded ? '会话库' : '会话菜单'} aria-haspopup={expanded ? undefined : 'menu'} aria-expanded={expanded ? libraryOpen : sessionMenuOpen} onClick={expanded ? () => libraryOpen ? setLibraryOpen(false) : openLibrary() : () => setSessionMenuOpen((open) => !open)}><ConversationsIcon /></button>
+        {!compactEmpty && <header className={`panel-chat-header${expanded ? ' is-browser' : ' is-numeric'}`} ref={sessionHeaderRef} onPointerDown={(event) => { const target = event.target as HTMLElement; if (target.closest('button, a, input, textarea, .panel-quick-tab')) return; beginWindowDrag(event, true); }}>
+          <button type="button" className="panel-library-toggle" aria-label={expanded ? '会话/拓展' : '会话菜单'} title={expanded ? '会话 → 拓展 → 收起' : '会话菜单'} aria-haspopup={expanded ? undefined : 'menu'} aria-expanded={expanded ? libraryOpen : sessionMenuOpen} onClick={expanded ? () => {
+            // 大窗三态循环：会话 → 拓展 → 收起；再次打开回到会话，筛选与搜索保留。
+            if (!libraryOpen) { setLibraryTab('sessions'); void openLibrary(); return }
+            if (libraryTab === 'sessions') { setLibraryTab('market'); return }
+            setLibraryOpen(false);
+          } : () => setSessionMenuOpen((open) => !open)}><ConversationsIcon /></button>
+          <button type="button" className="panel-rail-toggle" aria-label="右侧面板" title="右侧面板：目标、预览与拓展"
+            aria-expanded={rightRail !== 'closed'}
+            onClick={() => {
+              if (rightRail !== 'closed') {
+                if (railTab === 'plan') { setRailTab('preview'); return }
+                setRightRail('closed'); return
+              }
+              void (async () => {
+                await expandPanel()
+                // 宽度不足时左右栏不能同时开，先收起会话库。
+                if (libraryOpen && bubbleWidth < 380) setLibraryOpen(false)
+                setRailTab('plan')
+                setRightRail('overlay')
+              })()
+            }}>
+            <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3.2" y="4" width="13.6" height="12" rx="2.2" /><path d="M13 4v12" /></svg>
+          </button>
           {!expanded && sessionMenuOpen && <div className="panel-session-menu" id="panel-session-menu" role="menu" aria-label="会话菜单"
             onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); setSessionMenuOpen(false); } }}>
             <div className="panel-session-menu-heading">快捷会话</div>
@@ -2785,123 +2068,42 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
               closed: the "+" stays put so a new session is one click away,
               and the row never blinks out under the pointer. */}
           <nav className={`panel-quick-tabs${tabDragOrder ? ' is-dragging' : ''}`} ref={quickTabsRef} aria-label={expanded ? '顶部会话标签' : '顶部会话数字快捷切换'}>
-            {quickTabs.map((item, index) => <button key={item.id} type="button" data-tab-id={item.id} className={`panel-quick-tab${item.id === library?.activeConversationId ? ' is-current' : ''}${tabDragOrder && tabDragRef.current?.id === item.id ? ' is-dragging' : ''}`} aria-label={`${index + 1}：${item.title}，${taskLabels[conversationStatus(item)]}`} aria-current={item.id === library?.activeConversationId ? 'page' : undefined} title={`${item.title}，${taskLabels[conversationStatus(item)]}`} aria-disabled={libraryBusy || item.id === library?.activeConversationId} onContextMenu={(event) => showTabMenu(event, item)} onPointerDown={(event) => beginTabDrag(event, item)} onClick={() => { if (tabClickSuppressRef.current) { tabClickSuppressRef.current = false; return; } if (!libraryBusy && item.id !== library?.activeConversationId) void selectConversation(item); }}><i className={`panel-task-dot panel-task-dot-${conversationStatus(item)}`} aria-hidden="true" /><span className="panel-quick-tab-label">{expanded ? item.title : index + 1}</span></button>)}
+            {quickTabs.map((item, index) => <button key={item.id} type="button" data-tab-id={item.id} className={`panel-quick-tab${item.id === library?.activeConversationId ? ' is-current' : ''}${tabDragOrder && tabDragRef.current?.id === item.id ? ' is-dragging' : ''}`} aria-label={`${index + 1}：${item.title}，${taskLabels[conversationStatus(item)]}`} aria-current={item.id === library?.activeConversationId ? 'page' : undefined} title={`${item.title}，${taskLabels[conversationStatus(item)]}`} aria-disabled={libraryBusy || item.id === library?.activeConversationId} onContextMenu={(event) => showTabMenu(event, item)} onPointerDown={(event) => beginTabDrag(event, item)} onClick={() => { if (tabClickSuppressRef.current) { tabClickSuppressRef.current = false; return; } if (!libraryBusy && item.id !== library?.activeConversationId) void selectConversation(item); }}><i className={`panel-task-dot panel-task-dot-${conversationStatus(item)}`} aria-hidden="true" /><span className="panel-quick-tab-label">{expanded && !tabCompact ? item.title : index + 1}</span>{expanded && <span role="button" tabIndex={-1} className="panel-quick-tab-close" aria-label={`关闭标签：${item.title}`} title="关闭标签，会话保留在未归档" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); void closeQuickTab(item); }}>×</span>}</button>)}
             {showNewTabButton(quickTabs.length, tabLimit) && <button type="button" className="panel-quick-tab panel-quick-tab-new" aria-label="新建会话" title="新建会话" onClick={() => { if (!libraryBusy) void createConversation(); }}><PlusIcon /></button>}
           </nav>
         </header>}
+        {rightRail !== 'closed' && <RightRail railTab={railTab} snapshot={snapshot} preview={preview} bottom={drawerBottom ?? 0} onClose={() => setRightRail('closed')} />}
         <div className="panel-chat-body">
         {(libraryOpen || drawerExit.closing) && drawerBottom !== null && <aside className={`panel-library-drawer${libraryOpen ? '' : ' is-closing'}`} style={{ bottom: drawerBottom ?? 0 }} aria-label="会话列表" onAnimationEnd={drawerExit.endClose}>
-          <header className="panel-library-header">
-            <button type="button" className="panel-library-icon panel-library-back" aria-label="返回对话" title="返回对话" onClick={() => setLibraryOpen(false)}><BackIcon /></button>
-            <h2>会话</h2>
-            <button type="button" className="panel-library-icon panel-library-select" aria-label={multiSelect ? '退出多选' : '多选会话'} title={multiSelect ? '退出多选' : '多选会话'} aria-pressed={multiSelect} disabled={libraryBusy} onClick={() => { if (multiSelect) { setMultiSelect(false); clearSelection(); } else { setMultiSelect(true); setDeleteId(null); setRenameId(null); } }}><SelectIcon /></button>
-            <button type="button" className="panel-library-icon panel-library-import" aria-label="导入会话" title="从文件导入会话" disabled={libraryBusy}
-              onClick={() => { void run(async (bridge) => { await bridge.importConversation?.(); }); }}><ImportIcon /></button>
-            <button type="button" className="panel-library-icon panel-library-new" disabled={libraryBusy} aria-label="新建会话" title="新建会话" onClick={() => { void createConversation(); }}><PlusIcon /></button>
-          </header>
+          <LibraryHeader tab={libraryTab} busy={libraryBusy} multiSelect={multiSelect} onBack={() => setLibraryOpen(false)} onToggleMulti={() => { if (multiSelect) { setMultiSelect(false); clearSelection(); } else { setMultiSelect(true); setDeleteId(null); setRenameId(null); } }} onImport={() => { void run(async (bridge) => { await bridge.importConversation?.(); }); }} onNew={() => { void createConversation(); }} />
+          {libraryTab === 'sessions' && <>
           <div className="panel-library-tabs" role="tablist" aria-label="会话状态">
             <button type="button" role="tab" aria-selected={!libraryArchived} onClick={() => { setLibraryArchived(false); clearSelection(); }}>未归档</button>
             <button type="button" role="tab" aria-selected={libraryArchived} onClick={() => { setLibraryArchived(true); clearSelection(); }}>已归档</button>
           </div>
           <input className="panel-library-search" type="search" aria-label="搜索会话" placeholder="搜索会话与消息" value={libraryQuery} onChange={(event) => { setLibraryQuery(event.target.value); clearSelection(); }} />
           {libraryError && <div className="panel-library-error" role="alert">{libraryError}</div>}
-          <div className="panel-session-list" aria-label={libraryArchived ? '已归档会话' : '未归档会话'}>
+          <div className="panel-session-list" ref={sessionListRef} onScroll={(event) => { sessionScrollRef.current = event.currentTarget.scrollTop; }} aria-label={libraryArchived ? '已归档会话' : '未归档会话'}>
             {searchStatus === 'loading' && <div className="panel-library-empty" role="status">正在搜索…</div>}
             {searchStatus === 'error' && <div className="panel-library-empty" role="alert">搜索失败，请重新输入或切换分类后重试。</div>}
             {visibleConversations.length === 0 && (searchStatus === 'done' || !searchActive) && <div className="panel-library-empty">{searchActive ? '没有找到会话' : libraryArchived ? '暂无归档会话' : '开始一个新对话'}</div>}
             {displayedGroups.map((group) => <div key={group.key} className="panel-library-group">
+              {group.dividerBefore && <div className="panel-library-divider" role="separator" aria-label="标签页中的会话与其余会话的分界" />}
               {group.label && <div className="panel-library-group-heading">{group.label}</div>}
-              {group.conversations.map((item) => <div key={item.id} className={`panel-session${library?.activeConversationId === item.id ? ' is-current' : ''}${selectedSessionIds.has(item.id) ? ' is-selected' : ''}`}>
-              {!multiSelect && renameId === item.id ? <form className="panel-session-edit" onSubmit={(event) => { event.preventDefault(); void saveRename(item.id); }}>
-                <input autoFocus aria-label="会话名称" maxLength={120} value={renameDraft} onChange={(event) => setRenameDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Escape') setRenameId(null); }} />
-                <button type="submit" className="panel-session-save" aria-label="保存名称" title="保存名称" disabled={libraryBusy}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m4.8 10.6 3.4 3.4 7-7.4" /></svg></button><button type="button" onClick={() => setRenameId(null)}>取消</button>
-              </form> : !multiSelect && deleteId === item.id ? <div className="panel-session-confirm">
-                <span>永久删除“{item.title}”？</span>
-                <button type="button" disabled={libraryBusy} onClick={() => { void libraryAction((bridge) => bridge.deleteConversation(item.id), () => { forgetParentSide(item.id); composerStash.current.delete(item.id); setDeleteId(null); }); }}>确认删除</button>
-                <button type="button" onClick={() => setDeleteId(null)}>取消</button>
-              </div> : <>
-                <button type="button" className={`panel-session-main${multiSelect ? ' is-selecting' : ''}`} disabled={libraryBusy} aria-pressed={multiSelect ? selectedSessionIds.has(item.id) : undefined} aria-label={multiSelect ? `${selectedSessionIds.has(item.id) ? '取消选择' : '选择'} ${item.title}` : undefined} onKeyDown={(event) => { if (event.altKey && event.key === 'Enter') { event.preventDefault(); toggleSelected(item.id); } }} onClick={(event) => { if (multiSelect || event.altKey) toggleSelected(item.id); else void selectConversation(item); }}>
-                  {multiSelect && <i className={`panel-session-check${selectedSessionIds.has(item.id) ? ' is-checked' : ''}`} aria-hidden="true">{selectedSessionIds.has(item.id) ? '✓' : ''}</i>}
-                  <strong>{item.title}</strong><span>{item.preview || (item.archivedAt ? '点击恢复' : '暂无消息')}</span>
-                </button>
-                {!multiSelect && <div className="panel-session-actions">
-                  <button type="button" aria-label={`导出 ${item.title}`} title="导出会话" disabled={libraryBusy}
-                    onClick={() => { void run(async (bridge) => { await bridge.exportConversation?.(item.id); }); }}><ExportIcon /></button>
-                  {!item.archivedAt && <button type="button" aria-label={item.pinnedAt ? '取消置顶' : '置顶会话'} title={item.pinnedAt ? '取消置顶' : '置顶会话'} disabled={libraryBusy} onClick={() => { void libraryAction((bridge) => bridge.setConversationPinned(item.id, !item.pinnedAt)); }}><PinIcon pinned={Boolean(item.pinnedAt)} /></button>}
-                  <button type="button" aria-label={`重命名 ${item.title}`} title="重命名" onClick={() => { setRenameId(item.id); setRenameDraft(item.title); }}><EditIcon /></button>
-                  <button type="button" aria-label={`${item.archivedAt ? '恢复' : '归档'} ${item.title}`} title={statusRunning(item) ? '这个会话还在运行，结束后才能归档' : item.archivedAt ? '恢复' : '归档'} disabled={libraryBusy || statusRunning(item)} onClick={() => { void libraryAction((bridge) => item.archivedAt ? bridge.restoreConversation(item.id) : bridge.archiveConversation(item.id), () => { if (!item.archivedAt) forgetParentSide(item.id); }); }}><ArchiveIcon restore={Boolean(item.archivedAt)} /></button>
-                  <button type="button" aria-label={`删除 ${item.title}`} title={statusRunning(item) ? '这个会话还在运行，结束后才能删除' : '删除'} disabled={libraryBusy || statusRunning(item)} onClick={() => setDeleteId(item.id)}><DeleteIcon /></button>
-                </div>}
-                {!multiSelect && <div className="panel-session-meta" aria-hidden="true">
-                  <span>{modeLabels[item.mode]}</span>
-                  <span>创建 {stampText(item.createdAt)}</span>
-                  <span>活动 {stampText(item.lastActivityAt)}</span>
-                  <span>{item.messageCount} 条消息</span>
-                </div>}
-              </>}
-              </div>)}
+              {group.conversations.map((item) => <SessionRow key={item.id} item={item} active={library?.activeConversationId === item.id} selected={selectedSessionIds.has(item.id)} multiSelect={multiSelect} busy={libraryBusy} renaming={renameId === item.id} deleting={deleteId === item.id} renameDraft={renameDraft} onRenameDraft={setRenameDraft} onStartRename={() => { setRenameId(item.id); setRenameDraft(item.title); }} onCancelRename={() => setRenameId(null)} onSaveRename={() => { void saveRename(item.id); }} onStartDelete={() => setDeleteId(item.id)} onCancelDelete={() => setDeleteId(null)} onSelect={() => { void selectConversation(item); }} onToggleSelected={() => toggleSelected(item.id)} onLibraryAction={libraryAction} onForgetParentSide={(id) => { forgetParentSide(id, { sideSnapshots, activeConversationIdRef, applySideSnapshotRef, sideComposerStash, sideComposerOpenRef }); composerStash.current.delete(id); }} />)}
             </div>)}
           </div>
-          {multiSelect && <div className="panel-library-batch" aria-label="批量会话操作">
-            {batchDeleteConfirm ? <>
-              <span className="panel-library-batch-confirm">永久删除 {selectedVisibleIds.length} 个会话？</span>
-              <button type="button" disabled={libraryBusy || selectedVisibleIds.length === 0} onClick={() => { void batchManage('delete', selectedVisibleIds); }}>删除</button>
-              <button type="button" onClick={() => setBatchDeleteConfirm(false)}>取消</button>
-            </> : <>
-              <span className="panel-library-batch-count">已选 {selectedVisibleIds.length}</span>
-              <button type="button" aria-label="全选当前列表" title="全选当前列表" disabled={libraryBusy || visibleSessionIds.length === 0} onClick={() => { setSelectedSessionIds(new Set(visibleSessionIds.slice(0, 100))); if (visibleSessionIds.length > 100) setLibraryError('一次最多选择前 100 个会话。'); }}><SelectIcon /></button>
-              {!libraryArchived && <button type="button" aria-label={batchUnpin ? '取消置顶已选会话' : '置顶已选会话'} title={batchUnpin ? '取消置顶已选会话' : '置顶已选会话'} disabled={libraryBusy || selectedVisibleIds.length === 0} onClick={() => { void batchManage(batchUnpin ? 'unpin' : 'pin', selectedVisibleIds); }}><PinIcon pinned={batchUnpin} /></button>}
-              <button type="button" aria-label={libraryArchived ? '恢复已选会话' : '归档已选会话'} title={libraryArchived ? '恢复已选会话' : '归档已选会话'} disabled={libraryBusy || selectedVisibleIds.length === 0} onClick={() => { void batchManage(libraryArchived ? 'restore' : 'archive', selectedVisibleIds); }}><ArchiveIcon restore={libraryArchived} /></button>
-              <button type="button" aria-label="删除已选会话" title="删除已选会话" disabled={libraryBusy || selectedVisibleIds.length === 0} onClick={() => setBatchDeleteConfirm(true)}><DeleteIcon /></button>
-            </>}
-          </div>}
+          {multiSelect && <LibraryBatchBar confirm={batchDeleteConfirm} busy={libraryBusy} count={selectedVisibleIds.length} visibleCount={visibleSessionIds.length} archived={libraryArchived} unpin={batchUnpin} onConfirm={() => { void batchManage('delete', selectedVisibleIds); }} onCancelConfirm={() => setBatchDeleteConfirm(false)} onDelete={() => setBatchDeleteConfirm(true)} onSelectAll={() => { setSelectedSessionIds(new Set(visibleSessionIds.slice(0, 100))); if (visibleSessionIds.length > 100) setLibraryError('一次最多选择前 100 个会话。'); }} onManage={(action) => { void batchManage(action, selectedVisibleIds); }} />}
+          </>}
+          {libraryTab === 'market' && <LibraryMarket kind={railMarketKind} setKind={setRailMarketKind} installed={installedExtended} />}
         </aside>}
         <div className="panel-chat-main">
-        {sideSessionId && <div className={`panel-side-strip${sideExpanded ? ' is-expanded' : ''}`} aria-label="临时会话">
-          {sideExpanded ? <>
-            <button type="button" className="panel-side-back" aria-label="收起临时会话，返回主线" title="返回主线，临时会话继续保留" onClick={() => { void setSideExpanded(false); }}><BackIcon /><span>主线</span></button>
-            {status !== 'idle' && <span className={`panel-status panel-status-${status}`} role="status"><i />{statusLive ? <span className="panel-live-label">{taskLabels[status]}</span> : taskLabels[status]}</span>}
-            <span className="panel-side-meta">
-              {sideChat?.queuePaused && <span className="panel-side-paused" title={sideChat.pauseReason || '发送新消息后继续处理保留的队列'}>已停止，队列保留</span>}
-              <span className="panel-side-name">临时会话</span>
-            </span>
-          </> : <button type="button" className="panel-side-chip" aria-label={`展开临时会话，${sideChat?.queuePaused ? '已停止，队列保留' : taskLabels[sideStatus]}`} title={sideChat?.queuePaused ? '已停止，队列保留；点击展开' : '展开临时会话'} onClick={() => { void setSideExpanded(true); }}><i className={`panel-task-dot panel-task-dot-${sideStatus}`} aria-hidden="true" />临时会话</button>}
-          <button type="button" className="panel-side-discard" aria-label="结束并丢弃临时会话" title="结束临时会话，记录不进入会话库" onClick={() => { void discardSide(); }}>×</button>
-        </div>}
-        {(status !== 'idle' || (snapshot?.subagents?.length ?? 0) > 0) && !sideExpanded && (
-          <div className="panel-status-row">
-            <span className={`panel-status panel-status-${status}`} role="status"><i />{statusLive ? <span className="panel-live-label">{taskLabels[status]}</span> : taskLabels[status]}</span>
-            <SubagentTray subagents={snapshot?.subagents} controlsEnabled={snapshot?.subagentControls !== false}
-              onBackgroundTask={snapshot?.subagentControls === false ? undefined : (task) => {
-                const toolUseId = task.toolUseId;
-                if (!toolUseId) return;
-                void run(async (bridge) => { await bridge.backgroundTask(toolUseId, activeConversationIdRef.current ?? undefined); });
-              }}
-              onStopTask={snapshot?.subagentControls === false ? undefined : (task) => {
-                void run(async (bridge) => { await bridge.stopTask(task.taskId, activeConversationIdRef.current ?? undefined); });
-              }}
-              onMessageSubagent={snapshot?.subagentControls === false ? undefined : (task, text) => {
-                const toolUseId = task.toolUseId;
-                if (!toolUseId) return;
-                void run(async (bridge) => { await bridge.messageSubagent(toolUseId, text, activeConversationIdRef.current ?? undefined); });
-              }} />
-          </div>
-        )}
-
+        <PanelStatusBar sideOpen={Boolean(sideSessionId)} sideExpanded={sideExpanded} onToggleSide={(expanded) => { void setSideExpanded(expanded); }} onDiscardSide={() => { void discardSide(); }} status={status} sideStatus={sideStatus} queuePaused={Boolean(sideChat?.queuePaused)} queueReason={sideChat?.pauseReason} snapshot={snapshot} conversationId={library?.activeConversationId ?? undefined} controlsEnabled={snapshot?.subagentControls !== false} onBackgroundTask={(task) => { const toolUseId = task.toolUseId; if (!toolUseId) return; void run(async (bridge) => { await bridge.backgroundTask(toolUseId, activeConversationIdRef.current ?? undefined); }); }} onStopTask={(task) => { void run(async (bridge) => { await bridge.stopTask(task.taskId, activeConversationIdRef.current ?? undefined); }); }} onMessageSubagent={(task, text) => { const toolUseId = task.toolUseId; if (!toolUseId) return; void run(async (bridge) => { await bridge.messageSubagent(toolUseId, text, activeConversationIdRef.current ?? undefined); }); }} />
         <div className="panel-feed-wrap" ref={feedWrapRef}>
           <TimelineNav marks={navMarkList} onJump={jumpToEntry} windowSize={expanded ? NAV_WINDOW_WIDE : NAV_WINDOW_COMPACT} baseWidth={expanded ? 12 : 8.8} />
-          <div className="panel-feed" ref={feedRef} aria-label="对话与任务时间线" onScroll={(event) => {
-            const feed = event.currentTarget;
-            // 切换对话后的程序滚动保持跟随，不算用户离开底部。
-            if (switchJumpRef.current) { followFeedRef.current = true; setFeedAtBottom(true); return; }
-            const atBottom = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 48;
-            followFeedRef.current = atBottom;
-            setFeedAtBottom(atBottom);
-            // Reaching the top pulls in the next stretch of older history.
-            if (feed.scrollTop < 240) loadEarlier();
-          }}>
+          <div className="panel-feed" ref={feedRef} aria-label="对话与任务时间线" onScroll={onFeedScroll}>
             {sideExpanded && <p className="panel-side-intro">临时会话，记录不进入会话库</p>}
-            {historyLoading && <p className="panel-history-loading" role="status">正在加载历史…</p>}
+            {!snapshot && <p className="panel-history-loading" role="status">正在连接对话…</p>}
             {visibleGroups.map((group, index) => {
               if (group.kind === 'single') {
                 if (group.entry.divider) {
@@ -2911,56 +2113,17 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
               }
               const segments = segmentTurn(group.items);
               const isLiveTurn = index === latestTurnIndex && active;
-              // 思考中：插话按顺序留在过程流里——那就是当时的现场，不提前
-              // 搬走。这一轮结束、过程合并成一条之后，插话才整体抬到折叠链
-              // 上方，按条数叠成一列：折叠不被插话打断，链任何时候都能收。
-              const { asides, flow } = isLiveTurn
-                ? { asides: [] as Array<Extract<TurnSegment, { kind: 'user' }>>, flow: segments }
-                : liftAsides(segments);
-              // A finished turn folds everything before its final sentence into
-              // one process row, so the outcome is what stays in sight; while
-              // the turn runs, nothing folds — its process is the view.
-              const { head, tail } = splitTurnTail(flow, isLiveTurn);
+              // 插话不再抬到顶部：按时间顺序留在思考链里，由 TurnProcess 的
+              // renderUser 渲染，和前后步骤保持先后关系。
+              const { head, tail } = splitTurnTail(segments, isLiveTurn);
               // One reply is one box — avatar and clock once at its top, the
               // pieces listed beneath like an unordered list — so alignment is
               // structural, and none of the pieces become rail marks.
               const firstReplyId = group.items.find((item) => item.kind === 'assistant')?.id;
-              // "Latest reply" is the turn's final entry itself: a mid-turn
-              const runAnchor = group.items[0];
-              return <div className="panel-turn" key={group.user.id}>
-                {group.user.divider
-                  ? <div className="panel-timeline-divider"><span>{group.user.text.split('\n')[0]}</span></div>
-                  : <TimelineItem entry={group.user} display={rowDisplay} onOpenImage={openImageViewer} onKill={killTurn} onAvatarMenu={sideExpanded ? undefined : (event) => showTurnMenu(event, group.user.id, turnMenuTitle(group.user), isLiveTurn)} />}
-                {/* 插话夹在自己的消息和这条回复之间，按条数叠成一列——它们是
-                    消息，不是小鲸气泡里的东西；过程依旧整条可折叠。 */}
-                {asides.length > 0 && <div className="panel-turn-asides">
-                  {asides.map((segment) => <TimelineItem key={segment.entry.id} entry={segment.entry} display={rowDisplay} onKill={killTurn} onOpenImage={openImageViewer} />)}
-                </div>}
-                {runAnchor && <article className="panel-event panel-event-assistant is-run" data-entry-id={firstReplyId ?? runAnchor.id}
-                  aria-label={`${kindLabels.assistant}，${timeText(runAnchor.time)}`}>
-                  <div className="panel-event-avatar" aria-hidden="true" onContextMenu={sideExpanded ? undefined : (event) => showTurnMenu(event, group.user.id, turnMenuTitle(group.user), isLiveTurn)}>
-                    <AvatarGlyph kind="assistant" fallback="鲸" name={rowDisplay.avatars.assistant} presetSrc={rowDisplay.personaAvatar} />
-                    {rowDisplay.showTimestamps && <time className="panel-event-time" dateTime={runAnchor.time}>{timeText(runAnchor.time)}</time>}
-                  </div>
-                  <div className="panel-event-body">
-                    {head.length > 0 && <TurnProcess segments={head} renderEntry={renderEntry} renderNote={renderNote} />}
-                    {tail.map((segment, segmentIndex) => segment.kind === 'note'
-                      ? <RunParagraph key={segment.entry.id} entry={segment.entry} onOpenImage={openImageViewer} />
-                      : segment.kind === 'user'
-                      ? <TimelineItem key={segment.entry.id} entry={segment.entry} display={rowDisplay} onKill={killTurn} onOpenImage={openImageViewer} />
-                      : <WorkCluster
-                          key={segment.id}
-                          items={segment.items}
-                          running={isLiveTurn && segmentIndex === tail.length - 1}
-                          renderEntry={renderEntry}
-                        />)}
-                  </div>
-                </article>}
-                <TurnStats entries={group.items}
-                  metrics={group.user.metrics ?? (index === latestTurnIndex && active ? snapshot?.taskMetrics : undefined)}
-                  running={index === latestTurnIndex && active}
-                  showMissingUsage={index === latestTurnIndex && !active} />
-              </div>;
+              // 最后一轮在模型开口前也先渲染助手块：头像和竖线在发送那一刻
+              // 就该在，不能等第一条思考/工具条目出现才跟着冒出来。
+              const runAnchor = group.items[0] ?? (index === visibleGroups.length - 1 ? group.user : undefined);
+              return <TurnBlock key={group.user.id} user={group.user} asides={[]} head={head} tail={tail} runAnchor={runAnchor} firstReplyId={firstReplyId} live={isLiveTurn} display={rowDisplay} showAsides={!sideExpanded} onOpenImage={openImageViewer} onKill={killTurn} onAvatarMenu={(event) => showTurnMenu(event, group.user.id, turnMenuTitle(group.user), isLiveTurn)} renderEntry={renderEntry} renderNote={renderNote} stats={{ entries: group.items, metrics: group.user.metrics ?? (index === latestTurnIndex && active ? snapshot?.taskMetrics : undefined), running: index === latestTurnIndex && active, showMissingUsage: index === latestTurnIndex && !active }} />;
             })}
             <WorkingIndicator sending={sendingCurrent} thinking={liveThinking} status={status} tool={runningTool}
               compacting={Boolean(snapshot?.contextCompacting)} compactingAuto={Boolean(snapshot?.contextCompactingAuto)}
@@ -2975,7 +2138,7 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
             )}
           </div>
 
-          {!feedAtBottom && !modelPickerOpen && !effortMenuOpen && !contextMenuOpen && <button
+          {!feedAtBottom && !modelPickerOpen && !contextMenuOpen && <button
             type="button"
             className={`panel-scroll-bottom${active ? ' is-running' : ''}`}
             aria-label="回到底部"
@@ -2996,38 +2159,85 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
 
         {pendingMessages.length > 0 && <div className="panel-queue" aria-label="待发送消息">
           <div className="panel-queue-heading">待发送 <strong>{pendingMessages.length}</strong></div>
-          <div className="panel-queue-list">{pendingMessages.map((message) => <div key={message.id} className="panel-queue-item">
+          <div className="panel-queue-list">{pendingMessages.map((message) => <div key={message.id}
+            className={`panel-queue-item${queueDragId === message.id ? ' is-dragging' : ''}${queueDropBefore === message.id && queueDragId !== message.id ? ' is-drop-before' : ''}`}
+            onDragOver={(event) => {
+              if (!queueDragId || queueDragId === message.id) return;
+              event.preventDefault();
+              setQueueDropBefore(message.id);
+            }}
+            onDrop={(event) => {
+              if (!queueDragId) return;
+              event.preventDefault();
+              const moving = queueDragId;
+              const before = message.id;
+              setQueueDragId(null);
+              setQueueDropBefore(null);
+              if (moving !== before) void moveQueuedMessage(moving, before);
+            }}>
+            <button type="button" className="panel-queue-grip" draggable aria-label="拖动调整待发送消息顺序" title="拖动调整顺序"
+              onDragStart={(event) => {
+                event.dataTransfer.effectAllowed = 'move';
+                event.dataTransfer.setData('text/plain', message.id);
+                // 只拖三横标本身，不拖整行。
+                event.dataTransfer.setDragImage(event.currentTarget, 9, 11);
+                setQueueDragId(message.id);
+              }}
+              onDragEnd={() => { setQueueDragId(null); setQueueDropBefore(null); }}>
+              <GripIcon />
+            </button>
             <span title={message.text}>{message.text || `附件 ${message.attachments.length} 个`}</span>
             <button type="button" aria-label={`引导：${message.text.slice(0, 20)}`} title="插队发送（不打断当前回答，Ctrl+Enter）" onClick={() => { const id = sideExpanded ? sideSessionId : null; void run((bridge) => id ? bridge.steerSideQueuedMessage(id, message.id) : bridge.steerQueuedMessage(message.id)); }}><ReturnIcon /></button>
             <button type="button" aria-label={`修改待发送消息：${message.text.slice(0, 20)}`} title="修改" onClick={() => { void editQueuedMessage(message); }}><EditIcon /></button>
-            <button type="button" aria-label={`移除待发送消息：${message.text.slice(0, 20)}`} title="从队列移除" onClick={() => { const id = sideExpanded ? sideSessionId : null; void run((bridge) => id ? bridge.removeSideQueuedMessage(id, message.id) : bridge.removeQueuedMessage(message.id)); }}>×</button>
-          </div>)}</div>
+            <button type="button" aria-label={`移除待发送消息：${message.text.slice(0, 20)}`} title="从队列移除" onClick={() => { const id = sideExpanded ? sideSessionId : null; void run((bridge) => id ? bridge.removeSideQueuedMessage(id, message.id) : bridge.removeQueuedMessage(message.id)); }}><CloseIcon /></button>
+          </div>)}
+          {queueDragId && <div className="panel-queue-tail" aria-hidden="true"
+            onDragOver={(event) => { event.preventDefault(); setQueueDropBefore(null); }}
+            onDrop={(event) => {
+              event.preventDefault();
+              const moving = queueDragId;
+              setQueueDragId(null);
+              setQueueDropBefore(null);
+              void moveQueuedMessage(moving, null);
+            }} />}
+          </div>
         </div>}
 
         {!compactEmpty && <TaskStrip key={sideExpanded ? sideSessionId : library?.activeConversationId} tasks={tasks}
           planMode={Boolean(snapshot?.planMode)} planSummary={sideExpanded ? undefined : snapshot?.approvedPlan} />}
 
-        {!compactEmpty && !sideExpanded && snapshot?.goal && <GoalBanner goal={snapshot.goal} onClear={clearGoal} />}
+        {!compactEmpty && !sideExpanded && snapshot?.goal && <GoalBanner goal={snapshot.goal} onClear={clearGoal}
+          onPause={(paused) => { void (async () => {
+            const ok = await run((bridge) => bridge.setGoalPaused(paused));
+            // 从暂停切回播放等于发一条“继续目标”，让 agent 立刻接着跑。
+            if (ok && !paused) await sendGoal('继续执行目标');
+          })(); }}
+          onEdit={() => { setDraft(snapshot.goal?.condition ?? ''); setGoalPrompting(true); setComposerOpen(true); }}
+          onContinue={() => { void sendGoal('继续执行目标') }} />}
 
         <div className={`panel-compose-dock${composerOpen || composerExit.closing || ask || plan || permission ? ' is-open' : ''}`} ref={composeDockRef}>
           {ask ? (
             <AskQuestionPanel
               key={ask.id}
-              request={ask}
-              onSubmit={(answers) => run((bridge) => sideExpanded && sideSessionId ? bridge.answerSideChatQuestion(sideSessionId, ask.id, answers) : bridge.answerQuestion(ask.id, answers))}
+              request={localizeAskRequest(ask)}
+              onSubmit={(answers) => run((bridge) => sideExpanded && sideSessionId ? bridge.answerSideChatQuestion(sideSessionId, ask.id, answers) : bridge.answerQuestion(ask.id, restoreAskAnswers(answers)))}
               onSkip={() => run((bridge) => sideExpanded && sideSessionId ? bridge.answerSideChatQuestion(sideSessionId, ask.id, null) : bridge.answerQuestion(ask.id, null))}
             />
           ) : plan ? (
             <PlanApprovalPanel
               key={plan.id}
               request={plan}
-              onDecide={(approved) => run((bridge) => sideExpanded && sideSessionId ? bridge.answerSideChatPlan(sideSessionId, plan.id, approved) : bridge.answerPlan(plan.id, approved))}
+              onDecide={(approved, note) => {
+                // 自己写的修改意见随「继续调整」带回输入框，用户接着改再发。
+                if (!approved && note?.trim()) setDraft(note.trim())
+                return run((bridge) => sideExpanded && sideSessionId ? bridge.answerSideChatPlan(sideSessionId, plan.id, approved) : bridge.answerPlan(plan.id, approved))
+              }}
             />
           ) : permission ? (
             <ToolApprovalPanel
               key={permission.id}
               request={permission}
-              onDecide={(allow) => run((bridge) => bridge.answerPermission(permission.id, allow))}
+              onDecide={(decision) => run((bridge) => bridge.answerPermission(permission.id, decision))}
             />
           ) : composerOpen || composerExit.closing ? (
           <form className={`panel-composer${composerOpen ? '' : ' is-closing'}`} ref={composerRef} onAnimationEnd={composerExit.endClose} onSubmit={(event) => { event.preventDefault(); void send('queue'); }} onKeyDown={(event) => {
@@ -3038,22 +2248,10 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
                 if (modelPickerOpen) setModelPickerOpen(false);
               }
             }}>
-              <button type="button" className="panel-composer-collapse" aria-label="收起输入框" title="收起输入框" onClick={closeComposer}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" /></svg></button>
+              {!compactEmpty && <button type="button" className="panel-composer-collapse" aria-label="收起输入框" title="收起输入框" onClick={closeComposer}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" /></svg></button>}
               {suggestionOpen && suggestionTrigger && <ComposerSuggestions kind={suggestionTrigger.kind} query={suggestionTrigger.query} items={suggestionItems} selectedIndex={suggestionSelected} loading={suggestionLoading} failed={suggestionFailed} onSelect={acceptSuggestion} />}
-              {attachments.length > 0 && <div className="panel-attachments" aria-label="已添加附件"
-                onMouseLeave={() => setPreviewCard(null)} onBlur={() => setPreviewCard(null)}>
-                {attachments.map((attachment) => { const badge = fileBadge(attachment.name); return <span key={attachment.id} className="panel-attachment-chip" title={attachment.name}
-                  onMouseEnter={(event) => showAttachmentPreview(attachment, event.currentTarget)}
-                  onFocus={(event) => showAttachmentPreview(attachment, event.currentTarget)}
-                  onClick={(event) => { if (!(event.target as HTMLElement).closest('button')) void openAttachmentImage(attachment); }}>
-                  <i aria-hidden="true">{badge.kind}</i>
-                  <span>{badge.stem}</span>
-                  <button type="button" aria-label={`移除 ${attachment.name}`} onClick={() => setAttachments((current) => current.filter((item) => item.id !== attachment.id))}>×</button>
-                </span>})}
-              </div>}
-              {previewCard && attachmentPreviews[previewCard.path] && attachments.some((item) => item.path === previewCard.path) &&
-                <AttachmentPreview placement={previewCard.placement} name={previewCard.name} src={attachmentPreviews[previewCard.path]} />}
-              {attachmentError && <div className="panel-attachment-error" role="status">{attachmentError}</div>}
+              <AttachmentChips attachments={attachments} onHover={showAttachmentPreview} onLeave={() => setPreviewCard(null)} onOpen={(attachment) => { void openAttachmentImage(attachment); }} onRemove={(id) => setAttachments((current) => current.filter((item) => item.id !== id))} />
+              <AttachmentPreviewStrip preview={previewCard} previews={attachmentPreviews} names={attachments.map((item) => item.path)} error={attachmentError} />
               <div className="panel-composer-inputrow">
                 <textarea
                   ref={editorRef}
@@ -3066,59 +2264,8 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
                   aria-controls={suggestionOpen ? 'panel-composer-suggestions' : undefined}
                   aria-expanded={suggestionOpen && (suggestionLoading || suggestionItems.length > 0)}
                   aria-activedescendant={suggestionOpen && suggestionItems.length > 0 ? `panel-suggestion-${suggestionSelected}` : undefined}
-                  onChange={(event) => { setDraft(event.target.value); setCaretIndex(event.target.selectionStart); setDismissedSuggestion(null); }}
-                  onClick={(event) => setCaretIndex(event.currentTarget.selectionStart)}
-                  onKeyUp={(event) => { if (['ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key)) setCaretIndex(event.currentTarget.selectionStart); }}
-                  onPaste={(event) => {
-                    const files = pastedFiles(event.clipboardData);
-                    if (!files.length) return;
-                    event.preventDefault();
-                    void addFiles(files);
-                  }}
-                  onKeyDown={(event) => {
-                    if (suggestionOpen && !event.nativeEvent.isComposing) {
-                      if (event.key === 'Escape') {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        setDismissedSuggestion(suggestionKey);
-                        return;
-                      }
-                      if (suggestionItems.length > 0 && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
-                        event.preventDefault();
-                        setSuggestionSelected((current) => (current + (event.key === 'ArrowDown' ? 1 : -1) + suggestionItems.length) % suggestionItems.length);
-                        return;
-                      }
-                      // Tab 接受当前高亮项：命令、技能、文件和会话引用走同一套补全。
-                      // 不拦下的话 Tab 会把焦点移出输入框。
-                      if (suggestionItems.length > 0 && event.key === 'Tab') {
-                        event.preventDefault();
-                        acceptSuggestion(suggestionItems[suggestionSelected] ?? suggestionItems[0]);
-                        return;
-                      }
-                      if (suggestionItems.length > 0 && event.key === 'Enter' && !event.ctrlKey && !event.metaKey) {
-                        event.preventDefault();
-                        acceptSuggestion(suggestionItems[suggestionSelected] ?? suggestionItems[0]);
-                        return;
-                      }
-                    }
-                    // 目标模式：Tab 直接补上“全部完成前不要停”，再回车就设定。
-                    if (goalPrompting && event.key === 'Tab' && !event.nativeEvent.isComposing) {
-                      event.preventDefault();
-                      const editor = editorRef.current;
-                      if (!editor || editor.value.trim()) return;
-                      const defaultGoal = '在把我交代的任务全部完成之前不要停下';
-                      setDraft(defaultGoal);
-                      requestAnimationFrame(() => {
-                        editor.focus();
-                        editor.setSelectionRange(defaultGoal.length, defaultGoal.length);
-                      });
-                      return;
-                    }
-                    if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
-                      event.preventDefault();
-                      void send(event.ctrlKey || event.metaKey ? 'steer' : 'queue');
-                    }
-                  }}
+                  {...composerKeys}
+                
                 />
               </div>
               <VoiceWaveform phase={voicePhase} />
@@ -3130,120 +2277,14 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
                     if (files.length) void addFiles(files);
                   }} />
                 {compactEmpty && (library?.conversations.length ?? 0) > 1 && <button type="button" className="panel-tool-button panel-conversations-button" aria-label="会话库" title="会话库" onClick={openLibrary}><ConversationsIcon /></button>}
-                <div className="panel-model-picker-wrap" ref={modelPickerRef}>
-                  <button type="button" className="panel-model-button" aria-label="模型与上下文" title="模型与上下文" aria-haspopup="dialog" aria-expanded={modelPickerOpen} onClick={() => setModelPickerOpen((open) => !open)}>
-                    <ModelIcon />
-                  </button>
-                  <div className={`panel-model-menu${modelPickerOpen ? ' is-open' : ''}`} role="dialog" aria-label="模型与上下文" aria-hidden={!modelPickerOpen} inert={!modelPickerOpen}
-                    onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); setModelPickerOpen(false); } }}>
-                    {/* 三个开关都属于这个左下角菜单：目标、计划、联网搜索。
-                        顺序固定，图标在前；菜单外面不再单独摆目标/计划按钮。 */}
-                    <div className="panel-popover-modes">
-                      <div className="panel-popover-heading">模式</div>
-                      <button type="button" role="switch" aria-checked={goalPrompting || Boolean(snapshot?.goal)} className={`panel-mode-toggle is-goal${goalPrompting || snapshot?.goal ? ' is-on' : ''}`} disabled={sideExpanded || snapshot?.mode !== 'dsh'}
-                        title={goalPrompting || snapshot?.goal ? '关闭目标模式' : '打开后写目标；按 Tab 补上“全部完成前不要停”，回车设定'}
-                        onClick={toggleGoal}>
-                        <span className="panel-mode-toggle-main"><span className="panel-mode-icon"><GoalIcon /></span><span>目标模式</span></span>
-                        <span className="panel-mode-switch" aria-hidden="true" />
-                      </button>
-                      <button type="button" role="switch" aria-checked={Boolean(snapshot?.planMode)} className={`panel-mode-toggle is-plan${snapshot?.planMode ? ' is-on' : ''}`} disabled={snapshot?.mode !== 'dsh'}
-                        onClick={() => { void choosePlanMode(!snapshot?.planMode); }}>
-                        <span className="panel-mode-toggle-main"><span className="panel-mode-icon"><PlanIcon /></span><span>计划模式</span></span>
-                        <span className="panel-mode-switch" aria-hidden="true" />
-                      </button>
-                      <button type="button" role="switch" aria-checked={library?.settings.webSearchEnabled !== false}
-                        className={`panel-mode-toggle is-web${library?.settings.webSearchEnabled !== false ? ' is-on' : ''}`}
-                        disabled={sideExpanded || snapshot?.mode !== 'dsh'}
-                        title={library?.settings.webSearchEnabled !== false ? '关闭后模型不会尝试联网搜索' : '打开后模型可以联网搜索'}
-                        onClick={() => { void run((bridge) => bridge.setWebSearchEnabled(library?.settings.webSearchEnabled === false)); }}>
-                        <span className="panel-mode-toggle-main"><span className="panel-mode-icon"><WebSearchIcon /></span><span>联网搜索</span></span>
-                        <span className="panel-mode-switch" aria-hidden="true" />
-                      </button>
-                    </div>
-                    <div className="panel-popover-heading">模型</div>
-                    <div className="panel-model-list" role="radiogroup" aria-label="选择模型配置">
-                      {sideExpanded && <div className="panel-model-empty">临时会话沿用开启时的模型。回到主线可切换配置。</div>}
-                      {(library?.settings.modelProfiles ?? []).filter((profile) => profile.enabled !== false).length === 0 &&
-                        <div className="panel-model-empty">还没有可用的模型配置——<button type="button" className="panel-model-empty-link" onClick={() => { void run((bridge) => bridge.openOnboarding()); }}>打开配置向导</button></div>}
-                      {(library?.settings.modelProfiles ?? []).filter((profile) => profile.enabled !== false).map((profile) => (
-                        <button key={profile.id} type="button" role="radio" aria-checked={profile.id === library?.settings.activeModelProfileId}
-                          className={`panel-model-pick${profile.id === library?.settings.activeModelProfileId ? ' is-active' : ''}`}
-                          disabled={sideExpanded}
-                          onClick={() => { void switchModelProfile(profile.id); }}>
-                          <span>{profile.name}</span>{profile.id === library?.settings.activeModelProfileId && <span className="panel-model-check">✓</span>}
-                        </button>))}
-                      <button type="button" className="panel-model-manage" onClick={() => { void run((bridge) => bridge.openSettings()); }}>在设置中管理…</button>
-                    </div>
-                  </div>
-                </div>
-                {!sideExpanded && <div className="panel-effort-wrap" ref={effortMenuRef}>
-                  <button type="button" className={`panel-tool-button panel-effort-button${snapshot?.effort && snapshot.effort !== 'max' ? ' is-on' : ''}`} aria-label={`思考强度：${EFFORT_LABELS[snapshot?.effort ?? 'max']}`} aria-haspopup="dialog" aria-expanded={effortMenuOpen} title={`思考强度：${EFFORT_LABELS[snapshot?.effort ?? 'max']}`} disabled={!snapshot} onClick={() => setEffortMenuOpen((open) => !open)}>
-                    <EffortIcon level={snapshot?.effort ?? 'max'} />
-                  </button>
-                  <div className={`panel-effort-menu${effortMenuOpen ? ' is-open' : ''}`} role="dialog" aria-label="思考强度" aria-hidden={!effortMenuOpen} inert={!effortMenuOpen}
-                    onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); setEffortMenuOpen(false); } }}>
-                    <div className="panel-popover-heading">思考强度</div>
-                    <EffortSlider value={snapshot?.effort ?? 'max'} disabled={!snapshot} onCommit={chooseEffort} />
-                  </div>
-                </div>}
-                {snapshot?.mode === 'dsh' && <div className="panel-approval-wrap" ref={approvalMenuRef}>
-                  <button type="button" className={`panel-tool-button panel-approval-button is-${approvalMode === 'workspace-write' ? 'write' : approvalMode === 'danger-full-access' ? 'bypass' : approvalMode === 'selfEvolve' ? 'evolve' : 'readonly'}`}
-                    aria-label={`审批模式：${APPROVAL_MODE_LABELS[approvalMode]}`}
-                    aria-haspopup="dialog" aria-expanded={approvalMenuOpen}
-                    title={`审批模式：${APPROVAL_MODE_LABELS[approvalMode]}`}
-                    disabled={sideExpanded}
-                    onClick={() => setApprovalMenuOpen((open) => !open)}>
-                    <ApprovalIcon mode={approvalMode} />
-                  </button>
-                  <div className={`panel-approval-menu${approvalMenuOpen ? ' is-open' : ''}`} role="dialog" aria-label="审批模式" aria-hidden={!approvalMenuOpen} inert={!approvalMenuOpen}
-                    onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); setApprovalMenuOpen(false); } }}>
-                    <div className="panel-popover-heading">审批模式</div>
-                    {APPROVAL_MODES.map((mode) => <button key={mode} type="button" role="radio" aria-checked={approvalMode === mode}
-                      className={`panel-approval-pick${approvalMode === mode ? ' is-active' : ''}`}
-                      onClick={() => { void chooseApprovalMode(mode); }}>
-                      <span className={`panel-approval-pick-icon is-${mode}`} aria-hidden="true"><ApprovalIcon mode={mode} /></span>
-                      <span className="panel-approval-pick-text">
-                        <span>{APPROVAL_MODE_LABELS[mode]}</span>
-                        <small>{APPROVAL_MODE_HINTS[mode]}</small>
-                      </span>
-                      {approvalMode === mode && <span className="panel-model-check" aria-hidden="true">✓</span>}
-                    </button>)}
-                  </div>
-                </div>}
+                <ModelPicker wrapperRef={modelPickerRef} open={modelPickerOpen} dsh={snapshot?.mode === 'dsh'} sideExpanded={sideExpanded} goalOn={goalPrompting || Boolean(snapshot?.goal)} planOn={Boolean(snapshot?.planMode)} webOn={library?.settings.webSearchEnabled !== false} goalTitle={goalPrompting || snapshot?.goal ? '关闭目标模式' : '打开后写目标；按 Tab 补上“全部完成前不要停”，回车设定'} profiles={library?.settings.modelProfiles ?? []} activeId={library?.settings.activeModelProfileId} effort={snapshot?.effort ?? 'max'} onToggle={() => setModelPickerOpen((open) => !open)} onClose={() => setModelPickerOpen(false)} onToggleGoal={toggleGoal} onChoosePlan={choosePlanMode} onToggleWeb={() => { void run((bridge) => bridge.setWebSearchEnabled(library?.settings.webSearchEnabled === false)); }} onPickProfile={(id) => { void switchModelProfile(id); }} onManage={() => { void run((bridge) => bridge.openSettings()); }} onOpenOnboarding={() => { void run((bridge) => bridge.openOnboarding()); }} onEffort={chooseEffort} />
+                {snapshot?.mode === 'dsh' && <ApprovalMenu wrapperRef={approvalMenuRef} mode={approvalMode} open={approvalMenuOpen} disabled={sideExpanded} onToggle={() => setApprovalMenuOpen((open) => !open)} onClose={() => setApprovalMenuOpen(false)} onChoose={(mode) => { void chooseApprovalMode(mode); }} />}
                 <button type="button" className="panel-tool-button panel-attachment-button" aria-label="添加附件"
                   title="添加图片或文件（也可以直接拖入或粘贴）" onClick={() => attachmentInputRef.current?.click()}>
                   <PlusIcon />
                 </button>
-                <div className="panel-context-wrap" ref={contextMenuRef}>
-                  <ContextMeter usage={contextUsage} compacting={contextCompacting} open={contextMenuOpen} onToggle={() => setContextMenuOpen((open) => !open)} />
-                  <div className={`panel-context-menu${contextMenuOpen ? ' is-open' : ''}`} role="dialog" aria-label="上下文" aria-hidden={!contextMenuOpen} inert={!contextMenuOpen}
-                    onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); setContextMenuOpen(false); } }}>
-                    <div className="panel-popover-heading">上下文</div>
-                    {contextUsage?.status === 'available' && Number.isFinite(contextUsage.usedPercent) ? <>
-                      <div className="panel-context-stat"><span>已用</span><strong>{Math.round(contextUsage.usedPercent!)}%</strong></div>
-                      {contextUsage.maxTokens !== undefined && contextUsage.usedTokens !== undefined && <div className="panel-context-tokens">{contextUsage.usedTokens.toLocaleString()} / {contextUsage.maxTokens.toLocaleString()} token</div>}
-                    </> : <div className="panel-context-unknown">用量暂不可读取</div>}
-                    {contextUsage?.status === 'available' && contextUsage.stale && <div className="panel-context-stale">上次读数，等待刷新</div>}
-                    <div className="panel-context-tokens panel-context-threshold" role="slider" tabIndex={0}
-                      aria-label="自动压缩阈值" aria-valuemin={AUTO_COMPACT_MIN_PERCENT} aria-valuemax={AUTO_COMPACT_MAX_PERCENT}
-                      aria-valuenow={library?.settings.autoCompactPercent ?? AUTO_COMPACT_DEFAULT_PERCENT}
-                      title="滚轮上下调整（50%–90%）"
-                      onWheel={(event) => { event.preventDefault(); nudgeAutoCompact(event.deltaY < 0 ? 1 : -1); }}
-                      onKeyDown={(event) => {
-                        if (event.key === 'ArrowUp' || event.key === 'ArrowRight') { event.preventDefault(); nudgeAutoCompact(1); }
-                        else if (event.key === 'ArrowDown' || event.key === 'ArrowLeft') { event.preventDefault(); nudgeAutoCompact(-1); }
-                      }}>
-                      自动压缩阈值 {library?.settings.autoCompactPercent ?? AUTO_COMPACT_DEFAULT_PERCENT}%
-                    </div>
-                    <button type="button" className="panel-compact-button" disabled={contextCompacting || !snapshot || !snapshot.dshReady} onClick={() => { void compactContext(); }}>{contextCompacting ? '压缩中…' : '压缩上下文'}</button>
-                  </div>
-                </div>
-                <VoiceButton phase={voicePhase}
-                  canListen={voiceReady && Boolean(voiceManagerRef.current?.available ?? voiceConfig?.siliconFlowAvailable)}
-                  disabled={Boolean(busy) && voicePhase === 'idle'} onToggle={toggleVoice} />
-                <button type={active && !draft.trim() && !attachments.length ? 'button' : 'submit'} className={`panel-send${sendingCurrent ? ' is-sending' : ''}`} disabled={(!active && !draft.trim() && !attachments.length) || Boolean(busy) || sendingCurrent || !snapshot || (contextCompacting && !(active && !draft.trim() && !attachments.length))} aria-label={goalPrompting ? '设定目标' : sendingCurrent ? '发送中…' : active && !draft.trim() && !attachments.length ? '停止任务' : active ? '排队发送消息' : '发送消息'} title={goalPrompting ? '回车设定目标' : sendingCurrent ? '发送中…' : active && !draft.trim() && !attachments.length ? '停止任务（Esc）' : active ? snapshot?.mode === 'dsh' ? 'Enter 排队发送，Ctrl+Enter 插队发送' : 'Enter 排队发送，Ctrl+Enter 优先排队' : '发送消息（Enter）'} onClick={active && !draft.trim() && !attachments.length ? () => { void stop(); } : undefined}>
-                  {sendingCurrent ? <span className="panel-send-spinner" aria-hidden="true" /> : active && !draft.trim() && !attachments.length ? <span className="panel-stop-square" /> : <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h11m-5-5 5 5-5 5" /></svg>}
-                </button>
+                <ContextMenu wrapperRef={contextMenuRef} usage={contextUsage} compacting={contextCompacting} open={contextMenuOpen} autoCompactPercent={autoCompactPreview ?? library?.settings.autoCompactPercent ?? AUTO_COMPACT_DEFAULT_PERCENT} onToggle={() => setContextMenuOpen((open) => !open)} onClose={() => setContextMenuOpen(false)} onNudge={nudgeAutoCompact} onCompact={() => { void compactContext(); }} />
+                <ComposerSendRow phase={voicePhase} canListen={voiceReady && Boolean(voiceManagerRef.current?.available ?? voiceConfig?.siliconFlowAvailable)} busy={Boolean(busy)} sending={sendingCurrent} active={active} empty={!draft.trim() && !attachments.length} snapshotReady={Boolean(snapshot)} compacting={contextCompacting} goalPrompting={goalPrompting} mode={snapshot?.mode} onToggleVoice={toggleVoice} onStop={() => { void stop(); }} />
               </div>
             </form>
           ) : (
@@ -3259,36 +2300,8 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
       {imageViewer && <button type="button" className="panel-image-viewer" aria-label={`关闭图片预览：${imageViewer.name}`} onClick={() => setImageViewer(null)}>
         <img src={imageViewer.url} alt={imageViewer.name} />
       </button>}
-      {bypassConfirmOpen && <div className="panel-bypass-backdrop" onClick={() => setBypassConfirmOpen(false)}>
-        <section className="panel-bypass panel-bypass-full" role="dialog" aria-modal="true" aria-labelledby="bypass-title" onClick={(event) => event.stopPropagation()}>
-          <h3 id="bypass-title">开启「完全访问」？</h3>
-          <p>这个模式会跳过所有工具调用的确认——AI 可以直接执行命令、修改文件、访问网络，不再逐条征求你的同意。</p>
-          <p>请先充分了解其中的风险，再决定是否开启。另一方面，AI Agent 的顺畅运行依赖宽松的审批；从任务完成效率出发，了解风险后开启是合理的。开启之后，建议在对话中为它设定明确、有效的行为边界与约束。</p>
-          <div className="panel-bypass-actions">
-            <button type="button" className="panel-bypass-cancel" onClick={() => setBypassConfirmOpen(false)}>取消</button>
-            <button type="button" className="panel-bypass-confirm" onClick={() => { void applyApprovalMode('danger-full-access'); }}>我已了解风险，开启</button>
-          </div>
-        </section>
-      </div>}
-      {evolveConfirmOpen && <div className="panel-bypass-backdrop" onClick={() => setEvolveConfirmOpen(false)}>
-        <section className="panel-bypass panel-evolve-confirm" role="dialog" aria-modal="true" aria-labelledby="evolve-title" onClick={(event) => event.stopPropagation()}>
-          <h3 id="evolve-title">开启「自我进化」？这是最高权限。</h3>
-          <p><strong>这不是普通的完全访问。</strong>开启后，我可以在没有逐条确认的情况下修改自己的源码、运行构建和测试、打包新版本、重启应用，并在重启后继续执行任务。</p>
-          <p><strong>错误的自修改可能让应用无法启动、丢失未保存的工作，或被新版本带回旧问题。</strong>命令超时、步骤上限和重启次数只是保护，不是回滚。请先提交代码或做好备份，并只在明确知道要改什么时开启。</p>
-          <p>随时切回其他审批模式即可停用。但已经启动的重启和已排队命令不会因为切换模式而取消。</p>
-          <label className="panel-evolve-authorize">
-            <span>必须手动输入下面的短语才能开启：<code>{evolveAuthorizePhrase}</code></span>
-            <input type="text" value={evolveAuthorizeText} autoFocus spellCheck={false}
-              placeholder={evolveAuthorizePhrase}
-              onChange={(event) => setEvolveAuthorizeText(event.target.value)} />
-          </label>
-          <div className="panel-bypass-actions">
-            <button type="button" className="panel-bypass-cancel" onClick={() => setEvolveConfirmOpen(false)}>取消</button>
-            <button type="button" className="panel-bypass-confirm" disabled={evolveAuthorizeText.trim() !== evolveAuthorizePhrase}
-              onClick={() => { void applyApprovalMode('selfEvolve'); }}>授权并开启</button>
-          </div>
-        </section>
-      </div>}
+      <BypassConfirmDialog open={bypassConfirmOpen} onCancel={() => setBypassConfirmOpen(false)} onConfirm={() => { void applyApprovalMode('danger-full-access'); }} />
+      <EvolveConfirmDialog open={evolveConfirmOpen} phrase={evolveAuthorizePhrase} text={evolveAuthorizeText} onText={setEvolveAuthorizeText} onCancel={() => setEvolveConfirmOpen(false)} onConfirm={() => { void applyApprovalMode('selfEvolve'); }} />
     </section>
   );
 }

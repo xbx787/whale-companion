@@ -64,6 +64,8 @@ describe('the tool-kill switch', () => {
     expect(kill()).toBe(0)
     await settle()
     expect(kill()).toBe(1)
+    // 叉替换省略号，不是两个一起出现。
+    expect(container.querySelector('.panel-tool-result')).toBeNull()
   })
 
   it('stays in place through opening and shutting the row once it is up', async () => {

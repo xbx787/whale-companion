@@ -45,14 +45,40 @@ describe('工具行信息详细程度', () => {
     await act(async () => { root.render(<TimelineItem entry={entry} display={display} />) })
   }
 
-  it('默认显示中文说明；没有说明时显示命令本身并截断', async () => {
+  it('把耗时放在说明右边，说明先缩、时间不缩', async () => {
+    const entry: TimelineEntry = { ...withNote, id: 'tool-time', tool: { ...withNote.tool!, durationMs: 12_340 } }
+    await mount(entry)
+    expect(container.querySelector('.panel-tool-time')?.textContent).toBe('12s')
+    const summary = container.querySelector('summary')!
+    const children = [...summary.children]
+    expect(children.findIndex((node) => node.classList.contains('panel-tool-argument')))
+      .toBeLessThan(children.findIndex((node) => node.classList.contains('panel-tool-time')))
+  })
+
+  it('keeps milliseconds and decimals for non-command tools', async () => {
+    const entry: TimelineEntry = { ...fileEdit, id: 'tool-edit-time', tool: { ...fileEdit.tool!, durationMs: 12_340 } }
+    await mount(entry, 'brief', 'D:/DesktopPetProject')
+    expect(container.querySelector('.panel-tool-time')?.textContent).toBe('12.3s')
+  })
+
+  it('counts whole seconds while a command is still running', async () => {
+    const entry: TimelineEntry = {
+      id: 'tool-live', kind: 'tool', text: '执行中', time: '2026-10-20T12:00:00.000Z',
+      tool: {
+        toolUseId: 'toolu_live', name: 'pwsh', status: 'running',
+        startedAt: new Date(Date.now() - 3_000).toISOString()
+      }
+    }
+    await mount(entry)
+    expect(container.querySelector('.panel-tool-time')?.textContent).toMatch(/^\d+s$/u)
+  })
+
+  it('默认显示中文说明；没有说明时把完整命令交给 CSS 按宽度截断', async () => {
     await mount(withNote)
     expect(container.querySelector('.panel-tool-argument')!.textContent).toBe(chineseNote)
 
     await mount(withoutNote)
-    const argument = container.querySelector('.panel-tool-argument')!.textContent ?? ''
-    expect(argument.endsWith('…')).toBe(true)
-    expect(Array.from(argument).length).toBeLessThanOrEqual(29)
+    expect(container.querySelector('.panel-tool-argument')!.textContent).toBe(command)
   })
 
   it('工作区路径缩成 ~', async () => {

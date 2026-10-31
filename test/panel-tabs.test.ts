@@ -3,11 +3,11 @@ import { moveTab, orderConversationTabs, quickTabLimit, showNewTabButton, TAB_SL
 
 describe('quickTabLimit', () => {
   it('caps the strip at five slots, whatever the stored setting says', () => {
-    expect(TAB_SLOTS).toBe(5)
-    expect(quickTabLimit(undefined)).toBe(5)
+    expect(TAB_SLOTS).toBe(8)
+    expect(quickTabLimit(undefined)).toBe(8)
     expect(quickTabLimit(3)).toBe(3)
-    expect(quickTabLimit(8)).toBe(5)
-    expect(quickTabLimit(12)).toBe(5)
+    expect(quickTabLimit(8)).toBe(8)
+    expect(quickTabLimit(12)).toBe(8)
     expect(quickTabLimit(0)).toBe(1)
   })
 })

@@ -139,7 +139,7 @@
 .settings-voice-form input[type="password"], .settings-voice-form select { width: 100%; height: 32px; padding: 0 9px; border: 1px solid rgba(190, 213, 253, .35); border-radius: 8px; color: #eef4ff; background: rgba(10, 24, 58, .45); font-size: var(--text-sm); outline: none; }
 .settings-voice-form input:focus-visible, .settings-voice-form select:focus-visible { outline: 2px solid #b4d1ff; outline-offset: 2px; }
 .settings-voice-form input[type="range"] { width: 100%; accent-color: #bbd2ff; }
-.settings-voice-speed { color: #cfe0ff; font-family: var(--font-numeric); font-variant-numeric: tabular-nums; }
+.settings-voice-speed { color: #cfe0ff; font-family: var(--font-ui); font-variant-numeric: tabular-nums; }
 .settings-voice-actions { display: flex; flex-wrap: wrap; gap: 7px; }
 .settings-voice-actions button { min-height: 30px; padding: 0 11px; border: 1px solid rgba(190, 213, 253, .28); border-radius: 8px; color: #dbe8ff; background: rgba(160, 191, 251, .1); font-size: var(--text-sm); }
 .settings-voice-actions button:hover:not(:disabled) { background: rgba(160, 191, 251, .22); }

@@ -6,6 +6,9 @@ const servers: ReturnType<typeof createServer>[] = []
 
 afterEach(async () => {
   for (const server of servers.splice(0)) {
+    // 关掉 keep-alive 连接，否则 close 要等到 fetch 的连接自然断开，
+    // 并行跑时会把后面的用例拖到超时。
+    server.closeAllConnections?.()
     await new Promise<void>((resolve) => server.close(() => resolve()))
   }
 })

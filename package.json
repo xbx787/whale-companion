@@ -1,6 +1,6 @@
 {
   "name": "desktop-resident-agent",
-  "version": "0.0.115",
+  "version": "0.0.139",
   "private": true,
   "license": "UNLICENSED",
   "author": "DesktopPetProject",
@@ -12,6 +12,8 @@
     "preview": "electron-vite preview",
     "check": "tsc --noEmit",
     "test": "vitest run",
+    "test:full": "vitest run",
+    "test:smoke": "vitest run test/font-system.test.ts test/duration.test.ts test/tool-kill.test.tsx test/panel-tool-row-dom.test.tsx test/panel-asides-dom.test.tsx test/panel-avatar-preload-dom.test.tsx test/panel-library-divider-dom.test.tsx test/panel-library-layout-dom.test.tsx test/panel-right-rail-dom.test.tsx test/panel-context-threshold-dom.test.tsx test/goal-banner.test.tsx test/libraries.test.ts test/composer-suggestions.test.ts test/composer-suggestions.test.tsx test/timeline-nav.test.tsx test/timeline-groups.test.ts test/work-cluster.test.tsx test/panel-stop-command-dom.test.tsx test/settings-libraries-dom.test.tsx",
     "live2d:generate": "node tools/live2d-motion/generate.mjs",
     "live2d:validate": "node tools/live2d-motion/validate.mjs",
     "live2d:check": "npm run live2d:generate -- --check && npm run live2d:validate",
@@ -23,6 +25,7 @@
   },
   "dependencies": {
     "katex": "^0.19.0",
+    "koffi": "^3.3.4",
     "pixi-live2d-display": "0.4.0",
     "pixi.js": "6.5.10",
     "react": "^19.3.0",
@@ -51,7 +54,7 @@
   },
   "build": {
     "appId": "local.desktop.resident.agent",
-    "productName": "Whale Companion Preview",
+    "productName": "小鲸",
     "directories": {
       "output": "release"
     },
@@ -91,7 +94,13 @@
           "!**/*.d.ts",
           "!**/*.d.mts",
           "!**/*.d.cts",
-          "!**/*.tsbuildinfo"
+          "!**/*.tsbuildinfo",
+          "!**/test/**",
+          "!**/tests/**",
+          "!**/docs/**",
+          "!**/examples/**",
+          "!**/*.md",
+          "!**/README*"
         ]
       },
       {
@@ -99,17 +108,30 @@
         "to": "dsh/package.json"
       },
       {
+        "from": "scripts/wps-mcp-server.cjs",
+        "to": "wps-mcp-server.cjs"
+      },
+      {
+        "from": "scripts/wps-com.ps1",
+        "to": "wps-com.ps1"
+      },
+      {
         "from": "scripts/pet-mcp-bridge.cjs",
         "to": "pet-mcp-bridge.cjs"
       }
     ],
     "asar": true,
-  "npmRebuild": false,
-  "asarUnpack": [
-    "node_modules/uiohook-napi/**/*"
-  ],
+    "npmRebuild": false,
+    "electronLanguages": [
+      "zh-CN",
+      "en-US"
+    ],
+    "asarUnpack": [
+      "node_modules/uiohook-napi/**/*"
+    ],
     "win": {
       "icon": "src/renderer/assets/whale-tray-icon-pixel.ico",
+      "executableName": "Whale Companion Preview",
       "target": "dir"
     },
     "nsis": {
@@ -128,16 +150,3 @@
     }
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-

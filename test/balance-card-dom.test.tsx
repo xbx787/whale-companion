@@ -38,11 +38,11 @@ describe('the balance card layout', () => {
     })
   }
 
-  it('keeps the checked time beside 余额 and drops the bottom row', async () => {
+  it('keeps the checked time beside the brand and drops the bottom row', async () => {
     await mount(snapshot)
-    const heading = host.querySelector('.balance-heading')!
-    expect(heading.textContent).toContain('余额')
-    expect(heading.querySelector('.balance-updated')?.textContent).toBe('18:03')
+    const top = host.querySelector('.balance-top')!
+    expect(top.textContent).toContain('DeepSeek')
+    expect(top.querySelector('.balance-updated')?.textContent).toBe('18:03')
     // 正常状态：底部那行整个不在，卡片不多占一行。
     expect(host.querySelector('.balance-foot')).toBeNull()
     expect(host.querySelector('.balance-peek')!.className).not.toContain('has-notice')

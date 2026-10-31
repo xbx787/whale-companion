@@ -70,32 +70,14 @@ export interface AvatarBox {
 export interface AgentGoal {
   condition: string
   phase: 'requested' | 'confirmed' | 'stopping' | 'unverified'
+  /** 暂停后对话停下时不再自动发继续消息；当前回合不受影响。 */
+  paused?: boolean
   /** Only SDK active_goal events can confirm an iteration count. */
   iterations?: number
   startedAt: string
   statusMessage?: string
   /** Why the goal's own stop hook did not consider it met last round. */
   lastReason?: string
-}
-
-export type GrowthStatus = 'proposed' | 'running' | 'ready' | 'failed' | 'stale' | 'adopted' | 'published' | 'discarded'
-
-export interface GrowthProposal {
-  id: string
-  title: string
-  objective: string
-  evidence: string
-  sourceConversationId?: string
-  status: GrowthStatus
-  createdAt: string
-  updatedAt: string
-  baseCommit?: string
-  experimentCommit?: string
-  diff?: string
-  checks?: Array<{ name: string; ok: boolean; output: string }>
-  releaseNotes?: string
-  version?: string
-  error?: string
 }
 
 export type TaskStatus =
@@ -111,7 +93,7 @@ export type TaskStatus =
 export interface TimelineEntry {
   id: string
   time: string
-  kind: 'user' | 'assistant' | 'system' | 'tool' | 'thinking'
+  kind: 'user' | 'assistant' | 'system' | 'tool' | 'thinking' | 'subagent'
   text: string
   /** System notices only: `error` renders as a warning, apart from the
    *  ordinary muted notice line. */
@@ -143,11 +125,16 @@ export interface TimelineEntry {
     status: 'running' | 'done' | 'error'
     input?: string
     output?: string
+    /** 开始时刻与耗时，给工具行右侧显示「这条命令跑了多久」。 */
+    startedAt?: string
+    durationMs?: number
     /** Stable animation semantic derived from the adapter's tool kind/name. */
     activity?: AgentActivity
     /** Image files returned by the tool, opened with the system viewer on demand. */
     images?: Array<{ name: string; path: string }>
   }
+  /** 对话内的子代理条目：名字、状态、步骤都挂在这里，和消息一起滚动。 */
+  subagent?: SubagentTask
 }
 
 export type SubagentStatus = 'running' | 'completed' | 'failed' | 'stopped'
@@ -212,8 +199,8 @@ export interface BalanceSnapshot {
 }
 
 /** 展开面板的最小尺寸：拖拽手柄与窗口布局共用同一套钳制。 */
-export const PANEL_MIN_WIDTH = 360
-export const PANEL_MIN_HEIGHT = 400
+export const PANEL_MIN_WIDTH = 420
+export const PANEL_MIN_HEIGHT = 420
 
 /** 自动压缩上下文的百分比阈值：默认 80，可在 50–90 之间用滚轮调整。 */
 export const AUTO_COMPACT_DEFAULT_PERCENT = 80
@@ -227,6 +214,8 @@ export function isAutoCompactPercent(value: unknown): value is number {
 
 export interface ConversationSettings {
   visibleConversationTabs: number
+  /** 手动关掉的顶部标签：会话仍在未归档列表，只是不占顶部槽位。 */
+  hiddenTabIds?: string[]
   autoArchiveAfterDays: 0 | 7 | 14 | 30
   goalMaxIterations: number
   goalMaxMinutes: number
@@ -264,6 +253,8 @@ export interface ConversationSettings {
   uiSize: UiSize
   /** 桌面人物的显示大小；命中区和窗口都跟着它走。 */
   avatarSize: AvatarSize
+  /** 窗口整体不透明度 0-100；0 表示关闭透明效果（等效完全不透明，省合成开销）。 */
+  windowOpacity?: number
   /** 工具行显示多少细节。缺省按 brief 处理。 */
   toolRowDetail?: ToolRowDetail
   /** 桌面人物的渲染实现。缺失或无效的旧数据回退到标准插画。 */
@@ -453,6 +444,18 @@ export interface ToolPermissionRequest {
   input: string
 }
 
+/** 插件市场里一个本地插件的摘要。 */
+ export interface PluginSummary {
+  id: string
+  name: string
+  version: string
+  description?: string
+  skills: number
+  connectors: number
+  agents: number
+  hooks: number
+}
+
 /** One choice inside an ask-user question; the description shows under the label. */
 export interface AskQuestionOption {
   label: string
@@ -486,7 +489,7 @@ export interface PlanApprovalRequest {
 /** Question key → chosen label (labels array for multiSelect); free text allowed. */
 export type AskAnswers = Record<string, string | string[]>
 
-export interface ClaudeWorkflowOption {
+export interface AppCommandOption {
   name: string
   description: string
   kind: 'command' | 'skill'
@@ -521,6 +524,8 @@ export interface AppSnapshot {
   timelineRevision: number
   /** True when `timeline` is an incremental update, not the whole history. */
   timelinePartial?: boolean
+  /** 主进程只下发尾部一段时，这里是整段对话的总条数；渲染层据此决定还要不要往前拉。 */
+  timelineTotal?: number
   proposal?: ProposedAction
   currentTask?: string
   modelReady: boolean
@@ -636,6 +641,8 @@ export interface PetAPI {
   stopSideChat(sessionId: string): Promise<void>
   interruptSideChat(sessionId: string): Promise<void>
   removeSideQueuedMessage(sessionId: string, messageId: string): Promise<void>
+  /** 把临时会话的待发送消息移到 beforeId 之前；beforeId 为 null 表示移到末尾。 */
+  moveSideQueuedMessage(sessionId: string, messageId: string, beforeId: string | null): Promise<void>
   steerSideQueuedMessage(sessionId: string, messageId: string): Promise<void>
   approveSideChatAction(sessionId: string, id: string): Promise<void>
   rejectSideChatAction(sessionId: string, id: string): Promise<void>
@@ -658,6 +665,8 @@ export interface PetAPI {
   renameConversation(id: string, title: string): Promise<void>
   setConversationPinned(id: string, pinned: boolean): Promise<void>
   setConversationTabOrder(ids: string[]): Promise<void>
+  /** 关掉顶部标签（会话保留在未归档列表）。 */
+  setHiddenTabs(ids: string[]): Promise<void>
   archiveConversation(id: string): Promise<void>
   restoreConversation(id: string): Promise<void>
   deleteConversation(id: string): Promise<void>
@@ -665,14 +674,18 @@ export interface PetAPI {
   batchManageConversations(action: ConversationBatchAction, ids: string[]): Promise<ConversationBatchResult>
   deleteTurn(conversationId: string, userEntryId: string): Promise<void>
   getContextUsage(conversationId?: string): Promise<ContextUsageSnapshot>
+  /** 取 `before` 之前的 `limit` 条历史；分页窗口之外的旧消息靠它补齐。 */
+  timelinePage(conversationId: string, before: number, limit: number): Promise<TimelineEntry[]>
   compactConversation(conversationId?: string): Promise<void>
-  listClaudeWorkflows(): Promise<ClaudeWorkflowOption[]>
+  listAppCommands(): Promise<AppCommandOption[]>
   onSlashUiAction(callback: (action: SlashUiAction) => void): () => void
   searchWorkspaceFiles(query: string): Promise<WorkspaceFileOption[]>
   searchConversations(query: string, archived?: boolean): Promise<ConversationSummary[]>
   /** Installed MCP, skill, and plugin entries for the composer's @ picker. */
   listLibraries(): Promise<LibraryItem[]>
   removeQueuedMessage(id: string): Promise<void>
+  /** 把待发送消息移到 beforeId 之前；beforeId 为 null 表示移到末尾。 */
+  moveQueuedMessage(id: string, beforeId: string | null): Promise<void>
   /** Delivers a queued message into the running turn right now (native steer);
    *  when steering is unavailable it jumps to the front of the queue instead. */
   steerQueuedMessage(id: string): Promise<void>
@@ -684,7 +697,12 @@ export interface PetAPI {
    *  model in plan mode so it can revise and propose again. */
   answerPlan(id: string, approved: boolean, conversationId?: string): Promise<void>
   /** Allows (true) or denies (false) the parked tool call. */
-  answerPermission(id: string, allow: boolean, conversationId?: string): Promise<void>
+  answerPermission(id: string, decision: 'once' | 'always' | 'deny', conversationId?: string): Promise<void>
+  previewFile(path: string): Promise<{ path: string; text: string; truncated: boolean }>
+  listPlugins(): Promise<PluginSummary[]>
+  installPlugin(id: string): Promise<unknown>
+  listAlwaysAllowed(conversationId?: string): Promise<string[]>
+  clearAlwaysAllowed(kind?: string, conversationId?: string): Promise<void>
   setApprovalMode(mode: ApprovalMode, conversationId?: string): Promise<void>
   /** The composer text as typed, kept per conversation so closing the window
    *  or the app never loses a half-written message. */
@@ -694,7 +712,11 @@ export interface PetAPI {
    *  command, sent as a turn of its own behind an interrupt of the loop's
    *  current turn. Steered text never reaches it as a command. */
   clearGoal(conversationId?: string): Promise<void>
+  /** 暂停/恢复目标：只决定对话停下后是否自动继续。 */
+  setGoalPaused(paused: boolean, conversationId?: string): Promise<void>
   stop(conversationId?: string): Promise<void>
+  /** 只结束当前正在跑的命令进程，回合和思考继续；找不到进程时返回 false。 */
+  stopCommand(conversationId?: string): Promise<boolean>
   /** Aborts what the running turn is executing (a stuck command) while the
    *  session and any queued messages survive. */
   interruptTurn(conversationId?: string): Promise<void>
@@ -756,7 +778,12 @@ export interface PetAPI {
    *  plan / bypassPermissions). Side chats keep the main conversation's. */
   setApprovalMode(mode: ApprovalMode, conversationId?: string): Promise<void>
   /** Allows (true) or denies (false) the parked tool call. */
-  answerPermission(id: string, allow: boolean, conversationId?: string): Promise<void>
+  answerPermission(id: string, decision: 'once' | 'always' | 'deny', conversationId?: string): Promise<void>
+  previewFile(path: string): Promise<{ path: string; text: string; truncated: boolean }>
+  listPlugins(): Promise<PluginSummary[]>
+  installPlugin(id: string): Promise<unknown>
+  listAlwaysAllowed(conversationId?: string): Promise<string[]>
+  clearAlwaysAllowed(kind?: string, conversationId?: string): Promise<void>
   /** Creates or updates one model profile; the first one becomes active. */
   saveModelProfile(profile: ModelProfile): Promise<void>
   deleteModelProfile(id: string): Promise<void>
@@ -776,7 +803,7 @@ export interface PetAPI {
   /** Data URL of the stored avatar, or null when none is set. */
   readAvatar(kind: 'user' | 'assistant'): Promise<string | null>
   /** Brings the settings window to the front (model management lives there). */
-  openSettings(): Promise<void>
+  openSettings(tab?: string): Promise<void>
   /** Opens the first-run configuration wizard (DeepSeek setup). */
   openOnboarding(): Promise<void>
   setAvatarState(state: AvatarState): Promise<void>

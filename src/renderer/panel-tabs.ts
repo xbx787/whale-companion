@@ -2,9 +2,8 @@
  *  when the "+" appears. Kept as pure functions so the rules stay pinned by
  *  tests rather than buried in the panel component. */
 
-/** Five slots — the owner's rule — regardless of what the stored setting
- *  says (libraries may still carry 1–12 from before). */
-export const TAB_SLOTS = 5;
+/** 八个槽位是上限；设置里存几就显示几（1–8）。 */
+export const TAB_SLOTS = 8;
 
 export function quickTabLimit(visibleConversationTabs: number | undefined): number {
   return Math.max(1, Math.min(TAB_SLOTS, visibleConversationTabs ?? TAB_SLOTS));

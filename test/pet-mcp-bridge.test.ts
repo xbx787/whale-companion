@@ -144,7 +144,14 @@ describe('pet-mcp-bridge stdio script', () => {
       const chunks: Buffer[] = []
       request.on('data', (chunk) => chunks.push(chunk))
       request.on('end', () => {
-        requests.push(JSON.parse(Buffer.concat(chunks).toString('utf8')) as { tool: string; args: Record<string, unknown> })
+        const body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as { tool: string; args: Record<string, unknown> }
+        // tools/list 会先问宿主要动态工具表；测试里返回空，让桥回退静态表。
+        if (request.url === '/tools') {
+          response.writeHead(200, { 'content-type': 'application/json' })
+          response.end(JSON.stringify({ tools: [] }))
+          return
+        }
+        requests.push(body)
         response.writeHead(200, { 'content-type': 'application/json' })
         response.end(JSON.stringify({ content: [{ type: 'text', text: '{"ok":true}' }] }))
       })
@@ -183,7 +190,8 @@ describe('pet-mcp-bridge stdio script', () => {
     write({ jsonrpc: '2.0', id: 2, method: 'tools/list' })
     const listed = await next()
     const tools = (listed.result as { tools: Array<{ name: string }> }).tools
-    expect(tools.map((tool) => tool.name)).toEqual(PET_MCP_TOOLS.map((tool) => tool.name))
+    // 两边的工具集合必须一致；顺序不影响模型，比较前排序，避免同一集合被误判。
+    expect([...tools.map((tool) => tool.name)].sort()).toEqual([...PET_MCP_TOOLS.map((tool) => tool.name)].sort())
 
     write({
       jsonrpc: '2.0', id: 3, method: 'tools/call',
@@ -193,6 +201,22 @@ describe('pet-mcp-bridge stdio script', () => {
     expect((called.result as { content: Array<{ text: string }> }).content[0].text).toContain('ok')
     expect(requests).toEqual([{ tool: 'conversations_list', args: {} }])
   }, 20_000)
+})
+
+describe('built-in windows tools', () => {
+  it('lists the backend tools with the win_ prefix', async () => {
+    const bridge = new PetMcpBridge()
+    bridge.setWindowsMcpClient({
+      start: async () => undefined,
+      listTools: async () => [
+        { name: 'Screenshot', description: '截屏', inputSchema: { type: 'object', properties: {} } },
+        { name: 'Click', description: '点击', inputSchema: { type: 'object', properties: {} } }
+      ]
+    } as never)
+    const tools = await bridge.toolList()
+    expect(tools.some((tool) => tool.name === 'win_screenshot')).toBe(true)
+    expect(tools.some((tool) => tool.name === 'win_click')).toBe(true)
+  })
 })
 
 describe('writeDshProfile', () => {

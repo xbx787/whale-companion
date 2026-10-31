@@ -2,6 +2,7 @@ import { Fragment, memo, useEffect, useRef, useState, type ReactNode } from 'rea
 import type { TimelineEntry } from '../shared/contracts'
 import { toolLabel } from '../shared/tool-labels'
 import { thinkingDurationText, thinkingElapsedSeconds } from './thinking-item'
+import { RunningDots } from './running-dots'
 import { toolArgumentPreview } from './tool-arguments'
 import { sameTimelineEntry, type TurnSegment } from './timeline-groups'
 
@@ -136,12 +137,9 @@ export const WorkCluster = memo(function WorkCluster({ items, running, renderEnt
   // the click. Only the automatic fold at the end still closes it.
   const foldedByHandRef = useRef(false)
   useEffect(() => {
-    if (!running) { setOpen(false); return }
-    // A stretch that is still running opens on its own: a transient
-    // non-running snapshot used to close it for good mid-run (reported live),
-    // and its rows are the live view of the work anyway. It folds once it
-    // ends — but a fold the owner made by hand is not reopened.
-    if (!foldedByHandRef.current) setOpen(true)
+    // 运行中自动展开；这一段结束、变成「已工作」时自动收起。
+    if (foldedByHandRef.current) return
+    setOpen(running)
   }, [running])
   const facts = workFacts(items, Date.now(), running)
   const parts = workFactsParts(facts, running)
@@ -159,7 +157,7 @@ export const WorkCluster = memo(function WorkCluster({ items, running, renderEnt
       <Chevron />
       <ClusterLabel running={running} label="work" />
       {parts.length > 0 && <span className="panel-cluster-facts">{parts.map((part) => <span key={part}>{part}</span>)}</span>}
-      <span className={`panel-cluster-state${running ? ' is-running' : ''}`} aria-hidden="true">{running ? '…' : '✓'}</span>
+      <span className={`panel-cluster-state${running ? ' is-running' : ''}`} aria-hidden="true">{running ? <RunningDots /> : '✓'}</span>
     </summary>
     <div className="panel-cluster-body">{items.map((entry, index) => <Fragment key={entry.id}>{renderEntry(entry, running && index === items.length - 1)}</Fragment>)}</div>
     {/* 展开时最底下的一行：箭头落在竖线的中轴上，点它把整段收起。
@@ -188,11 +186,13 @@ function sameSegment(a: TurnSegment, b: TurnSegment): boolean {
  * sight is the outcome. Clicking the header lays the process back out — the
  * same clusters and sentences, not a different view of them.
  */
-export const TurnProcess = memo(function TurnProcess({ segments, renderEntry, renderNote }: {
+export const TurnProcess = memo(function TurnProcess({ segments, renderEntry, renderNote, renderUser }: {
   segments: TurnSegment[]
   renderEntry: (entry: TimelineEntry, running: boolean) => ReactNode
   renderNote: (entry: TimelineEntry) => ReactNode
+  renderUser: (entry: TimelineEntry) => ReactNode
 }) {
+  // 思维链属于过程：对话结束后自动收起，运行中由外层展开。
   const [open, setOpen] = useState(false)
   const items = segments.flatMap((segment) => segment.kind === 'work' ? segment.items : [segment.entry])
   // A finished stretch: every span is closed, so the clock never reads nowMs.
@@ -211,8 +211,11 @@ export const TurnProcess = memo(function TurnProcess({ segments, renderEntry, re
     </summary>
     <div className="panel-cluster-body">{segments.map((segment) => segment.kind === 'work'
       ? <WorkCluster key={segment.id} items={segment.items} running={false} renderEntry={renderEntry} />
-      : <Fragment key={segment.entry.id}>{renderNote(segment.entry)}</Fragment>)}
+      : segment.kind === 'user'
+        ? <Fragment key={segment.entry.id}>{renderUser(segment.entry)}</Fragment>
+        : <Fragment key={segment.entry.id}>{renderNote(segment.entry)}</Fragment>)}
     </div>
   </details>
 }, (prev, next) => prev.renderEntry === next.renderEntry && prev.renderNote === next.renderNote &&
+  prev.renderUser === next.renderUser &&
   prev.segments.length === next.segments.length && prev.segments.every((segment, index) => sameSegment(segment, next.segments[index])))

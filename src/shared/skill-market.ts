@@ -45,9 +45,10 @@ export const SKILL_MARKET_SOURCES: readonly SkillMarketSource[] = [
   }
 ]
 
-export const DEFAULT_SKILL_MARKET_SOURCES: readonly string[] = ['anthropic', 'superpowers']
+/** 预置主流市场：官方技能、Superpowers、Awesome Skills 聚合都默认开启。 */
+export const DEFAULT_SKILL_MARKET_SOURCES: readonly string[] = ['anthropic', 'superpowers', 'awesome']
 
-/** 设置里存的是来源 id 数组；缺省只开官方和 Superpowers。 */
+/** 设置里存的是来源 id 数组；缺省开预置的三个主流来源。 */
 export function enabledSkillMarketSources(value: unknown): SkillMarketSource[] {
   const ids = Array.isArray(value)
     ? value.filter((item): item is string => typeof item === 'string')

@@ -3,9 +3,6 @@
 // another character's face or a mismatched status anchor.
 import { avatarRigFor } from './avatar-rig'
 
-export const avatarBodyUrl: string | null = avatarRigFor('xiaojing').body
-export const avatarAhogeUrl: string | null = avatarRigFor('xiaojing').ahoge
-
 /** 当前人设对应的立绘、可选呆毛层与小鲸专属表情组。 */
 export function avatarArtFor(personaId?: string | null): { body: string | null; ahoge: string | null; poses: boolean } {
   const rig = avatarRigFor(personaId)

@@ -10,7 +10,10 @@ const roots: string[] = []
 const servers: ReturnType<typeof createServer>[] = []
 
 afterEach(async () => {
-  for (const server of servers.splice(0)) await new Promise<void>((resolve) => server.close(() => resolve()))
+  for (const server of servers.splice(0)) {
+    server.closeAllConnections?.()
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+  }
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
 

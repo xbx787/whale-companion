@@ -40,7 +40,7 @@ describe('Claudian style composer discovery', () => {
     vi.stubGlobal('ResizeObserver', class { observe(): void {} disconnect(): void {} })
     Object.defineProperty(Element.prototype, 'scrollIntoView', { configurable: true, value: () => {} })
     bridge = new Proxy({
-      listClaudeWorkflows: async () => [
+      listAppCommands: async () => [
         { name: 'compact', kind: 'command', source: 'builtin', description: '压缩对话' },
         { name: 'review', kind: 'skill', source: 'user', description: '代码审查' }
       ],

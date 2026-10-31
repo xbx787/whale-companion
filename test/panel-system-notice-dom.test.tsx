@@ -52,7 +52,7 @@ describe('system notices keep their own row', () => {
         if (property.startsWith('on')) return () => () => {}
         if (property === 'getContextUsage') return async () => ({ status: 'unavailable' })
         if (property === 'readAvatar') return async () => null
-        if (property === 'listClaudeWorkflows' || property === 'searchWorkspaceFiles') return async () => []
+        if (property === 'listAppCommands' || property === 'searchWorkspaceFiles') return async () => []
         return async () => undefined
       }
     }) as unknown as PetAPI

@@ -34,7 +34,6 @@ export const SPEECH_SPEED_MIN = 0.5
 export const SPEECH_SPEED_MAX = 2
 
 export const MAX_TTS_INPUT_CHARS = 300
-export const MAX_REPLY_SPEECH_CHARS = 12_000
 export const MAX_DOCUMENT_BYTES = 2 * 1024 * 1024
 export const MAX_DOCUMENT_SEGMENTS = 1_000
 

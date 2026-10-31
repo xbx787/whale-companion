@@ -7,8 +7,7 @@ import { PanelBubble } from '../src/renderer/panel'
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
-/** 插话不再把折叠打断：它抬到这一轮的最上面、按条数叠成一列单独可见，
- *  下面整条过程（插话前后的工作）一起折起来——任何时候都能收。 */
+/** 插话按时间顺序留在思考链中间，不再抬到回复顶部。 */
 
 const settings: ConversationSettings = {
   visibleConversationTabs: 5, autoArchiveAfterDays: 0, goalMaxIterations: 5, goalMaxMinutes: 30,
@@ -55,7 +54,7 @@ describe('a steered line inside a finished turn', () => {
         if (prop === 'getDraft') return () => Promise.resolve('')
         if (prop === 'getContextUsage') return () => Promise.resolve({ status: 'unavailable' })
         if (prop === 'readAvatar') return () => Promise.resolve(null)
-        if (prop === 'listClaudeWorkflows') return () => Promise.resolve([])
+        if (prop === 'listAppCommands') return () => Promise.resolve([])
         if (prop === 'searchWorkspaceFiles') return () => Promise.resolve([])
         return () => Promise.resolve(undefined)
       }
@@ -71,36 +70,25 @@ describe('a steered line inside a finished turn', () => {
     host.remove()
   })
 
-  it('stacks the steered line above a process that folds whole', async () => {
+  it('keeps the steered line between the steps it followed', async () => {
     await act(async () => {
       root.render(<PanelBubble visible snapshot={snapshot} error={null} run={async (action) => { await action(window.pet); return true }} />)
     })
-    const asides = host.querySelector('.panel-turn-asides')
-    const process = host.querySelector('.panel-cluster.is-turn-process')
     const reply = host.querySelector('.panel-event-assistant')
-    expect(asides).toBeTruthy()
-    expect(asides!.textContent).toContain('插话：用另一种方案')
-    expect(process).toBeTruthy()
+    expect(host.querySelector('.panel-turn-asides')).toBeNull()
     expect(reply).toBeTruthy()
-    // 插话在自己的消息行上、在小鲸的气泡外面：在气泡里假装成它的内容会
-    // 让消息看起来"跑错了地方"。
-    expect(reply!.contains(asides!)).toBe(false)
-    expect(asides!.compareDocumentPosition(reply!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    // 也没掉进折叠块——它永远看得见。
-    expect(process!.textContent).not.toContain('插话：用另一种方案')
-    // 折叠块默认是收起来的：插话前后的工作都在里面，链整条可收。
-    expect(process!.hasAttribute('open')).toBe(false)
-    expect(process!.textContent).toContain('思维链')
+    const body = reply!.textContent ?? ''
+    expect(body).toContain('插话：用另一种方案')
+    expect(body.indexOf('先看配置')).toBeLessThan(body.indexOf('插话：用另一种方案'))
+    expect(body.indexOf('插话：用另一种方案')).toBeLessThan(body.indexOf('换方案的思路'))
   })
 
-  it('keeps the steered line inside the process while the turn still runs', async () => {
+  it('keeps the steered line in the process while the turn still runs', async () => {
     const live: AppSnapshot = { ...snapshot, taskStatus: 'executing', taskMetrics: { startedAt: at(0) } }
     await act(async () => {
       root.render(<PanelBubble visible snapshot={live} error={null} run={async (action) => { await action(window.pet); return true }} />)
     })
-    // 主人明确要求：思考中的插话留在过程流里发生的位置，不能提前搬走；
-    // 这一轮结束后才整体抬到折叠链上方。
     expect(host.querySelector('.panel-turn-asides')).toBeNull()
-    expect(host.textContent).toContain('插话：用另一种方案')
+    expect(host.querySelector('.panel-event-assistant')!.textContent).toContain('插话：用另一种方案')
   })
 })

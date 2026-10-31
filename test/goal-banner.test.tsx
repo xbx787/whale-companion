@@ -25,17 +25,19 @@ async function mount(element: React.ReactElement): Promise<HTMLDivElement> {
 }
 
 describe('GoalBanner', () => {
-  it('只留靶子图标、条件文本和停止按钮，不再显示轮数与阶段标签', async () => {
+  it('显示运行时间和修改/暂停/删除三键', async () => {
     const onClear = vi.fn()
     const host = await mount(<GoalBanner goal={{ condition: '把目标模式做完', phase: 'confirmed', startedAt: new Date().toISOString(), iterations: 3 }} onClear={onClear} />)
     expect(host.querySelector('.panel-goal-banner-icon svg')).toBeTruthy()
     expect(host.querySelector('.panel-goal-banner-condition')?.textContent).toBe('把目标模式做完')
+    expect(host.querySelector('.panel-goal-banner-time')?.textContent).toMatch(/^\d{2}:\d{2}$/)
+    expect(host.querySelectorAll('.panel-goal-action')).toHaveLength(3)
     expect(host.textContent).not.toContain('目标：')
     expect(host.querySelector('.panel-goal-banner-meta')).toBeNull()
     expect(host.querySelector('.panel-goal-banner-budget')).toBeNull()
     expect(host.querySelector('.panel-goal-banner-reason')).toBeNull()
     expect(host.querySelector('.panel-goal-resume')).toBeNull()
-    await act(async () => host.querySelector<HTMLButtonElement>('.panel-goal-stop')!.click())
+    await act(async () => host.querySelectorAll<HTMLButtonElement>('.panel-goal-action')[2].click())
     expect(onClear).toHaveBeenCalledTimes(1)
   })
 

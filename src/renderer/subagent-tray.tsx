@@ -2,11 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { SubagentTask } from '../shared/contracts'
 import { formatDuration } from './duration'
+import { RunningDots } from './running-dots'
 import { toolLabel } from '../shared/tool-labels'
 
 /** A finished subagent keeps its head for a beat so its ending is visible. */
-const SUBAGENT_RETAIN_MS = 6_000
-
 const STATUS_LABEL: Record<SubagentTask['status'], string> = {
   running: '运行中',
   completed: '已完成',
@@ -58,7 +57,7 @@ function Steps({ task }: { task: SubagentTask }) {
   return <ol className="panel-subagent-timeline">
     {entries.map((entry) => <li key={entry.id} className={`panel-subagent-step is-${entry.kind}`}>
       <span className="panel-subagent-step-mark" aria-hidden="true">
-        {entry.kind === 'tool' ? (entry.tool?.status === 'running' ? '…' : entry.tool?.status === 'error' ? '!' : '✓') : '·'}
+        {entry.kind === 'tool' ? (entry.tool?.status === 'running' ? <RunningDots /> : entry.tool?.status === 'error' ? '!' : '✓') : '·'}
       </span>
       <span className="panel-subagent-step-text">{entry.kind === 'tool' && entry.tool ? toolLabel(entry.tool.name) : entry.text}</span>
     </li>)}
@@ -70,62 +69,80 @@ function Steps({ task }: { task: SubagentTask }) {
  * head opens a compact read-only pane: identity, running counters, the child's
  * latest steps and the two controls the SDK exposes (background, stop).
  */
-export function SubagentTray({ subagents, controlsEnabled = true, onBackgroundTask, onStopTask, onMessageSubagent }: {
+export function SubagentTray({ conversationId, subagents, controlsEnabled = true, onBackgroundTask, onStopTask, onMessageSubagent }: {
+  /** 切换会话时才清空已保留的卡片；同一会话内不因快照抖动重挂载。 */
+  conversationId?: string
   subagents?: SubagentTask[]
   controlsEnabled?: boolean
   onBackgroundTask?: (task: SubagentTask) => void
   onStopTask?: (task: SubagentTask) => void
   onMessageSubagent?: (task: SubagentTask, text: string) => void
 }) {
-  const [displayed, setDisplayed] = useState<SubagentTask[]>([])
+  // 卡片状态按会话缓存在 sessionStorage：状态行重挂载（空面板转有内容）
+  // 或快照抖动都不能把已完成的代理抹掉。
+  const cacheKey = `subagent-cards:${conversationId ?? ''}`
+  // 右键删掉的代理进黑名单：快照再送回来也不重新出现，换会话前一直生效。
+  const removedKey = `subagent-removed:${conversationId ?? ''}`
+  const [removed, setRemoved] = useState<Set<string>>(() => {
+    try {
+      const raw = window.sessionStorage.getItem(removedKey)
+      return new Set(raw ? JSON.parse(raw) as string[] : [])
+    } catch { return new Set() }
+  })
+  const [displayed, setDisplayed] = useState<SubagentTask[]>(() => {
+    try {
+      const raw = window.sessionStorage.getItem(cacheKey)
+      return raw ? JSON.parse(raw) as SubagentTask[] : []
+    } catch { return [] }
+  })
   const [openTaskId, setOpenTaskId] = useState<string | null>(null)
   const [anchor, setAnchor] = useState<PopoverAnchor | null>(null)
   const [messageDraft, setMessageDraft] = useState('')
   const [messageSent, setMessageSent] = useState(false)
+  // 工具链默认展开；用户收起后在整个弹层生命周期内记住。
+  const [stepsOpen, setStepsOpen] = useState(true)
   const sentTimer = useRef<number | undefined>(undefined)
-  const removalTimers = useRef(new Map<string, number>())
   const popoverRef = useRef<HTMLDivElement | null>(null)
+  // 只有真正换会话才清空；快照里 subagents 短暂为空不能把卡片抹掉。
+  const lastConversationRef = useRef(conversationId)
+  useEffect(() => {
+    if (lastConversationRef.current === conversationId) return
+    lastConversationRef.current = conversationId
+    setDisplayed([])
+    setOpenTaskId(null)
+    try {
+      const raw = window.sessionStorage.getItem(`subagent-removed:${conversationId ?? ''}`)
+      setRemoved(new Set(raw ? JSON.parse(raw) as string[] : []))
+    } catch { setRemoved(new Set()) }
+  }, [conversationId])
   useEffect(() => {
     setMessageDraft('')
     setMessageSent(false)
   }, [openTaskId])
   useEffect(() => () => { if (sentTimer.current !== undefined) window.clearTimeout(sentTimer.current) }, [])
 
-  // The main process prunes finished tasks from its map; the panel keeps the
-  // last copy briefly so a child that just ended stays readable.
+  // 子代理卡片常驻：任务结束后不移除，避免只闪一下就消失。
   useEffect(() => {
-    const incoming = subagents ?? []
-    const incomingIds = new Set(incoming.map((task) => task.taskId))
-    const retain = (taskId: string): void => {
-      if (removalTimers.current.has(taskId)) return
-      const timer = window.setTimeout(() => {
-        removalTimers.current.delete(taskId)
-        setDisplayed((current) => current.filter((task) => task.taskId !== taskId))
-      }, SUBAGENT_RETAIN_MS)
-      removalTimers.current.set(taskId, timer)
-    }
+    const incoming = (subagents ?? []).filter((task) => !removed.has(task.taskId))
+    if (!incoming.length) return
     setDisplayed((current) => {
       const next = new Map(current.map((task) => [task.taskId, task]))
-      for (const task of incoming) {
-        next.set(task.taskId, task)
-        if (task.status === 'running') {
-          const timer = removalTimers.current.get(task.taskId)
-          if (timer !== undefined) {
-            window.clearTimeout(timer)
-            removalTimers.current.delete(task.taskId)
-          }
-        } else retain(task.taskId)
-      }
-      for (const task of current) {
-        if (!incomingIds.has(task.taskId)) retain(task.taskId)
-      }
+      for (const task of incoming) next.set(task.taskId, task)
       return [...next.values()]
     })
-  }, [subagents])
-  useEffect(() => () => {
-    for (const timer of removalTimers.current.values()) window.clearTimeout(timer)
-    removalTimers.current.clear()
-  }, [])
+  }, [subagents, removed])
+  useEffect(() => {
+    try {
+      if (removed.size) window.sessionStorage.setItem(removedKey, JSON.stringify([...removed]))
+      else window.sessionStorage.removeItem(removedKey)
+    } catch { /* 存储不可用时只是少了跨挂载记忆 */ }
+  }, [removed, removedKey])
+  useEffect(() => {
+    try {
+      if (displayed.length) window.sessionStorage.setItem(cacheKey, JSON.stringify(displayed))
+      else window.sessionStorage.removeItem(cacheKey)
+    } catch { /* 存储不可用时只是少了跨挂载缓存 */ }
+  }, [cacheKey, displayed])
 
   // Only an explicit outside click or Esc closes the pane. Scrolling, moving
   // the pointer over it and dragging its own scrollbar must never dismiss it.
@@ -172,8 +189,16 @@ export function SubagentTray({ subagents, controlsEnabled = true, onBackgroundTa
           const rect = event.currentTarget.getBoundingClientRect()
           setAnchor({ left: rect.left, top: rect.top, bottom: rect.bottom })
           setOpenTaskId(task.taskId)
+        }}
+        onContextMenu={(event) => {
+          event.preventDefault()
+          // 右键删掉这张卡片；只有已结束的代理可以删，运行中的留给停止按钮。
+          if (task.status === 'running') return
+          setDisplayed((current) => current.filter((item) => item.taskId !== task.taskId))
+          setRemoved((current) => new Set(current).add(task.taskId))
+          if (openTaskId === task.taskId) setOpenTaskId(null)
         }}>
-        <RobotIcon />
+        <RobotIcon /><span className="panel-subagent-name">{task.description}</span>
       </button>)}
     </span>
     {openTask && anchor && createPortal(<div ref={popoverRef} className="panel-subagent-popover"
@@ -187,9 +212,15 @@ export function SubagentTray({ subagents, controlsEnabled = true, onBackgroundTa
       {openTask.summary && <p className="panel-subagent-summary" title={openTask.summary}>{openTask.summary}</p>}
       <p className="panel-subagent-meta">
         {openTask.lastToolName ? `最近：${toolLabel(openTask.lastToolName)}` : '等待输出'}
-        {' · '}{openTask.toolUses ?? 0} 次工具 · {elapsedText(openTask)}
+        {'　'}{openTask.toolUses ?? 0} 次工具，{elapsedText(openTask)}
       </p>
-      <Steps task={openTask} />
+      {openTask.timeline?.length ? <>
+        <button type="button" className="panel-subagent-chain-toggle" aria-expanded={stepsOpen}
+          onClick={() => setStepsOpen((open) => !open)}>
+          {stepsOpen ? '收起工具链' : '展开工具链'}
+        </button>
+        {stepsOpen && <Steps task={openTask} />}
+      </> : null}
       {(onBackgroundTask || onStopTask) && openTask.status === 'running' && <div className="panel-subagent-actions">
         {openTask.toolUseId && onBackgroundTask && !openTask.isBackgrounded &&
           <button type="button" onClick={() => onBackgroundTask(openTask)}>后台运行</button>}

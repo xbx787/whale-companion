@@ -45,7 +45,7 @@ describe('the approval-mode control', () => {
         if (prop === 'getDraft') return () => Promise.resolve('')
         if (prop === 'getContextUsage') return () => Promise.resolve({ status: 'unavailable' })
         if (prop === 'readAvatar') return () => Promise.resolve(null)
-        if (prop === 'listClaudeWorkflows') return () => Promise.resolve([])
+        if (prop === 'listAppCommands') return () => Promise.resolve([])
         if (prop === 'searchWorkspaceFiles') return () => Promise.resolve([])
         return (...args: unknown[]) => {
           calls.push([String(prop), ...args])
@@ -186,6 +186,6 @@ describe('the approval-mode control', () => {
     expect(card?.textContent).toContain('需要允许')
     expect(card?.textContent).toContain('执行命令：npm test')
     await act(async () => { host.querySelector<HTMLElement>('.panel-permission-allow')!.click() })
-    expect(calls).toContainEqual(['answerPermission', 'p1', true])
+    expect(calls).toContainEqual(['answerPermission', 'p1', 'once'])
   })
 })

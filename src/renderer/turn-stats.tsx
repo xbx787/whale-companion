@@ -2,12 +2,10 @@ import { Fragment } from 'react';
 import { DEEPSEEK_PRICES_YUAN_PER_MILLION, getPeakStatus } from '../shared/deepseek-pricing';
 import { compactTokens, tokenBreakdownRows, type TokenBreakdownRow, type TokenBucket } from './token-usage';
 import { toolLabel } from '../shared/tool-labels';
+import { formatDuration } from './duration';
 import { toolArgumentPreview } from './tool-arguments';
 import type { TaskMetrics, TimelineEntry } from '../shared/contracts';
 
-function secondsLabel(seconds: number): string {
-  return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
-}
 
 /** All money in the bill reads at the same two decimals — rows, total and
  *  notes alike — so the written sum is easy to check by hand. */
@@ -58,7 +56,7 @@ export function TurnStats({ entries, metrics, running, showMissingUsage = false 
   // running), so this footer only carries what nothing else shows: the live
   // token count, and — once the turn settles — the frozen totals.
   const ended = metrics?.finishedAt ? Date.parse(metrics.finishedAt) : Date.now();
-  const elapsedLabel = !running && Number.isFinite(started) ? secondsLabel(Math.max(0, Math.floor((ended - started) / 1000))) : null;
+  const elapsedLabel = !running && Number.isFinite(started) ? formatDuration(Math.max(0, Math.floor((ended - started) / 1000))) : null;
   const usage = metrics?.usage ?? (metrics?.usedTokens !== undefined ? { total: metrics.usedTokens } : undefined);
   // 这个后端在流式期间不报输出量——live 探针实测：文字已流 230 字符时输出仍是
   // 0，消息完成的一瞬间才跳到真实值。运行中就用正在流的那段文字估一个下限
@@ -160,7 +158,7 @@ export function TurnStats({ entries, metrics, running, showMissingUsage = false 
           <span>{spendTotal.label}{tierLabel && <i className={`panel-turn-tier${tierTone}`}>{tierLabel}</i>}</span>
           {spendTotal.amount !== null && <span className="panel-turn-usage-total-amount">{spendTotal.amount}</span>}
         </span>}
-        {hitRate !== null && <span>缓存命中率 {hitRate}%</span>}
+        {hitRate !== null && <span className="panel-turn-hit-rate"><span>缓存命中率</span><span className="panel-turn-hit-rate-value">{hitRate}%</span></span>}
         <span className="panel-turn-usage-note">不含子代理和辅助调用</span>
       </span>}
     </span>}

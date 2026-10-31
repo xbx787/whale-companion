@@ -1,11 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { isLibraryItem, libraryMentionToken, parseLibraryMentions } from '../src/shared/libraries'
+import { isLibraryItem, libraryMentionToken, parseLibraryMentions, stripLibraryMentions } from '../src/shared/libraries'
 
 describe('library mentions', () => {
-  it('inserts a kind:id token that parses back', () => {
-    const token = libraryMentionToken({ kind: 'mcp', id: 'io.github.demo/server' })
-    expect(token).toBe('@mcp:io.github.demo/server')
-    expect(parseLibraryMentions(`用 ${token} 看一下`)).toEqual([{ kind: 'mcp', id: 'io.github.demo/server' }])
+  it('strips the token from the text sent to the engine', () => {
+    expect(stripLibraryMentions('@skill:code-review 合理运用 Skill 进行审核')).toBe('合理运用 Skill 进行审核')
+    expect(stripLibraryMentions('@mcp:demo 看下这个')).toBe('看下这个')
+    expect(stripLibraryMentions('普通文本')).toBe('普通文本')
+  })
+
+  it('inserts a kind:name token that parses back', () => {
+    const token = libraryMentionToken({ kind: 'skill', name: 'code-review' })
+    expect(token).toBe('@skill:code-review')
+    expect(parseLibraryMentions(`用 ${token} 看一下`)).toEqual([{ kind: 'skill', id: 'code-review' }])
   })
 
   it('deduplicates and keeps different kinds apart', () => {

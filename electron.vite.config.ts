@@ -27,6 +27,11 @@ export default defineConfig({
     // instead of emitting hashed individual files.
     publicDir: resolve(__dirname, 'resources'),
     build: {
+      // 本机 esbuild 0.28 处理大 chunk 时删临时文件必失败（Access denied）。
+      // Electron 的 Chromium 直接支持 esnext，关掉 chunk 级转译即可绕过；
+      // 压缩交给打包脚本里的 electron-builder，不再走 esbuild。
+      target: 'esnext',
+      minify: false,
       copyPublicDir: true,
       rollupOptions: {
         input: {

@@ -22,8 +22,10 @@ const ACP_MODEL_START = '# >>> 小鲸：ACP 模型（应用写入，勿手改）
 const ACP_MODEL_END = '# <<< 小鲸：ACP 模型（应用写入，勿手改）'
 const MODEL_CATALOG_START = '# >>> 小鲸：供应商模型目录（应用写入，勿手改）'
 const MODEL_CATALOG_END = '# <<< 小鲸：供应商模型目录（应用写入，勿手改）'
+const PWSH_START = '# >>> 小鲸：命令执行（应用写入，勿手改）'
+const PWSH_END = '# <<< 小鲸：命令执行（应用写入，勿手改）'
 
-function yamlQuote(value: string): string {
+export function yamlQuote(value: string): string {
   return `'${value.replace(/'/gu, "''")}'`
 }
 
@@ -74,6 +76,20 @@ export function syncDshCompactPatch(home: string, percent: number): void {
 /** 禁用 DSH 自带的目标工具：目标由宿主循环管理，避免模型再开一个不可见的循环。 */
 export function syncDshGoalToolPatch(home: string): void {
   rewrite(home, GOAL_START, GOAL_END, '- id: tool-goal\n  disabled: true')
+}
+
+/** 命令工具默认会把超时命令提升成后台 job，模型随后还要再轮询一次输出。
+ *  这里关掉“超时转后台”和主动后台：一次调用就等到进程退出或真正超时，
+ *  不再出现“先执行、再 job_output”的固定两步。 */
+export function syncDshPwshPatch(home: string): void {
+  const dir = path.join(home, 'profiles', 'acp')
+  if (!existsSync(path.join(dir, 'package.json'))) return
+  rewriteFile(path.join(dir, 'cordis.patch.yml'), PWSH_START, PWSH_END, [
+    '- id: tool-pwsh',
+    '  config:',
+    '    enableRunInBackground: false',
+    '    promoteOnTimeout: false'
+  ].join('\n'))
 }
 
 /** 把 ACP profile 的默认模型钉到适配器目录里的 id。

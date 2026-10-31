@@ -14,7 +14,6 @@
 :root {
   --font-ui: "Microsoft YaHei UI", "Noto Sans CJK SC", sans-serif;
   --font-mono: Consolas, "Microsoft YaHei UI", monospace;
-  --font-numeric: Bahnschrift, "Segoe UI", sans-serif;
 
   /* 唯一的基准字号：小档 11px，中档 12px，大档 13px。 */
   --font-base: 11px;

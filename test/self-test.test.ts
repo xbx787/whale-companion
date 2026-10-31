@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -39,6 +39,16 @@ afterEach(() => {
 })
 
 describe('runSelfTest', () => {
+  it('passes against the built renderer when it is present', () => {
+    const rendererRoot = path.resolve(__dirname, '../out/renderer')
+    if (!existsSync(path.join(rendererRoot, 'avatar.html'))) return
+    const dataRoot = mkdtempSync(path.join(tmpdir(), 'whale-self-test-built-'))
+    roots.push(dataRoot)
+    const result = runSelfTest({ version: '0.0.0', dataRoot, rendererRoot, windowsReady: true, settingsReady: true })
+    expect(result.checks, JSON.stringify(result.checks)).toEqual(result.checks.map((check) => ({ ...check, ok: true })))
+  })
+
+
   it('passes when windows, settings and every referenced Live2D file are present', () => {
     const input = fixture()
     const result = runSelfTest({ version: '0.0.87', ...input, windowsReady: true, settingsReady: true })

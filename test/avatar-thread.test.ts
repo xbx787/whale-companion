@@ -26,9 +26,11 @@ describe('avatar thread geometry', () => {
     expect(rule('.panel-turn-stats-dot.is-done')).toContain('background: #9db9e9')
   })
 
-  it('runs the thread to the block bottom and bridges the stats gap onto the dot', () => {
-    const thread = rule('.panel-event-avatar::after')
-    expect(thread).toContain('bottom: 0;')
+  it('runs the thread from under the clock to the block bottom and bridges the stats gap onto the dot', () => {
+    // 线是时间后面的真实 flex 元素：起点由布局决定，不再用 top 像素值。
+    const thread = rule('.panel-event-line')
+    expect(thread).toContain('flex: 1')
+    expect(thread).toContain('width: 1.6px')
     const bridge = rule('.panel-turn-stats:has(.panel-turn-stats-dot)::before')
     expect(bridge).toContain('top: -15px')
     expect(bridge).toContain('height: calc(50% + 11.5px)')

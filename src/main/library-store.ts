@@ -269,6 +269,11 @@ export class LibraryStore {
   }
 
   private async installFiles(entry: LibraryItem): Promise<LibraryItem> {
+    // 本地插件已经有目录（连接器/技能都在里面），直接登记，不再去仓库下载。
+    const localPath = entry.launch?.path
+    if (localPath && existsSync(localPath)) {
+      return { ...entry, installedAt: new Date().toISOString(), path: localPath }
+    }
     if (!entry.repo) throw new Error('这个条目没有安装地址。')
     const relative = safeRelative(entry.subdir ?? '')
     const name = safeSegment(entry.id)
@@ -364,9 +369,9 @@ export class LibraryStore {
   /** The launch details for the given ids, split by what the engine expects. */
   async launches(ids: readonly string[]): Promise<{ mcp: LibraryItem[]; plugins: LibraryItem[] }> {
     const wanted = new Set(ids)
-    // Include externally discovered entries: mentioning a Claude/project MCP
-    // can launch it without a separate import step.
-    const items = (await this.list()).filter((item) => wanted.has(`${item.kind}:${item.id}`) && !item.disabled)
+    // 兼容两种 token：新写入的是 @kind:名字，旧记录里可能是 @kind:id。
+    const items = (await this.list()).filter((item) => !item.disabled &&
+      (wanted.has(`${item.kind}:${item.id}`) || wanted.has(`${item.kind}:${item.name}`)))
     return {
       mcp: items.filter((item) => item.kind === 'mcp' && item.launch?.type === 'mcp'),
       plugins: items.filter((item) => item.kind === 'plugin' && item.path && existsSync(item.path))
@@ -406,10 +411,11 @@ function skillMeta(file: string, fallback: string): { name: string; description:
     }
     return {
       name: field('name') || fallback,
-      description: (field('description') || '本地技能').slice(0, 2_000)
+      // 没有 description 就留空，界面据此不显示第二行；不要用占位词冒充简介。
+      description: (field('description') || '').slice(0, 2_000)
     }
   } catch {
-    return { name: fallback, description: '本地技能' }
+    return { name: fallback, description: '' }
   }
 }
 

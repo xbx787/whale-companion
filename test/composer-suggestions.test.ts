@@ -6,19 +6,21 @@ describe('composer trigger detection', () => {
   it('offers workflows only at the beginning of the draft', () => {
     expect(detectComposerTrigger('/compact', 8)).toEqual({ kind: 'workflow', query: 'compact', start: 0, end: 8 });
     expect(detectComposerTrigger('请运行 /compact', 11)).toBeNull();
-    expect(detectComposerTrigger('  /compact', 10)).toEqual({ kind: 'workflow', query: 'compact', start: 2, end: 10 });
+    // 只有消息的第一个字符能当命令；前面的空白也不行。
+    expect(detectComposerTrigger('  /compact', 10)).toBeNull();
   });
 
   it('offers $ skills separately from / commands and leaves completed tokens alone', () => {
     expect(detectComposerTrigger('$review', 7)).toEqual({ kind: 'skill', query: 'review', start: 0, end: 7 });
-    expect(detectComposerTrigger('  $review', 9)).toEqual({ kind: 'skill', query: 'review', start: 2, end: 9 });
+    expect(detectComposerTrigger('  $review', 9)).toBeNull();
     expect(detectComposerTrigger('请用 $review', 10)).toBeNull();
     expect(detectComposerTrigger('$review file', 7)).toBeNull();
     expect(detectComposerTrigger('/compact now', 8)).toBeNull();
   });
 
-  it('offers files after a word boundary without interpreting email addresses', () => {
-    expect(detectComposerTrigger('请看 @notes', 9)).toEqual({ kind: 'file', query: 'notes', start: 3, end: 9 });
+  it('offers files only when @ opens the message, never mid-prose or in emails', () => {
+    expect(detectComposerTrigger('@notes', 6)).toEqual({ kind: 'file', query: 'notes', start: 0, end: 6 });
+    expect(detectComposerTrigger('请看 @notes', 9)).toBeNull();
     expect(detectComposerTrigger('a@example.com', 13)).toBeNull();
     expect(detectComposerTrigger('请看 @notes more', 9)).toBeNull();
     expect(detectComposerTrigger('请看 @{notes/file.md}', 19)).toBeNull();

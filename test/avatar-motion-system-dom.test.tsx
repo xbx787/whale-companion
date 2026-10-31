@@ -64,7 +64,7 @@ describe('avatar motion geometry', () => {
     expect(hitRule).not.toMatch(/\btransform\s*:/);
     expect(css).not.toMatch(/\.avatar-hit-target:active\s*\{[^}]*transform/);
     expect(css).not.toContain('var(--panel-pulse-p');
-    expect(css).toMatch(/\.avatar-status-dot\.is-pulsing\s*\{\s*animation:\s*avatar-task-pulse/);
+    expect(css).toMatch(/\.avatar-status-dot\.is-pulsing\.is-busy\s*\{\s*animation:\s*avatar-task-pulse/);
     for (const state of ['planning', 'executing', 'verifying', 'compacting', 'waiting']) {
       expect(css).toMatch(new RegExp(`\\.avatar-stage\\[data-task='${state}'\\] \\.avatar-state-loop \\{[^}]*animation:`));
     }

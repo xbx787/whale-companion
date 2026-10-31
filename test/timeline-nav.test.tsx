@@ -154,6 +154,11 @@ describe('TimelineNav', () => {
     expect(html).not.toContain('is-active')
   })
 
+  it('gives the newest message its own brighter tone', () => {
+    const html = renderToStaticMarkup(<TimelineNav marks={marks(40)} onJump={() => {}} />)
+    expect((html.match(/is-latest/g) ?? []).length).toBe(1)
+  })
+
   it('rests as a short handle of the newest marks, with no card until hovered', () => {
     const html = renderToStaticMarkup(<TimelineNav marks={marks(40)} onJump={() => {}} />)
     // At rest only the newest few marks render; the wheel window and the card

@@ -1,3 +1,4 @@
+import { isObject } from './object-util'
 import { randomUUID } from 'node:crypto'
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
@@ -119,9 +120,6 @@ interface PersistedLibrary {
   conversations: ConversationRecord[]
 }
 
-function isObject(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
-}
 
 /** 旧记录里的 `claude_code` 仍然可读，读入后由 normalizeModelMode 归一为 `dsh`。 */
 function isStoredMode(value: unknown): boolean {
@@ -290,7 +288,7 @@ function readExtendedSettings(settings: Record<string, unknown>): Pick<Conversat
   'goalMaxIterations' | 'goalMaxMinutes' | 'memoryEnabled' | 'panelSize' | 'panelPlacement' | 'panelTheme' | 'uiSize' | 'avatarSize' | 'avatarRenderer' | 'webSearchEnabled' | 'personaId' | 'agentKernel' | 'autoCompactPercent' |
   'toolRowDetail' |
   'outputStyle' | 'appendSystemPrompt' | 'autoScroll' | 'expandFileEditsByDefault' | 'sessionSort' | 'titleLocale' |
-  'titleModel' | 'loadUserSettings' | 'skillMarketSources'> {
+  'titleModel' | 'loadUserSettings' | 'skillMarketSources' | 'hiddenTabIds' | 'windowOpacity'> {
   const profiles = Array.isArray(settings.modelProfiles)
     ? (settings.modelProfiles.filter(isModelProfile) as ModelProfile[]).map((profile) => structuredClone(profile))
     : []
@@ -315,6 +313,8 @@ function readExtendedSettings(settings: Record<string, unknown>): Pick<Conversat
     panelTheme: isPanelTheme(settings.panelTheme) ? settings.panelTheme : 'dark',
     uiSize: isUiSize(settings.uiSize) ? settings.uiSize : 'small',
     avatarSize: isAvatarSize(settings.avatarSize) ? settings.avatarSize : 'small',
+    windowOpacity: typeof settings.windowOpacity === 'number' && Number.isFinite(settings.windowOpacity)
+      ? Math.min(100, Math.max(0, Math.round(settings.windowOpacity))) : 100,
     avatarRenderer: isAvatarRenderer(settings.avatarRenderer) ? settings.avatarRenderer : 'sprite',
     toolRowDetail: settings.toolRowDetail === 'full' || settings.toolRowDetail === 'name'
       ? settings.toolRowDetail : 'brief',
@@ -336,7 +336,11 @@ function readExtendedSettings(settings: Record<string, unknown>): Pick<Conversat
     titleLocale: settings.titleLocale === 'zh' || settings.titleLocale === 'en' ? settings.titleLocale : 'auto',
     titleModel: typeof settings.titleModel === 'string' && settings.titleModel.trim()
       ? settings.titleModel.trim().slice(0, 64) : 'deepseek-flash',
-    loadUserSettings: settings.loadUserSettings !== false
+    loadUserSettings: settings.loadUserSettings !== false,
+    // 关掉的顶部标签要跨重启保留：缺省为空，旧库读出来也安全。
+    hiddenTabIds: Array.isArray(settings.hiddenTabIds)
+      ? settings.hiddenTabIds.filter((id): id is string => typeof id === 'string')
+      : []
   }
 }
 
@@ -775,6 +779,13 @@ export class ConversationStore {
     return record ? structuredClone(record) : null
   }
 
+  /** 只读引用：切会话时不深拷贝整段 timeline。调用方只读，不得修改返回值。 */
+  async getConversationRef(id: string): Promise<ConversationRecord | null> {
+    await this.initialize()
+    await this.queue
+    return this.library!.conversations.find((candidate) => candidate.id === id) ?? null
+  }
+
   async createConversation(title = DEFAULT_TITLE, mode: ModelMode = 'dsh'): Promise<ConversationRecord> {
     const clean = cleanTitle(title)
     const normalized = normalizeModelMode(mode)
@@ -1005,7 +1016,7 @@ export class ConversationStore {
     const { goalMaxIterations, goalMaxMinutes, memoryEnabled } = patch
     const { enableAutoTitleGeneration, showMessageTimestamps, userName, assistantName, userAvatar, assistantAvatar, panelSize, panelPlacement, panelTheme, uiSize, avatarSize, avatarRenderer, toolRowDetail, personaId, agentKernel, autoCompactPercent,
       outputStyle, appendSystemPrompt, autoScroll, expandFileEditsByDefault, sessionSort, titleLocale,
-      titleModel, loadUserSettings } = patch
+      titleModel, loadUserSettings, hiddenTabIds } = patch
     if (tabs !== undefined && (!Number.isInteger(tabs) || tabs < 1 || tabs > MAX_VISIBLE_TABS)) {
       throw new ConversationStoreError('INVALID_INPUT', `快捷切换显示数量应为 1–${MAX_VISIBLE_TABS}。`)
     }
@@ -1087,7 +1098,11 @@ export class ConversationStore {
     if (loadUserSettings !== undefined && typeof loadUserSettings !== 'boolean') {
       throw new ConversationStoreError('INVALID_INPUT', '用户设置加载开关无效。')
     }
+    if (hiddenTabIds !== undefined && !(Array.isArray(hiddenTabIds) && hiddenTabIds.every((id) => typeof id === 'string'))) {
+      throw new ConversationStoreError('INVALID_INPUT', '隐藏标签列表无效。')
+    }
     return this.mutate((draft) => {
+      if (hiddenTabIds !== undefined) draft.settings.hiddenTabIds = [...new Set(hiddenTabIds)]
       if (tabs !== undefined) draft.settings.visibleConversationTabs = tabs
       if (autoArchive !== undefined) draft.settings.autoArchiveAfterDays = autoArchive
       if (effort !== undefined) draft.settings.effort = effort

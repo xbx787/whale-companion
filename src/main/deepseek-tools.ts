@@ -7,16 +7,6 @@
  *
  *  计费：DeepSeek 按次收（¥5 / 1000 次成功请求，失败与无结果不计费）。
  */
-import type { SdkMcpToolDefinition } from '@anthropic-ai/claude-agent-sdk';
-import { createSdkMcpServer } from '@anthropic-ai/claude-agent-sdk';
-import { z } from 'zod';
-
-/** MCP 工具返回的形状（SDK 的 CallToolResult 未导出，按协议结构写一份）。 */
-interface ToolResult {
-  content: Array<{ type: 'text'; text: string }>;
-  isError?: boolean;
-}
-
 const BASE_URL = 'https://api.deepseek.com';
 /** 单页正文上限：再长的页面进了上下文也只是噪声。 */
 const MAX_CONTENT_CHARS = 200_000;
@@ -73,61 +63,6 @@ export async function deepseekFetch(url: string, apiKey: string): Promise<DeepSe
       ? `${content.slice(0, MAX_CONTENT_CHARS)}\n…（正文过长，已截断）`
       : content
   };
-}
-
-function ok(payload: unknown): ToolResult {
-  return { content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }] };
-}
-
-function fail(message: string): ToolResult {
-  return { content: [{ type: 'text', text: message }], isError: true };
-}
-
-/** 以进程内 MCP server 的形式交给 Claude Code：模型调用 search/fetch 时由主
- *  进程直接打 DeepSeek 的接口。参数 schema 必须用 Zod schema/raw shape——
- *  createSdkMcpServer 只认这两种（手写 JSON Schema 会在注册时被拒），zod 已作为
- *  运行时依赖随包分发。 */
-export function createDeepSeekToolsServer(apiKey: string) {
-  const searchTool = {
-    name: 'search',
-    description: '用 DeepSeek 自研搜索引擎搜索网页。返回标题、链接与摘要；需要全文时再用 fetch 抓取对应链接。支持 site:、lang:、after: 等搜索操作符。',
-    inputSchema: {
-      query: z.string().describe('搜索词'),
-      count: z.number().optional().describe('返回条数，1-10，默认 6')
-    },
-    handler: async (args: { query?: unknown; count?: unknown }) => {
-      const query = typeof args.query === 'string' ? args.query.trim() : '';
-      if (!query) return fail('搜索词不能为空。');
-      try {
-        const hits = await deepseekSearch(query, typeof args.count === 'number' ? args.count : 6, apiKey);
-        return hits.length ? ok({ results: hits }) : ok({ results: [], note: '没有找到相关结果。' });
-      } catch (error) {
-        return fail(error instanceof Error ? error.message : '搜索失败。');
-      }
-    }
-  };
-  const fetchTool = {
-    name: 'fetch',
-    description: '抓取一个网页并返回 Markdown 正文。由 DeepSeek 服务端抓取，不受本机网络与客户端域名校验影响。',
-    inputSchema: {
-      url: z.string().describe('要抓取的 HTTP/HTTPS 网址')
-    },
-    handler: async (args: { url?: unknown }) => {
-      const url = typeof args.url === 'string' ? args.url.trim() : '';
-      if (!/^https?:\/\//i.test(url)) return fail('需要一个 HTTP/HTTPS 网址。');
-      try {
-        return ok(await deepseekFetch(url, apiKey));
-      } catch (error) {
-        return fail(error instanceof Error ? error.message : '抓取失败。');
-      }
-    }
-  };
-  return createSdkMcpServer({
-    name: 'deepseek',
-    version: '1.0.0',
-    instructions: '联网搜索与抓取由 DeepSeek 服务端完成：检索信息时先 search，再用 fetch 读取感兴趣的页面正文。',
-    tools: [searchTool, fetchTool] as unknown as Array<SdkMcpToolDefinition>
-  });
 }
 
 /** 找到能直连 DeepSeek 官方 API 的 key：配置指向官方端点时用它的 key，

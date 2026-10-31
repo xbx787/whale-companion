@@ -742,6 +742,36 @@ describe('conversation controller', () => {
     await until(() => controller.getSnapshot().timeline.some((item) => item.text === '新回复'), 'new reply')
   })
 
+  it('reorders waiting messages and can move one to the end', async () => {
+    let finish!: (reply: ModelReply) => void
+    const model: ModelClient = {
+      respond: () => new Promise((resolve) => { finish = resolve })
+    }
+    const controller = new ConversationController(
+      new ConversationStore(testRoot),
+      (_conversationId, onChange) => new AgentRuntime(new NoteStore(testRoot), undefined, onChange, model)
+    )
+    await controller.initialize()
+    await controller.sendMessage('正在运行')
+    await until(() => controller.displayedRuntime()!.isRunning(), 'running turn')
+    const first = await controller.sendMessage('A')
+    const second = await controller.sendMessage('B')
+    const third = await controller.sendMessage('C')
+    expect(controller.getSnapshot().pendingMessages.map((item) => item.text)).toEqual(['A', 'B', 'C'])
+
+    await controller.moveQueued(third.id, first.id)
+    expect(controller.getSnapshot().pendingMessages.map((item) => item.text)).toEqual(['C', 'A', 'B'])
+
+    await controller.moveQueued(third.id, null)
+    expect(controller.getSnapshot().pendingMessages.map((item) => item.text)).toEqual(['A', 'B', 'C'])
+
+    await controller.moveQueued(first.id, third.id)
+    expect(controller.getSnapshot().pendingMessages.map((item) => item.text)).toEqual(['B', 'A', 'C'])
+
+    await controller.stop()
+    finish({ text: '结束' })
+  })
+
   it('keeps archived conversation history separate and can remove one waiting message', async () => {
     let finish!: (reply: ModelReply) => void
     const model: ModelClient = {

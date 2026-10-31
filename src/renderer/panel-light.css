@@ -102,9 +102,9 @@ body.panel-theme-light.is-resizing-panel .panel-resize-grip::before{
   box-shadow: none !important;
 }
 /* 展开时会话库按钮紧贴手柄热区右缘。 */
-body.panel-theme-light .panel-bubble.is-expanded .panel-chat-header{ padding-left: 24px; }
-body.panel-theme-light .panel-window-action{ position: absolute; z-index: 20; top: 7px; display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 9px; color: #03112d; background: transparent; }
-body.panel-theme-light .panel-expand-toggle{ right: 49px; }
+body.panel-theme-light .panel-bubble.is-expanded .panel-chat-header{ padding-left: 10px; }
+body.panel-theme-light .panel-window-action{ position: absolute; z-index: 20; top: 9px; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 9px; color: #03112d; background: transparent; }
+body.panel-theme-light .panel-expand-toggle{ right: 45px; }
 body.panel-theme-light .panel-window-close{ right: 13px; }
 body.panel-theme-light .panel-window-action:hover{ color: #000000; background: rgba(4, 29, 77, 0.18); }
 body.panel-theme-light .panel-window-close:hover{ color: #000000; background: rgba(167, 64, 85, 0.35); }
@@ -182,11 +182,11 @@ body.panel-theme-light .panel-side-meta .panel-side-paused{ margin-left: 0; }
 body.panel-theme-light .panel-side-intro{ margin: 2px 0 12px; padding: 0 2px; color: #193562; font-size: var(--text-xs); line-height: 1.45; }
 body.panel-theme-light .panel-history-loading{ margin: 12px 2px; color: #193562; font-size: var(--text-xs); line-height: 1.45; }
 
-body.panel-theme-light .panel-chat-header{ position: relative; z-index: 5; display: flex; align-items: center; gap: 6px; flex: none; min-width: 0; height: 46px; padding: 4px 83px 0 24px; border-bottom: 1px solid rgba(0, 24, 67, 0.14); }
+body.panel-theme-light .panel-chat-header{ position: relative; z-index: 5; display: flex; align-items: center; gap: 6px; flex: none; min-width: 0; height: 46px; padding: 4px 113px 0 10px; border-bottom: 1px solid rgba(0, 24, 67, 0.14); }
 body.panel-theme-light .panel-library-toggle{ display: grid; place-items: center; flex: none; width: 28px; height: 28px; margin-bottom: 0; padding: 0; border: 0; border-radius: 9px; color: #000f2c; background: rgba(4, 29, 77, 0.09); }
 body.panel-theme-light .panel-library-toggle:hover{ color: #000000; background: rgba(4, 29, 77, 0.2); }
 body.panel-theme-light .panel-library-toggle svg{ width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
-body.panel-theme-light .panel-session-menu{ position: absolute; z-index: 6; top: 40px; left: 10px; display: grid; width: min(280px, calc(100vw - 36px)); max-height: min(310px, calc(100vh - 260px)); padding: 6px; overflow-y: auto; border: 1px solid rgba(0, 22, 65, 0.31); border-radius: 11px; background: linear-gradient(155deg, rgba(138, 161, 213, 0.99), rgba(183, 199, 238, 0.99)); box-shadow: 0 10px 28px rgba(217, 226, 250, 0.42); scrollbar-width: thin; }
+body.panel-theme-light .panel-session-menu{ position: absolute; z-index: 6; top: 40px; left: 10px; display: grid; width: min(228px, calc(100vw - 24px)); max-height: max(240px, min(320px, calc(100vh - 120px))); padding: 6px; overflow-y: auto; border: 1px solid rgba(0, 22, 65, 0.31); border-radius: 11px; background: linear-gradient(155deg, rgba(138, 161, 213, 0.99), rgba(183, 199, 238, 0.99)); box-shadow: 0 10px 28px rgba(217, 226, 250, 0.42); scrollbar-width: thin; }
 body.panel-theme-light .panel-session-menu-heading{ padding: 5px 8px 7px; color: #142a52; font-size: var(--text-xs); font-weight: 600; }
 body.panel-theme-light .panel-session-menu button{ display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 31px; padding: 2px 8px; border: 0; border-radius: 7px; color: #000918; background: transparent; text-align: left; font-size: var(--text-sm) !important; }
 body.panel-theme-light .panel-session-menu button:hover:not(:disabled), body.panel-theme-light .panel-session-menu button[aria-current="page"]{ background: rgba(0, 24, 74, 0.17); }
@@ -208,9 +208,10 @@ body.panel-theme-light .panel-status-row{
 body.panel-theme-light .panel-status{ display: inline-flex; align-items: center; gap: 7px; flex: none; color: #04153a; font-size: var(--text-sm); white-space: nowrap; }
 body.panel-theme-light .panel-status i{ flex: none; width: 8px; height: 8px; border-radius: 50%; background: #9db9e9; transform: translateY(0.8px); }
 body.panel-theme-light .panel-status-planning, body.panel-theme-light .panel-status-executing, body.panel-theme-light .panel-status-verifying{ color: #f5d39b; }
-body.panel-theme-light .panel-status-planning i, body.panel-theme-light .panel-status-executing i, body.panel-theme-light .panel-status-verifying i{ background: #f3c36f; box-shadow: 0 0 8px rgba(144, 96, 12, 0.3); opacity: calc(1 - .45 * var(--panel-pulse-p, 0)); transform: scale(calc(1 - .15 * var(--panel-pulse-p, 0))); }
+body.panel-theme-light .panel-status-planning i, body.panel-theme-light .panel-status-executing i, body.panel-theme-light .panel-status-verifying i{ background: #f3c36f; box-shadow: 0 0 8px rgba(144, 96, 12, 0.3); opacity: calc(1 - .5 * var(--panel-pulse-p, 0)); transform: scale(calc(1 - .15 * var(--panel-pulse-p, 0))); }
 body.panel-theme-light .panel-status-awaiting_approval{ color: #a9d5ff; }
-body.panel-theme-light .panel-status-awaiting_approval i{ background: #7bbaff; box-shadow: 0 0 8px rgba(0, 63, 132, 0.3); }
+body.panel-theme-light .panel-status-awaiting_approval i{ background: #7bbaff; box-shadow: 0 0 8px rgba(0, 63, 132, 0.3); animation: panel-wait-blink 1s ease-in-out infinite; }
+@keyframes panel-wait-blink { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
 body.panel-theme-light .panel-status-done{ color: #a8e8bc; }
 body.panel-theme-light .panel-status-done i{ background: #80d6a1; box-shadow: 0 0 8px rgba(41, 127, 74, 0.3); }
 body.panel-theme-light .panel-status-failed{ color: #ffc2c6; }
@@ -261,7 +262,9 @@ body.panel-theme-light .panel-nav-row{ position: relative; display: flex; align-
 body.panel-theme-light .panel-nav-mark{ display: block; width: var(--nav-base, 8.8px); height: 3.2px; margin-left: 4px; border-radius: 1.6px; background: rgba(27, 55, 103, 0.42); transform: scaleX(var(--nav-scale, 1)); transform-origin: left center; transition: transform .12s ease, background-color .12s ease; }
 /* 第 10、20、30……根横杠的序号，紧挨横杠右边。绝对定位：行高仍是 3.2px，
    滚轮按 NAV_STEP 计算行位置时不会被数字撑开。 */
-body.panel-theme-light .panel-nav-count{ position: absolute; left: 30px; top: 50%; transform: translateY(-50%); color: rgba(50, 70, 105, 0.5); font-family: var(--font-numeric); font-size: var(--text-2xs); font-variant-numeric: tabular-nums; line-height: 1; }
+body.panel-theme-light .panel-nav-count{ position: absolute; left: 30px; top: 50%; transform: translateY(-50%); color: rgba(50, 70, 105, 0.5); font-family: var(--font-ui); font-size: var(--text-2xs); font-variant-numeric: tabular-nums; line-height: 1; }
+/* 最新一条只在展开时才提亮；收起的三根横线保持一样，不当状态指示用。 */
+body.panel-theme-light .panel-nav.is-expanded .panel-nav-mark.is-latest{ background: rgba(0, 32, 77, 0.78); }
 body.panel-theme-light .panel-nav-mark.is-active{ background: #000c24; }
 body.panel-theme-light .panel-bubble.is-expanded .panel-nav{ --nav-base: 12px; }
 body.panel-theme-light .panel-nav-card{ position: absolute; z-index: 6; left: 28px; width: 206px; padding: 8px 10px 9px; border: 1px solid rgba(0, 22, 65, 0.3); border-radius: 12px; color: #000a20; background: rgba(189, 204, 239, 0.97); box-shadow: 0 10px 26px rgba(222, 230, 251, 0.45); transform: translateY(-50%); }
@@ -291,7 +294,7 @@ body.panel-theme-light .panel-scroll-arrow{ width: 15px; height: 15px; fill: non
 body.panel-theme-light .panel-scroll-ring{ position: absolute; left: 50%; top: 50%; width: 39px; height: 39px; margin: -19.5px 0 0 -19.5px; animation: spin 1.1s linear infinite; pointer-events: none; }
 body.panel-theme-light .panel-scroll-ring circle{ fill: none; stroke: #002863; stroke-width: 2; stroke-linecap: round; stroke-dasharray: 30 70; }
 
-body.panel-theme-light .panel-queue{ flex: none; min-height: 0; padding: 5px 14px 8px; border-top: 1px solid rgba(2, 22, 60, 0.14); background: rgba(174, 195, 237, 0.28); }
+body.panel-theme-light .panel-queue{ flex: none; min-height: 0; padding: 4px 14px 2px; border-top: 1px solid rgba(2, 22, 60, 0.14); background: rgba(174, 195, 237, 0.28); }
 body.panel-theme-light .panel-bubble:not(.is-composing) .panel-queue{ padding-right: 55px; }
 /* 正在插话：消息已投递给模型、还没轮到显示，先在这里给个交代。 */
 body.panel-theme-light .panel-steering{ border-top-color: rgba(9, 77, 133, 0.45); background: rgba(127, 159, 221, 0.35); }
@@ -299,7 +302,13 @@ body.panel-theme-light .panel-steering .panel-queue-heading{ color: #003160; }
 body.panel-theme-light .panel-queue-heading{ display: flex; gap: 5px; align-items: center; color: #0a2450; font-size: var(--text-xs); }
 body.panel-theme-light .panel-queue-heading strong{ color: #000b1f; font-size: var(--text-xs); font-weight: 600; }
 body.panel-theme-light .panel-queue-list{ overflow: visible; }
-body.panel-theme-light .panel-queue-item{ display: flex; align-items: center; gap: 5px; min-height: 24px; padding-left: 4px; color: #000c23; font-size: var(--text-sm); }
+body.panel-theme-light .panel-queue-item{ display: flex; align-items: center; gap: 4px; min-height: 24px; padding-left: 2px; color: #000c23; font-size: var(--text-sm); }
+body.panel-theme-light .panel-queue-item.is-dragging{ opacity: .45; }
+body.panel-theme-light .panel-queue-item.is-drop-before{ box-shadow: inset 0 2px 0 #002c72; border-radius: 6px; }
+body.panel-theme-light .panel-queue-grip{ cursor: grab; color: #304770 !important; }
+body.panel-theme-light .panel-queue-grip:active{ cursor: grabbing; }
+body.panel-theme-light .panel-queue-tail{ height: 12px; border-radius: 6px; }
+body.panel-theme-light .panel-queue-tail:hover{ background: rgba(0, 42, 112, 0.12); }
 body.panel-theme-light .panel-queue-item span{ flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The agent's task list, right above the text box: a one-line summary that opens
    into the subjects, so a created task never has to be dug out of the feed. */
@@ -330,8 +339,10 @@ body.panel-theme-light .panel-queue-item button:hover{ color: #000000; backgroun
    the conversation and composer stay in place. Its lower edge is pinned to
    the composer's top edge (inline `bottom`, measured live from the dock), so
    the input never ends up buried under the list. */
-body.panel-theme-light .panel-library-drawer{ position: absolute; z-index: 7; top: 0; left: 0; display: flex; flex-direction: column; width: min(320px, calc(100% - 56px)); min-width: 0; min-height: 0; overflow: hidden; border-right: 1px solid rgba(0, 22, 65, 0.26); border-radius: 0 14px 14px 0; background: linear-gradient(155deg, rgba(139, 164, 219, 0.99), rgba(190, 205, 241, 0.99)); box-shadow: 12px 0 30px rgba(222, 230, 251, 0.42); animation: panel-drawer-in .21s cubic-bezier(.22, .75, .25, 1) both; }
+body.panel-theme-light .panel-library-drawer{ position: absolute; z-index: 7; top: 0; left: 0; display: flex; flex-direction: column; width: min(calc(50% - 4px), 360px); min-width: 180px; min-height: 0; overflow: hidden; border-right: 1px solid rgba(0, 22, 65, 0.26); border-radius: 0 14px 14px 0; background: linear-gradient(155deg, rgba(139, 164, 219, 0.99), rgba(190, 205, 241, 0.99)); box-shadow: 12px 0 30px rgba(222, 230, 251, 0.42); animation: panel-drawer-in .21s cubic-bezier(.22, .75, .25, 1) both; }
 body.panel-theme-light .panel-library-drawer.is-closing{ pointer-events: none; animation: panel-drawer-out .19s cubic-bezier(.55, 0, .85, .4) both; }
+/* 小窗里左栏只占一条窄列，别把消息流整块盖掉。 */
+body.panel-theme-light .panel-bubble:not(.is-expanded) .panel-library-drawer{ width: min(260px, calc(100% - 20px)); }
 body.panel-theme-light .panel-library-header{ display: flex; align-items: center; gap: 6px; flex: none; height: 43px; padding: 7px 9px 4px 11px; }
 body.panel-theme-light .panel-library-header h2{ flex: 1; margin: 0; color: #00050f; font-size: var(--text-md); font-weight: 600; }
 body.panel-theme-light .panel-library-header button{ flex: none; border: 0; color: #000e28; background: transparent; }
@@ -340,8 +351,24 @@ body.panel-theme-light .panel-library-icon{ display: grid; place-items: center; 
 body.panel-theme-light .panel-library-icon:hover{ background: rgba(4, 29, 77, 0.16); }
 body.panel-theme-light .panel-library-icon svg{ width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; }
 body.panel-theme-light .panel-library-tabs{ display: flex; flex: none; gap: 6px; padding: 3px 12px 7px; }
-body.panel-theme-light .panel-library-tabs button{ flex: 1; min-height: 29px; border: 0; border-radius: 8px; color: #172b51; background: transparent; font-size: var(--text-sm) !important; }
+/* 左栏主分区：会话 / 市场。 */
+body.panel-theme-light .panel-library-sections{ display: flex; flex: none; gap: 6px; padding: 0 12px 4px; }
+body.panel-theme-light .panel-library-sections button{ flex: 1; min-height: 27px; border: 0; border-radius: 8px; outline: none; color: #172b51; background: transparent; font-size: var(--text-sm) !important; }
+body.panel-theme-light .panel-library-sections button.is-active{ color: #00050f; background: rgba(0, 28, 80, 0.17); }
+body.panel-theme-light .panel-library-sections button:focus-visible{ outline: 2px solid rgba(0, 40, 95, 0.6); outline-offset: -2px; }
+body.panel-theme-light .panel-library-market{ display: flex; flex: 1; flex-direction: column; gap: 8px; min-height: 0; overflow: hidden; padding: 4px 10px 10px; }
+body.panel-theme-light .panel-library-market .panel-right-market-kinds{ flex: none; margin-bottom: 0; }
+body.panel-theme-light .panel-library-installed{ display: flex; flex: 1; flex-direction: column; gap: 4px; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
+body.panel-theme-light .panel-library-installed-item{ display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 6px 8px; border-radius: 8px; background: rgba(207, 219, 245, 0.45); }
+body.panel-theme-light .panel-library-installed-item.is-disabled{ opacity: .55; }
+body.panel-theme-light .panel-library-installed-name{ display: flex; align-items: center; gap: 6px; color: #000817; font-size: var(--text-xs); }
+body.panel-theme-light .panel-library-installed-name small{ color: #2b426c; font-size: var(--text-2xs); }
+body.panel-theme-light .panel-library-installed-source{ overflow: hidden; color: #2b426c; font-size: var(--text-2xs); text-overflow: ellipsis; white-space: nowrap; }
+body.panel-theme-light .panel-library-market-open{ flex: none; margin-top: auto; min-height: 29px; border: 1px solid rgba(0, 41, 112, 0.35); border-radius: 8px; color: #001130; background: rgba(0, 41, 112, 0.1); font-size: var(--text-sm); }
+body.panel-theme-light .panel-library-market-open:hover{ background: rgba(0, 41, 112, 0.2); }
+body.panel-theme-light .panel-library-tabs button{ flex: 1; min-height: 29px; border: 0; border-radius: 8px; outline: none; color: #172b51; background: transparent; font-size: var(--text-sm) !important; }
 body.panel-theme-light .panel-library-tabs button[aria-selected="true"]{ color: #00050f; background: rgba(0, 28, 80, 0.17); }
+body.panel-theme-light .panel-library-tabs button:focus-visible{ outline: 2px solid rgba(0, 40, 95, 0.6); outline-offset: -2px; }
 body.panel-theme-light .panel-library-tabs button span{ margin-left: 4px; color: #091d42; font-size: var(--text-xs); }
 body.panel-theme-light .panel-library-search{ flex: none; width: calc(100% - 24px); height: 30px; margin: 0 12px 7px; padding: 0 10px; border: 1px solid rgba(2, 25, 65, 0.2); border-radius: 9px; outline: none; color: #000611; background: rgba(197, 211, 245, 0.34); font: inherit; font-size: var(--text-sm); }
 body.panel-theme-light .panel-library-search:focus{ border-color: rgba(2, 25, 65, 0.57); }
@@ -350,7 +377,9 @@ body.panel-theme-light .panel-session-list{ flex: 1; min-height: 0; padding: 0 1
 body.panel-theme-light .panel-library-empty{ padding: 32px 10px; color: #162747; font-size: var(--text-sm); text-align: center; }
 body.panel-theme-light .panel-library-group-heading{ padding: 8px 7px 5px; color: #1a3056; font-size: var(--text-xs); font-weight: 600; }
 body.panel-theme-light .panel-library-group:first-child .panel-library-group-heading{ padding-top: 3px; }
-body.panel-theme-light .panel-session{ display: flex; align-items: center; flex-wrap: wrap; gap: 4px; min-height: 49px; margin-bottom: 4px; padding: 3px 4px; border: 1px solid transparent; border-radius: 10px; }
+/* 标签页中的会话与其余未归档会话之间的分界。 */
+body.panel-theme-light .panel-library-divider{ height: 1px; margin: 7px 7px 5px; border-radius: 1px; background: rgba(0, 24, 67, 0.22); }
+body.panel-theme-light .panel-session{ position: relative; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; min-width: 0; min-height: 49px; margin-bottom: 4px; padding: 3px 4px; border: 1px solid transparent; border-radius: 10px; }
 body.panel-theme-light .panel-session:hover, body.panel-theme-light .panel-session.is-current{ border-color: rgba(0, 26, 76, 0.14); background: rgba(4, 29, 77, 0.08); }
 body.panel-theme-light .panel-session.is-selected{ border-color: rgba(0, 34, 86, 0.42); background: rgba(0, 34, 86, 0.14); }
 body.panel-theme-light .panel-session-main{ display: flex; flex: 1; flex-direction: column; align-items: flex-start; justify-content: center; min-width: 0; min-height: 39px; padding: 2px 5px; border: 0; color: #000713; background: transparent; text-align: left; }
@@ -358,14 +387,17 @@ body.panel-theme-light .panel-session-main.is-selecting{ position: relative; pad
 body.panel-theme-light .panel-session-check{ position: absolute; top: 50%; left: 4px; display: grid; place-items: center; width: 17px; height: 17px; border: 1px solid rgba(5, 29, 71, 0.62); border-radius: 5px; color: #a4bae7; background: rgba(10, 37, 84, 0.1); font-size: var(--text-md); font-style: normal; font-weight: 700; transform: translateY(-50%); }
 body.panel-theme-light .panel-session-check.is-checked{ border-color: #001d4b; background: #001d4b; }
 body.panel-theme-light .panel-session-main strong, body.panel-theme-light .panel-session-main span{ width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-body.panel-theme-light .panel-session-main strong{ font-size: var(--text-sm); font-weight: 600; }
+body.panel-theme-light .panel-session-main strong{ font-size: var(--text-md); line-height: 22px; font-weight: 600; }
 body.panel-theme-light .panel-session-main span{ margin-top: 3px; color: #1e3053; font-size: var(--text-xs); }
 body.panel-theme-light .panel-session-actions, body.panel-theme-light .panel-session-edit, body.panel-theme-light .panel-session-confirm{ display: flex; align-items: center; gap: 4px; min-width: 0; }
-body.panel-theme-light .panel-session-actions{ flex: none; opacity: 0; pointer-events: none; transition: opacity .12s ease; }
+/* 操作按钮浮在行上：透明时仍然占布局会把窄抽屉里的标题挤成省略号。
+   高度和顶部对齐标题行（3px 行内边距 + 2px main 内边距，行高 22px），
+   这样按钮只压标题，不会落下压到 preview 那行。 */
+body.panel-theme-light .panel-session-actions{ position: absolute; z-index: 1; top: 5px; right: 5px; flex: none; padding: 0 2px 0 10px; border-radius: 8px; background: linear-gradient(90deg, rgba(155, 176, 225, 0), rgba(155, 176, 225, 0.94) 10px); opacity: 0; pointer-events: none; transition: opacity .12s ease; }
 body.panel-theme-light .panel-session:hover .panel-session-actions, body.panel-theme-light .panel-session:focus-within .panel-session-actions{ opacity: 1; pointer-events: auto; }
 body.panel-theme-light .panel-session-actions button, body.panel-theme-light .panel-session-edit button, body.panel-theme-light .panel-session-confirm button{ min-height: 24px; padding: 0 6px; border: 0; border-radius: 6px; color: #000d23; background: rgba(0, 29, 86, 0.1); font-size: var(--text-xs) !important; }
-body.panel-theme-light .panel-session-actions button{ display: grid; place-items: center; width: 26px; height: 26px; min-height: 26px; padding: 0; background: transparent; }
-body.panel-theme-light .panel-session-actions button svg{ width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+body.panel-theme-light .panel-session-actions button{ display: grid; place-items: center; width: 22px; height: 22px; min-height: 22px; padding: 0; background: transparent; }
+body.panel-theme-light .panel-session-actions button svg{ width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 body.panel-theme-light .panel-session-edit, body.panel-theme-light .panel-session-confirm{ flex: 1 0 100%; padding: 1px 3px 4px; }
 /* The row's own second line, shown on hover or focus: mode, birth, last
    activity and size — the facts you otherwise had to open the session for.
@@ -393,7 +425,7 @@ body.panel-theme-light .panel-quick-tabs{ display: flex; align-items: center; ga
 body.panel-theme-light .panel-quick-tabs::-webkit-scrollbar{ display: none; }
 /* 会话标签是悬浮的小圆角矩形：四周留出空隙，不再把侧边线接到栏底。
    当前会话只用背景和描边高亮，不再加顶部强调线。 */
-body.panel-theme-light .panel-quick-tab{ position: relative; display: flex; align-items: center; justify-content: center; gap: 5px; flex: 1 1 0; min-width: 0; max-width: none; height: 26px; padding: 0 20px 0 8px; overflow: hidden; border: 1px solid transparent; border-radius: 7px; color: #1f3051; background: rgba(3, 38, 100, 0.055); font-size: var(--text-sm) !important; white-space: nowrap; touch-action: none; }
+body.panel-theme-light .panel-quick-tab{ position: relative; display: flex; align-items: center; justify-content: center; gap: 5px; flex: 1 1 0; min-width: 0; max-width: 160px; height: 26px; padding: 0 20px 0 8px; overflow: hidden; border: 1px solid transparent; border-radius: 7px; color: #1f3051; background: rgba(3, 38, 100, 0.055); font-size: var(--text-sm) !important; white-space: nowrap; touch-action: none; }
 body.panel-theme-light .panel-quick-tab-label{ min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* 关闭标签：鼠标悬停时才露出来，点了只把会话从顶部移回未归档。 */
 body.panel-theme-light .panel-quick-tab-close{ position: absolute; right: 4px; top: 50%; transform: translateY(-50%); flex: none; display: grid; place-items: center; width: 13px; height: 13px; border-radius: 4px; color: #273d62; font-size: var(--text-2xs); line-height: 1; opacity: 0; transition: opacity .12s ease, background .12s ease, color .12s ease; }
@@ -444,10 +476,9 @@ body.panel-theme-light .panel-event-avatar{ position: relative; display: flex; f
    every one-line message — the user bubble included — was stretched to match.
    It runs to the block's own bottom edge so the stats row's bridge can pick
    it up without a seam. */
-body.panel-theme-light .panel-event-avatar::after{ content: ''; position: absolute; top: 34px; bottom: 0; left: calc(50% - 0.8px); width: 1.6px; border-radius: 1px; background: rgba(29, 57, 105, 0.2); }
-/* With a clock between glyph and thread, the thread starts under it:
-   33 glyph + 8 gap + 10 clock + the 1px breather. */
-body.panel-theme-light .panel-event-avatar:has(.panel-event-time)::after{ top: 52px; }
+/* 线是时间后面的真实元素：flex 撑满剩余高度，起点天然在时间下面，
+   不再靠固定像素算 top，也不会穿过时间。 */
+body.panel-theme-light .panel-event-line{ flex: 1; width: 1.6px; margin-top: 2px; border-radius: 1px; background: rgba(29, 57, 105, 0.2); }
 /* One reply is one box: the avatar and clock appear once at its top, and
    every further piece is a list-like paragraph. Its dot is a pseudo-element
    of the paragraph itself — alignment by construction, it cannot drift. */
@@ -458,7 +489,7 @@ body.panel-theme-light .panel-event.is-run .panel-event-body{ display: grid; gap
 body.panel-theme-light .panel-turn-asides{ min-width: 0; }
 /* The reply pieces carry no bullet: a dot per paragraph read as a list of
    unrelated items — the final answer most of all. The pieces just flow. */
-body.panel-theme-light .panel-avatar-img{ width: 33px; height: 33px; border: 1px solid rgba(2, 25, 65, 0.35); border-radius: 11.5px; object-fit: cover; object-position: center 34%; }
+body.panel-theme-light .panel-avatar-img{ width: 33px; height: 33px; border: 1px solid rgba(2, 25, 65, 0.35); border-radius: 11.5px; object-fit: contain; }
 body.panel-theme-light .panel-event-glyph{
   display: grid;
   place-items: center;
@@ -473,7 +504,7 @@ body.panel-theme-light .panel-event-glyph{
 }
 body.panel-theme-light .panel-event-user .panel-event-glyph{ color: #f4d8c2; background: rgba(94, 39, 17, 0.12); }
 body.panel-theme-light .panel-event-tool .panel-event-glyph{ font-size: var(--glyph-md); font-weight: 400; }
-body.panel-theme-light .panel-event-time{ color: #2d4571; font-family: var(--font-numeric); font-size: var(--text-xs); font-variant-numeric: tabular-nums; line-height: 1; }
+body.panel-theme-light .panel-event-time{ color: #2d4571; font-family: var(--font-ui); font-size: var(--text-xs); font-variant-numeric: tabular-nums; line-height: 1; }
 body.panel-theme-light .panel-event-body{ min-width: 0; padding-top: 1px; }
 body.panel-theme-light .panel-event-body p{ margin: 4px 0 0; color: #000612; font-size: var(--text-md); line-height: 1.58; white-space: pre-wrap; overflow-wrap: anywhere; }
 /* A system notice has no speaker: it reads as a quiet centered aside between
@@ -505,6 +536,9 @@ body.panel-theme-light .panel-event-tool .panel-event-body p{ color: #0a1835; }
    43px indent (lining it up with message bodies) made the runs look adrift. */
 body.panel-theme-light .panel-thought{ margin: 0 0 2px; padding: 0 5px 0 0; border: 1px solid transparent; border-radius: 7px; color: #0f2346; background: rgba(199, 215, 248, 0.12); font-size: var(--text-sm); content-visibility: auto; contain-intrinsic-size: auto 26px; }
 body.panel-theme-light .panel-thought:hover, body.panel-theme-light .panel-thought[open]{ border-color: rgba(0, 25, 70, 0.15); background: rgba(199, 215, 248, 0.24); }
+/* 工作行不左移进头像列：那会和头像框重叠。改成整条 body 下移，让第一行
+   的垂直中心落在头像中心（时间 10px + 间隔 8px + 头像 33px 的中心）。 */
+body.panel-theme-light .panel-event.is-run .panel-event-body{ padding-top: 4px; }
 body.panel-theme-light .panel-thought summary{ display: flex; align-items: center; gap: 8px; min-height: 25px; list-style: none; cursor: pointer; color: #1b3056; }
 body.panel-theme-light .panel-thought summary::-webkit-details-marker{ display: none; }
 body.panel-theme-light .panel-thought-icon, body.panel-theme-light .panel-tool-icon{ flex: none; width: 16px; height: 16px; fill: none; stroke: #082556; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
@@ -515,7 +549,7 @@ body.panel-theme-light .panel-thought-label{ color: #071632; font-weight: 400; }
 body.panel-theme-light .panel-thought-label.panel-live-label{ font-weight: 700; }
 body.panel-theme-light .panel-thought-time{ color: #203860; font-variant-numeric: tabular-nums; }
 body.panel-theme-light .panel-thought-state{ margin-left: auto; flex: none; color: #276439; font-size: var(--glyph-sm); line-height: 1; }
-body.panel-theme-light .panel-thought-state.is-running{ color: #f0c47b; opacity: calc(1 - .45 * var(--panel-pulse-p, 0)); transform: scale(calc(1 - .15 * var(--panel-pulse-p, 0))); }
+body.panel-theme-light .panel-thought-state.is-running{ color: #f0c47b; opacity: calc(1 - .5 * var(--panel-pulse-p, 0)); transform: scale(calc(1 - .15 * var(--panel-pulse-p, 0))); }
 /* The opened thought body lines up under the "已思考" label — icon 14 px plus
    the summary's 8 px gap — instead of hanging flush against the window edge. */
 body.panel-theme-light .panel-thought .panel-markdown{ margin: 6px 0 8px 22px; max-height: 240px; overflow: auto; font-size: var(--text-sm); line-height: 1.55; scrollbar-width: thin; }
@@ -533,7 +567,7 @@ body.panel-theme-light .panel-turn-tools-errors{ color: #f6aeb5; }
    and the thread always has something to land on. */
 /* Same 1-device-pixel compensation as the bridge (13 + 0.8). */
 body.panel-theme-light .panel-turn-stats-dot{ position: absolute; left: 13.8px; top: calc(50% - 3.5px); width: 7px; height: 7px; border-radius: 50%; }
-body.panel-theme-light .panel-turn-stats-dot.is-running{ background: #f3c36f; opacity: calc(1 - .45 * var(--panel-pulse-p, 0)); transform: scale(calc(1 - .15 * var(--panel-pulse-p, 0))); }
+body.panel-theme-light .panel-turn-stats-dot.is-running{ background: #f3c36f; opacity: calc(1 - .5 * var(--panel-pulse-p, 0)); transform: scale(calc(1 - .15 * var(--panel-pulse-p, 0))); }
 body.panel-theme-light .panel-turn-stats-dot.is-done{ background: #9db9e9; }
 /* The thread's continuation across the gap between the message block and this
    row: the block's 15px margin and the stats' 3px margin collapse to 15px, so
@@ -568,6 +602,8 @@ body.panel-theme-light .panel-turn-formula-sub{ color: rgba(0, 14, 40, 0.85); te
 body.panel-theme-light .panel-turn-usage-total{ display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding-top: 4px; border-top: 1px solid rgba(0, 25, 70, 0.38); }
 body.panel-theme-light .panel-turn-usage-total-amount{ color: #00040b; }
 body.panel-theme-light .panel-turn-usage-note{ color: #304770; }
+body.panel-theme-light .panel-turn-hit-rate{ display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
+body.panel-theme-light .panel-turn-hit-rate-value{ color: #00040b; }
 /* The tool count rides the same hover-tip pattern as the token breakdown:
    one line per call, speaking the exact words the tool cards above use. */
 /* max-content keeps the absolutely-positioned tip as wide as its content —
@@ -634,19 +670,26 @@ body.panel-theme-light .panel-tool-activity summary code{ flex: 0 0 auto; min-wi
 body.panel-theme-light .panel-tool-activity summary code.panel-live-label{ font-weight: 700; }
 /* What the call acts on, dimmed next to the name; the row expands to the result only. */
 body.panel-theme-light .panel-tool-argument{ flex: 1; min-width: 0; overflow: hidden; color: #3d557e; font: var(--text-sm)/1.4 var(--font-mono); text-overflow: ellipsis; white-space: nowrap; }
+/* 时间不参与收缩：description 先被截，耗时永远完整。 */
+body.panel-theme-light .panel-tool-time{ flex: none; color: #304770; font-size: var(--text-2xs); font-variant-numeric: tabular-nums; white-space: nowrap; }
 /* Added and removed lines for the file-writing tools, GitHub style. */
 body.panel-theme-light .panel-tool-diff{ display: flex; flex: none; gap: 6px; font: var(--text-sm)/1.4 var(--font-mono); font-variant-numeric: tabular-nums; }
 body.panel-theme-light .panel-tool-diff-add{ color: #267940; }
 body.panel-theme-light .panel-tool-diff-del{ color: #5f0f19; }
-body.panel-theme-light .panel-tool-result{ margin-left: auto; flex: none; color: #276439; font-size: var(--glyph-sm); line-height: 1; }
+body.panel-theme-light .panel-tool-result{ display: grid; place-items: center; flex: none; width: 17px; height: 17px; margin-left: auto; color: #276439; font-size: var(--glyph-sm); line-height: 1; }
 /* 读图工具行右侧的直接入口：点一下交给系统默认程序，不在面板里嵌预览。
    靠右站，后面的状态勾紧跟着它；按钮本身不要边框。 */
 body.panel-theme-light .panel-tool-open-image{ flex: none; margin-left: auto; padding: 0 2px; border: 0; background: none; color: #103860; font: inherit; font-size: var(--text-xs); line-height: 1; cursor: pointer; }
 body.panel-theme-light .panel-tool-open-image:hover{ color: #001426; }
+/* 省略号在 17px 行盒里按文字基线会偏下，补一点下内边距把它提回中心。 */
+/* 运行中的三个点用圆点元素画，flex 垂直居中，不受字体基线影响。 */
+body.panel-theme-light .panel-tool-dots{ display: inline-flex; align-items: center; gap: 2px; line-height: 0; vertical-align: middle; }
+body.panel-theme-light .panel-tool-dots i{ width: 3px; height: 3px; border-radius: 50%; background: currentColor; }
 body.panel-theme-light .panel-tool-result.is-running{ color: #f0c47b; }
 body.panel-theme-light .panel-tool-result.is-error{ color: #5e0c15; }
-/* A command past the minute mark gets a kill switch in its own row. */
-body.panel-theme-light .panel-tool-kill{ display: grid; place-items: center; flex: none; width: 17px; height: 17px; padding: 0; border: 1px solid rgba(129, 15, 33, 0.55); border-radius: 6px; color: #360004; background: rgba(129, 15, 33, 0.16); font-size: var(--text-md); line-height: 1; }
+/* A command past the minute mark gets a kill switch in its own row. It replaces
+   the ellipsis instead of sitting next to it. */
+body.panel-theme-light .panel-tool-kill{ display: grid; place-items: center; flex: none; width: 17px; height: 17px; margin-left: auto; padding: 0 0 1px; border: 1px solid rgba(129, 15, 33, 0.55); border-radius: 6px; color: #360004; background: rgba(129, 15, 33, 0.16); font-size: var(--text-md); line-height: 1; }
 body.panel-theme-light .panel-tool-kill:hover{ color: #000000; background: rgba(129, 15, 33, 0.38); }
 body.panel-theme-light .panel-tool-activity pre{ margin: 0 0 8px; max-height: 180px; padding: 7px; overflow: auto; border-radius: 6px; color: #000c20; background: rgba(212, 224, 250, 0.25); font: var(--text-sm)/1.5 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
 body.panel-theme-light .panel-tool-empty{ padding: 8px 1px 2px; color: #283d64; }
@@ -692,7 +735,7 @@ body.panel-theme-light .panel-cluster-label{ flex: none; color: #071632; white-s
 body.panel-theme-light .panel-cluster-facts{ display: flex; flex: 1 1 auto; gap: 12px; min-width: 0; overflow: hidden; color: #425680; font-size: var(--text-xs); }
 body.panel-theme-light .panel-cluster-facts > span{ min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 body.panel-theme-light .panel-cluster-state{ margin-left: auto; flex: none; color: #276439; font-size: var(--glyph-sm); line-height: 1; }
-body.panel-theme-light .panel-cluster-state.is-running{ color: #f0c47b; opacity: calc(1 - .45 * var(--panel-pulse-p, 0)); transform: scale(calc(1 - .15 * var(--panel-pulse-p, 0))); }
+body.panel-theme-light .panel-cluster-state.is-running{ color: #f0c47b; opacity: calc(1 - .5 * var(--panel-pulse-p, 0)); transform: scale(calc(1 - .15 * var(--panel-pulse-p, 0))); }
 body.panel-theme-light .panel-cluster-body{ position: relative; margin: 2px 0 6px; padding-left: 22px; }
 /* One spine from the first row down past the last one, ending just above the
    footer's dot: spine, dot and the summary's chevron share one column (12px —
@@ -717,11 +760,9 @@ body.panel-theme-light .panel-cluster-body .panel-thought, body.panel-theme-ligh
 /* 首点（宽 5）的中心落在 16.5px 的同一条轴上（14 + 2.5）——和上面的状态点、
    统计点一列。 */
 body.panel-theme-light .panel-working{ position: relative; display: flex; align-items: center; gap: 9px; margin: 1px 0 15px; padding-left: 14px; color: #203860; font-size: var(--text-sm); }
-body.panel-theme-light .panel-working-dots{ display: inline-flex; flex: none; gap: 3px; }
-/* 三个等待点常亮且不跳动：运行状态由文字和圆点颜色表达。 */
-body.panel-theme-light .panel-working-dots i{ width: 5px; height: 5px; border-radius: 50%; background: #005980; opacity: 1; transform: none; }
-body.panel-theme-light .panel-working-dots i:nth-child(2){ background: #000d56; }
-body.panel-theme-light .panel-working-dots i:nth-child(3){ background: #110047; }
+body.panel-theme-light .panel-working-dots{ display: inline-flex; align-items: center; flex: none; gap: 3px; vertical-align: middle; }
+/* 三点同色同大小，不做各自的相位跳动：之前的透明度差看着就像大小不一。 */
+body.panel-theme-light .panel-working-dots i{ width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: .7; }
 body.panel-theme-light .panel-working-text{ color: #000d24; }
 body.panel-theme-light .panel-working-time{ color: #2b436f; font-variant-numeric: tabular-nums; }
 /* 子任务：每个 Task 子 agent 一个机器人头，点开是只读详情与它自己的步骤。 */
@@ -812,7 +853,7 @@ body.panel-theme-light .panel-approval{
   background: rgba(192, 204, 240, 0.58);
 }
 body.panel-theme-light .panel-approval-heading{ display: flex; align-items: center; gap: 8px; }
-body.panel-theme-light .panel-approval-symbol{ display: grid; place-items: center; flex: none; width: 26px; height: 26px; border-radius: 8px; color: #6a410e; background: rgba(109, 64, 13, 0.12); font-family: var(--font-numeric); font-size: var(--glyph-md); font-weight: 700; }
+body.panel-theme-light .panel-approval-symbol{ display: grid; place-items: center; flex: none; width: 26px; height: 26px; border-radius: 8px; color: #6a410e; background: rgba(109, 64, 13, 0.12); font-family: var(--font-ui); font-size: var(--glyph-md); font-weight: 700; }
 body.panel-theme-light .panel-eyebrow{ color: #5a3c1a; font-size: var(--text-xs); letter-spacing: .04em; }
 body.panel-theme-light .panel-approval h3{ margin: 3px 0 0; color: #201100; font-size: var(--text-md); font-weight: 600; }
 body.panel-theme-light .panel-risk{ margin-left: auto; color: #573817; font-size: var(--text-xs); }
@@ -854,7 +895,7 @@ body.panel-theme-light .panel-compose-trigger svg{ width: 19px; height: 19px; fi
    checkbox mark, an own-answer line, and a review tab before submitting. */
 /* No inner scrolling: the panel grows with its questions and the composer
    area takes the height it needs (the feed gives way). */
-body.panel-theme-light .panel-ask{ display: flex; flex-direction: column; width: 100%; min-width: 0; border: 1px solid rgba(132, 88, 15, 0.42); border-radius: 13px; background: rgba(202, 214, 246, 0.55); }
+body.panel-theme-light .panel-ask{ display: flex; flex-direction: column; width: 100%; min-width: 0; border: 1px solid rgba(0, 22, 65, 0.26); border-radius: 8px; background: rgba(202, 214, 246, 0.55); }
 body.panel-theme-light .panel-ask-tabs{ display: flex; align-items: center; flex-wrap: wrap; gap: 4px; flex: none; padding: 8px 12px 0; }
 body.panel-theme-light .panel-ask-tab{ display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border: 0; border-radius: 999px; color: #2b426c; background: transparent; font-family: inherit; font-size: var(--text-sm) !important; transition: background .15s ease, color .15s ease; }
 body.panel-theme-light .panel-ask-tab:hover{ color: #000d24; }
@@ -862,30 +903,30 @@ body.panel-theme-light .panel-ask-tab.is-active{ color: #00030c; background: rgb
 body.panel-theme-light .panel-ask-tick{ color: #267940; font-size: var(--text-xs); }
 body.panel-theme-light .panel-ask-tick:empty{ display: none; }
 body.panel-theme-light .panel-ask-tab-label{ max-width: 14ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-body.panel-theme-light .panel-ask-tab-submit.is-ready{ color: #6d480d; }
+body.panel-theme-light .panel-ask-tab-submit.is-ready{ color: #002970; }
 body.panel-theme-light .panel-ask-block{ display: flex; flex-direction: column; gap: 6px; padding: 8px 12px 4px; }
 body.panel-theme-light .panel-ask-tabs + .panel-ask-block{ padding-top: 5px; }
-body.panel-theme-light .panel-ask-header{ align-self: flex-start; padding: 1px 7px; border-radius: 6px; color: #6d480d; background: rgba(132, 88, 15, 0.13); font-size: var(--text-xs); }
+body.panel-theme-light .panel-ask-header{ align-self: flex-start; padding: 1px 7px; border-radius: 6px; color: #002970; background: rgba(132, 88, 15, 0.13); font-size: var(--text-xs); }
 body.panel-theme-light .panel-ask-text{ margin: 0; color: #000819; font-size: var(--text-md); font-weight: 600; line-height: 1.5; }
 body.panel-theme-light .panel-ask-options{ display: flex; flex-direction: column; gap: 2px; margin: 0 -7px; }
-body.panel-theme-light .panel-ask-option{ display: flex; align-items: flex-start; gap: 7px; width: 100%; padding: 5px 7px; border: 0; border-radius: 7px; color: #0a1832; background: transparent; font-family: inherit; font-size: var(--text-sm) !important; line-height: 1.45; text-align: left; }
+body.panel-theme-light .panel-ask-option{ display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 6px 8px; border: 0; border-radius: 6px; color: #0a1832; background: transparent; font-family: inherit; font-size: var(--text-sm) !important; line-height: 1.45; text-align: left; }
 body.panel-theme-light .panel-ask-option:hover{ background: rgba(4, 32, 83, 0.09); }
 body.panel-theme-light .panel-ask-option.is-picked .panel-ask-option-label{ color: #543608; }
 body.panel-theme-light .panel-ask-option-text{ display: flex; flex-direction: column; min-width: 0; }
 body.panel-theme-light .panel-ask-option-label{ overflow-wrap: anywhere; }
 body.panel-theme-light .panel-ask-option small{ color: #2b426c; font-size: var(--text-xs); line-height: 1.45; }
-body.panel-theme-light .panel-ask-mark{ flex: none; position: relative; box-sizing: border-box; width: 12px; height: 12px; margin-top: 1px; border: 1px solid rgba(43, 66, 108, 0.55); }
+body.panel-theme-light .panel-ask-mark{ flex: none; position: relative; box-sizing: border-box; width: 14px; height: 14px; margin-top: 3px; border: 1px solid rgba(43, 66, 108, 0.55); }
 body.panel-theme-light .panel-ask-mark-radio{ border-radius: 50%; }
 body.panel-theme-light .panel-ask-mark-check{ border-radius: 3px; }
-body.panel-theme-light .panel-ask-option.is-picked .panel-ask-mark-radio{ border-color: #6d480d; }
-body.panel-theme-light .panel-ask-option.is-picked .panel-ask-mark-radio::after{ content: ''; position: absolute; inset: 2px; border-radius: 50%; background: #6d480d; }
-body.panel-theme-light .panel-ask-option.is-picked .panel-ask-mark-check{ border-color: #6d480d; background: #6d480d; }
+body.panel-theme-light .panel-ask-option.is-picked .panel-ask-mark-radio{ border-color: #002970; }
+body.panel-theme-light .panel-ask-option.is-picked .panel-ask-mark-radio::after{ content: ''; position: absolute; inset: 2px; border-radius: 50%; background: #002970; }
+body.panel-theme-light .panel-ask-option.is-picked .panel-ask-mark-check{ border-color: #002970; background: #002970; }
 body.panel-theme-light .panel-ask-option.is-picked .panel-ask-mark-check::after{ content: ''; position: absolute; top: 1px; left: 3px; width: 3px; height: 6px; border: solid #a7bde8; border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
 body.panel-theme-light .panel-ask-custom{ align-items: center; cursor: text; }
 body.panel-theme-light .panel-ask-custom .panel-ask-mark{ margin-top: 0; }
 body.panel-theme-light .panel-ask-other{ flex: 1; min-width: 0; padding: 0 0 1px; border: 0; border-bottom: 1px solid rgba(43, 66, 108, 0.35); border-radius: 0; color: #000819; background: transparent; font-family: inherit; font-size: var(--text-sm); line-height: 1.45; }
 body.panel-theme-light .panel-ask-other::placeholder{ color: #3b5380; }
-body.panel-theme-light .panel-ask-other:focus{ border-bottom-color: rgba(132, 88, 15, 0.7); outline: none; }
+body.panel-theme-light .panel-ask-other:focus{ border-bottom-color: rgba(0, 41, 112, 0.8); outline: none; }
 body.panel-theme-light .panel-ask-review{ display: flex; flex-direction: column; gap: 5px; padding: 8px 12px 4px; }
 body.panel-theme-light .panel-ask-tabs + .panel-ask-review{ padding-top: 5px; }
 body.panel-theme-light .panel-ask-review-title{ color: #2b426c; font-size: var(--text-xs); }
@@ -898,7 +939,7 @@ body.panel-theme-light .panel-ask-review-empty{ color: #3b5380; font-size: var(-
 body.panel-theme-light .panel-ask-actions{ flex: none; display: flex; justify-content: flex-end; gap: 7px; padding: 3px 12px 10px; }
 body.panel-theme-light .panel-ask-skip{ padding: 4px 12px; border: 1px solid rgba(2, 25, 65, 0.28); border-radius: 8px; color: #0f2346; background: transparent; font-family: inherit; font-size: var(--text-sm) !important; }
 body.panel-theme-light .panel-ask-skip:hover:not(:disabled){ background: rgba(4, 32, 83, 0.1); }
-body.panel-theme-light .panel-ask-submit{ padding: 4px 12px; border: 1px solid rgba(132, 88, 15, 0.7); border-radius: 8px; color: #a7bde8; background: #6d480d; font-family: inherit; font-size: var(--text-sm) !important; font-weight: 600; }
+body.panel-theme-light .panel-ask-submit{ padding: 4px 12px; border: 1px solid rgba(0, 41, 112, 0.8); border-radius: 8px; color: #a7bde8; background: #002970; font-family: inherit; font-size: var(--text-sm) !important; font-weight: 600; }
 body.panel-theme-light .panel-ask-submit:hover:not(:disabled){ background: #543608; }
 body.panel-theme-light .panel-ask-submit:disabled{ opacity: .55; }
 
@@ -921,7 +962,7 @@ body.panel-theme-light .panel-image-viewer img{ max-width: 100%; max-height: 100
    typography — it is a document to read), with approve / send-back actions. */
 body.panel-theme-light .panel-plan{ display: flex; flex-direction: column; gap: 9px; width: 100%; min-width: 0; max-height: min(72vh, 520px); padding: 10px 12px; border: 1px solid rgba(132, 88, 15, 0.42); border-radius: 13px; background: rgba(202, 214, 246, 0.55); }
 body.panel-theme-light .panel-plan-block{ display: flex; flex-direction: column; gap: 6px; min-height: 0; overflow: hidden; }
-body.panel-theme-light .panel-plan-header{ align-self: flex-start; flex: none; padding: 1px 7px; border-radius: 6px; color: #6d480d; background: rgba(132, 88, 15, 0.13); font-size: var(--text-2xs); }
+body.panel-theme-light .panel-plan-header{ align-self: flex-start; flex: none; padding: 1px 7px; border-radius: 6px; color: #002970; background: rgba(132, 88, 15, 0.13); font-size: var(--text-2xs); }
 body.panel-theme-light .panel-plan-text{ min-height: 0; overflow-y: auto; padding-right: 2px; scrollbar-width: thin; }
 body.panel-theme-light .panel-plan-actions{ flex: none; display: flex; justify-content: flex-end; gap: 7px; }
 body.panel-theme-light .panel-plan-note{ display: flex; flex-direction: column; gap: 4px; flex: none; }
@@ -930,7 +971,7 @@ body.panel-theme-light .panel-plan-note textarea{ width: 100%; min-height: 44px;
 body.panel-theme-light .panel-plan-note textarea:focus{ border-color: rgba(2, 25, 65, 0.5); }
 body.panel-theme-light .panel-plan-revise{ padding: 4px 12px; border: 1px solid rgba(2, 25, 65, 0.28); border-radius: 8px; color: #0f2346; background: transparent; font-family: inherit; font-size: var(--text-xs) !important; }
 body.panel-theme-light .panel-plan-revise:hover:not(:disabled){ background: rgba(4, 32, 83, 0.1); }
-body.panel-theme-light .panel-plan-approve{ padding: 4px 12px; border: 1px solid rgba(132, 88, 15, 0.7); border-radius: 8px; color: #a7bde8; background: #6d480d; font-family: inherit; font-size: var(--text-xs) !important; font-weight: 600; }
+body.panel-theme-light .panel-plan-approve{ padding: 4px 12px; border: 1px solid rgba(0, 41, 112, 0.8); border-radius: 8px; color: #a7bde8; background: #002970; font-family: inherit; font-size: var(--text-xs) !important; font-weight: 600; }
 body.panel-theme-light .panel-plan-approve:hover:not(:disabled){ background: #543608; }
 body.panel-theme-light .panel-plan-approve:disabled, body.panel-theme-light .panel-plan-revise:disabled{ opacity: .55; }
 
@@ -938,7 +979,7 @@ body.panel-theme-light .panel-plan-approve:disabled, body.panel-theme-light .pan
    summary on top and the raw input folded away. */
 body.panel-theme-light .panel-permission{ display: flex; flex-direction: column; gap: 9px; width: 100%; min-width: 0; max-height: 226px; padding: 10px 12px; border: 1px solid rgba(132, 88, 15, 0.42); border-radius: 13px; background: rgba(202, 214, 246, 0.55); }
 body.panel-theme-light .panel-permission-block{ display: flex; flex-direction: column; gap: 6px; min-height: 0; overflow: hidden; }
-body.panel-theme-light .panel-permission-header{ align-self: flex-start; flex: none; padding: 1px 7px; border-radius: 6px; color: #6d480d; background: rgba(132, 88, 15, 0.13); font-size: var(--text-2xs); }
+body.panel-theme-light .panel-permission-header{ align-self: flex-start; flex: none; padding: 1px 7px; border-radius: 6px; color: #002970; background: rgba(132, 88, 15, 0.13); font-size: var(--text-2xs); }
 body.panel-theme-light .panel-permission-summary{ margin: 0; color: #000819; font-size: var(--text-md); line-height: 1.5; overflow-wrap: anywhere; }
 body.panel-theme-light .panel-permission-detail{ min-height: 0; overflow-y: auto; color: #0f2346; font-size: var(--text-sm); scrollbar-width: thin; }
 body.panel-theme-light .panel-permission-detail summary{ cursor: pointer; color: #2b426c; }
@@ -946,7 +987,7 @@ body.panel-theme-light .panel-permission-detail pre{ margin: 6px 0 0; max-height
 body.panel-theme-light .panel-permission-actions{ flex: none; display: flex; justify-content: flex-end; gap: 7px; }
 body.panel-theme-light .panel-permission-deny{ padding: 4px 12px; border: 1px solid rgba(2, 25, 65, 0.28); border-radius: 8px; color: #0f2346; background: transparent; font-family: inherit; font-size: var(--text-xs) !important; }
 body.panel-theme-light .panel-permission-deny:hover:not(:disabled){ background: rgba(4, 32, 83, 0.1); }
-body.panel-theme-light .panel-permission-allow{ padding: 4px 12px; border: 1px solid rgba(132, 88, 15, 0.7); border-radius: 8px; color: #a7bde8; background: #6d480d; font-family: inherit; font-size: var(--text-xs) !important; font-weight: 600; }
+body.panel-theme-light .panel-permission-allow{ padding: 4px 12px; border: 1px solid rgba(0, 41, 112, 0.8); border-radius: 8px; color: #a7bde8; background: #002970; font-family: inherit; font-size: var(--text-xs) !important; font-weight: 600; }
 body.panel-theme-light .panel-permission-allow:hover:not(:disabled){ background: #543608; }
 body.panel-theme-light .panel-permission-allow:disabled, body.panel-theme-light .panel-permission-deny:disabled{ opacity: .55; }
 
@@ -979,9 +1020,9 @@ body.panel-theme-light .panel-tool-button.panel-approval-button.is-write{ color:
 body.panel-theme-light .panel-tool-button.panel-approval-button.is-bypass{ color: #884751; border-color: rgba(136, 71, 81, 0.35); background: rgba(136, 71, 81, 0.08); }
 body.panel-theme-light .panel-tool-button.panel-approval-button.is-evolve{ color: #250073; border-color: rgba(37, 0, 115, 0.35); background: rgba(37, 0, 115, 0.08); }
 /* Goal and plan live in the mode menu now, not as separate bottom-bar buttons. */
-body.panel-theme-light .panel-approval-menu{ position: absolute; z-index: 10; bottom: calc(100% + 4px); left: 0; display: grid; width: 248px; padding: 5px 6px; border: 1px solid rgba(0, 22, 65, 0.32); border-radius: 12px; background: rgba(168, 188, 232, 0.98); box-shadow: 0 6px 20px rgba(217, 226, 250, 0.3); opacity: 0; visibility: hidden; pointer-events: none; filter: blur(3px); transform: translateY(6px); transition: opacity .14s ease, visibility .18s ease, filter .18s ease, transform .18s ease; }
+body.panel-theme-light .panel-approval-menu{ position: absolute; z-index: 10; bottom: calc(100% + 4px); left: 0; display: grid; width: 316px; padding: 7px 8px; border: 1px solid rgba(0, 22, 65, 0.32); border-radius: 12px; background: rgba(168, 188, 232, 0.98); box-shadow: 0 6px 20px rgba(217, 226, 250, 0.3); opacity: 0; visibility: hidden; pointer-events: none; filter: blur(3px); transform: translateY(6px); transition: opacity .14s ease, visibility .18s ease, filter .18s ease, transform .18s ease; }
 body.panel-theme-light .panel-approval-menu.is-open{ opacity: 1; visibility: visible; pointer-events: auto; filter: none; transform: none; }
-body.panel-theme-light .panel-approval-pick{ display: flex; align-items: center; justify-content: flex-start; gap: 8px; padding: 6px 8px; border: 0; border-radius: 7px; color: #000918; background: transparent; text-align: left; font-family: inherit; }
+body.panel-theme-light .panel-approval-pick{ display: flex; align-items: center; justify-content: flex-start; gap: 9px; padding: 9px 10px; border: 0; border-radius: 7px; color: #000918; background: transparent; text-align: left; font-family: inherit; }
 /* 每个选项最左边放它自己的图标，颜色和三档按钮保持一致。 */
 body.panel-theme-light .panel-approval-pick-icon{ display: grid; place-items: center; flex: none; width: 16px; height: 16px; color: #33496c; }
 body.panel-theme-light .panel-approval-pick-icon svg{ width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
@@ -1009,7 +1050,7 @@ body.panel-theme-light .panel-bypass p{ margin: 0; color: #101e37; font-size: va
 body.panel-theme-light .panel-bypass-actions{ display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
 body.panel-theme-light .panel-bypass-cancel{ padding: 4px 12px; border: 1px solid rgba(2, 25, 65, 0.28); border-radius: 8px; color: #0f2346; background: transparent; font-family: inherit; font-size: var(--text-xs) !important; }
 body.panel-theme-light .panel-bypass-cancel:hover{ background: rgba(4, 32, 83, 0.1); }
-body.panel-theme-light .panel-bypass-confirm{ padding: 4px 12px; border: 1px solid rgba(132, 88, 15, 0.7); border-radius: 8px; color: #a7bde8; background: #6d480d; font-family: inherit; font-size: var(--text-xs) !important; font-weight: 600; }
+body.panel-theme-light .panel-bypass-confirm{ padding: 4px 12px; border: 1px solid rgba(0, 41, 112, 0.8); border-radius: 8px; color: #a7bde8; background: #002970; font-family: inherit; font-size: var(--text-xs) !important; font-weight: 600; }
 body.panel-theme-light .panel-bypass-confirm:hover{ background: #543608; }
 /* 自我进化是最高权限：红色边框、必须手输授权短语才能确认。 */
 body.panel-theme-light .panel-evolve-confirm{ border-color: rgba(37, 0, 115, 0.5); }
@@ -1086,17 +1127,19 @@ body.panel-theme-light .panel-goal-banner-condition:focus-visible{ outline: 2px 
 body.panel-theme-light .panel-goal-banner.is-expanded .panel-goal-banner-condition{ white-space: normal; overflow: visible; text-overflow: clip; }
 body.panel-theme-light .panel-goal-stop{ display: grid; place-items: center; flex: none; width: 22px; height: 22px; padding: 0; border: 1px solid rgba(0, 22, 65, 0.22); border-radius: 7px; color: #000c23; background: rgba(4, 35, 95, 0.12); }
 body.panel-theme-light .panel-goal-stop:hover{ background: rgba(4, 35, 95, 0.22); }
-/* Thinking depth sits on the toolbar, one tap away; the depth slider itself
-   opens in a small popover above its button. */
-body.panel-theme-light .panel-effort-wrap{ position: relative; display: flex; flex: none; }
-/* 思考强度只用图标：火花数量表示档位，按钮和其他工具按钮一样大。 */
-body.panel-theme-light .panel-effort-button{ display: grid; place-items: center; width: 29px; padding: 0; }
-body.panel-theme-light .panel-effort-button svg{ width: 16px; height: 16px; }
-body.panel-theme-light .panel-effort-menu{ position: absolute; z-index: 10; bottom: calc(100% + 8px); left: 0; display: grid; width: 210px; padding: 5px 6px; border: 1px solid rgba(0, 22, 65, 0.32); border-radius: 12px; background: rgba(168, 188, 232, 0.98); box-shadow: 0 6px 20px rgba(217, 226, 250, 0.3); opacity: 0; visibility: hidden; pointer-events: none; filter: blur(3px); transform: translateY(6px); transition: opacity .14s ease, visibility .18s ease, filter .18s ease, transform .18s ease; }
-body.panel-theme-light .panel-effort-menu.is-open{ opacity: 1; visibility: visible; pointer-events: auto; filter: none; transform: none; }
-body.panel-theme-light .panel-effort-menu .panel-effort-row{ padding: 2px 4px 3px; }
-/* The slider rides inside that popover: ordered stops, and only the values
-   DeepSeek's wire actually reads (low / high / max, plus a real off). */
+/* 目标条：左侧运行时间，右侧修改/暂停/删除三键。 */
+body.panel-theme-light .panel-goal-banner-time{ flex: none; color: #203860; font-family: var(--font-ui); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
+body.panel-theme-light .panel-goal-actions{ display: flex; align-items: center; flex: none; gap: 4px; }
+body.panel-theme-light .panel-goal-action{ display: grid; place-items: center; flex: none; width: 22px; height: 22px; padding: 0; border: 1px solid rgba(0, 22, 65, 0.22); border-radius: 7px; color: #000c23; background: rgba(4, 35, 95, 0.12); }
+body.panel-theme-light .panel-goal-action:hover:not(:disabled){ background: rgba(4, 35, 95, 0.22); }
+body.panel-theme-light .panel-goal-action:disabled{ opacity: .45; }
+body.panel-theme-light .panel-goal-action svg{ width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+body.panel-theme-light .panel-goal-action.is-danger{ color: #5f0f19; }
+body.panel-theme-light .panel-goal-banner.is-paused{ opacity: .78; }
+/* 思考强度并进了「模型与上下文」弹窗：和模型列表同一块面板，用一条分隔线
+   区分，不再单独占一个工具栏按钮。 */
+body.panel-theme-light .panel-model-effort{ margin-top: 7px; padding-top: 8px; border-top: 1px solid rgba(0, 22, 65, 0.16); }
+body.panel-theme-light .panel-model-effort .panel-effort-row{ padding: 2px 8px 3px; }
 body.panel-theme-light .panel-effort-row{ display: flex; align-items: center; gap: 12px; padding: 2px 8px 4px; }
 body.panel-theme-light .panel-effort-slider-wrap{ position: relative; display: flex; align-items: center; flex: 1; min-width: 0; height: 24px; }
 /* The rail is drawn here, not by the native track: a fat capsule with one stop
@@ -1164,6 +1207,7 @@ body.panel-theme-light .panel-send-spinner{ width: 13px; height: 13px; border: 2
 @keyframes composer-appear { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes panel-scroll-appear { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes panel-drawer-in { from { transform: translateX(-100%); } }
+@keyframes panel-drawer-in-right { from { transform: translateX(100%); } }
 @keyframes panel-drawer-out { to { transform: translateX(-103%); } }
 @keyframes composer-dismiss { to { opacity: 0; transform: translateY(5px); } }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -1204,3 +1248,67 @@ body.panel-theme-light .panel-timeline-divider span{ flex: none; padding: 0 2px;
 /* 头像槽：图片解码前先显示字形占位，避免左侧时间线出现空白。 */
 body.panel-theme-light .panel-avatar-shell{ position: relative; display: grid; place-items: center; width: 33px; height: 33px; flex: none; }
 body.panel-theme-light .panel-avatar-shell .panel-avatar-img{ position: absolute; inset: 0; }
+/* 对话内的子代理稿：和消息一起滚动的卡片，状态行上的图标仍保留。 */
+body.panel-theme-light .panel-subagent-entry{ margin: 6px 0; padding: 7px 9px; border: 1px solid rgba(0, 50, 105, 0.18); border-radius: 10px; background: rgba(173, 195, 235, 0.32); }
+body.panel-theme-light .panel-subagent-entry.is-running{ border-color: rgba(0, 89, 128, 0.4); }
+body.panel-theme-light .panel-subagent-entry.is-completed{ border-color: rgba(31, 112, 62, 0.34); }
+body.panel-theme-light .panel-subagent-entry.is-failed{ border-color: rgba(101, 24, 24, 0.4); }
+body.panel-theme-light .panel-subagent-entry-head{ display: flex; align-items: center; gap: 7px; min-width: 0; }
+body.panel-theme-light .panel-subagent-entry-mark{ flex: none; width: 16px; text-align: center; color: #003960; }
+body.panel-theme-light .panel-subagent-entry-name{ flex: 1; min-width: 0; overflow: hidden; color: #000818; font-size: var(--text-sm); text-overflow: ellipsis; white-space: nowrap; }
+body.panel-theme-light .panel-subagent-entry-state{ flex: none; color: #273d62; font-size: var(--text-2xs); }
+body.panel-theme-light .panel-subagent-entry-steps{ display: grid; gap: 2px; margin: 5px 0 0; padding: 0; list-style: none; }
+body.panel-theme-light .panel-subagent-entry-steps li{ display: flex; gap: 6px; min-width: 0; color: #172948; font-size: var(--text-xs); }
+body.panel-theme-light .panel-subagent-entry-step-text{ min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body.panel-theme-light .panel-subagent-entry > summary{ list-style: none; cursor: pointer; }
+body.panel-theme-light .panel-subagent-entry > summary::-webkit-details-marker{ display: none; }
+body.panel-theme-light .panel-subagent-entry[open] > summary{ margin-bottom: 2px; }
+body.panel-theme-light .panel-goal-continue{ flex: none; padding: 2px 8px; border: 1px solid rgba(0, 41, 112, 0.5); border-radius: 6px; color: #001130; background: rgba(0, 41, 112, 0.12); font-size: var(--text-xs); }
+body.panel-theme-light .panel-goal-continue:hover{ background: rgba(0, 41, 112, 0.22); }
+body.panel-theme-light .panel-goal-banner.is-unverified{ border-color: rgba(0, 41, 112, 0.45); }
+/* 右侧弹窗与左侧会话库同一套抽屉语言：贴边、同宽、同背景、反向滑入。 */
+/* 右侧弹窗与左侧会话库同一套抽屉语言；从顶栏下方开始，不挡顶栏按钮。 */
+body.panel-theme-light .panel-right-rail{ position: absolute; z-index: 7; top: 46px; right: 0; bottom: 0; display: flex; flex-direction: column; width: min(calc(50% - 4px), 360px); min-width: 180px; overflow: hidden; border-left: 1px solid rgba(0, 22, 65, 0.26); border-radius: 14px 0 0 14px; background: linear-gradient(155deg, rgba(139, 164, 219, 0.99), rgba(190, 205, 241, 0.99)); box-shadow: -12px 0 30px rgba(222, 230, 251, 0.42); animation: panel-drawer-in-right .21s cubic-bezier(.22, .75, .25, 1) both; }
+body.panel-theme-light .panel-right-rail-head{ display: flex; align-items: center; justify-content: flex-start; gap: 8px; flex: none; height: 43px; padding: 7px 11px 4px; color: #00050f; }
+body.panel-theme-light .panel-right-rail-head h2{ margin: 0; font-size: var(--text-md); font-weight: 600; }
+body.panel-theme-light .panel-rail-step{ margin-left: 5px; color: #304770; font-size: var(--text-2xs); font-weight: 400; }
+body.panel-theme-light .panel-right-rail-close{ display: grid; place-items: center; flex: none; margin-left: auto; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 8px; color: #000e28; background: transparent; }
+body.panel-theme-light .panel-right-rail-close svg{ width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+body.panel-theme-light .panel-right-rail-close:hover{ background: rgba(4, 29, 77, 0.16); }
+body.panel-theme-light .panel-right-rail-body{ flex: 1; min-height: 0; overflow-y: auto; padding: 10px; scrollbar-width: thin; }
+body.panel-theme-light .panel-right-goal-condition{ margin: 0 0 6px; color: #000817; font-size: var(--text-sm); line-height: 1.5; white-space: pre-wrap; }
+body.panel-theme-light .panel-right-goal-meta{ margin: 0 0 8px; color: #2b426c; font-size: var(--text-xs); }
+body.panel-theme-light .panel-right-goal button{ margin-right: 6px; padding: 3px 9px; border: 1px solid rgba(0, 41, 112, 0.5); border-radius: 6px; color: #001130; background: rgba(0, 41, 112, 0.12); font-size: var(--text-xs); }
+body.panel-theme-light .panel-right-goal-stop{ border-color: rgba(105, 15, 15, 0.45) !important; color: #2d0004 !important; background: rgba(105, 15, 15, 0.1) !important; }
+body.panel-theme-light .panel-right-empty{ margin: 0; color: #2b426c; font-size: var(--text-xs); }
+body.panel-theme-light .panel-right-empty.is-centered{ display: grid; place-items: center; min-height: 160px; text-align: center; }
+body.panel-theme-light .panel-right-preview-path{ margin: 0 0 6px; color: #2b426c; font-family: var(--font-mono); font-size: var(--text-xs); word-break: break-all; }
+body.panel-theme-light .panel-chat-header .panel-rail-toggle{ position: absolute; z-index: 20; top: 9px; right: 77px; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 9px; color: #000f2c; background: rgba(4, 29, 77, 0.09); }
+body.panel-theme-light .panel-rail-toggle:hover{ color: #000000; background: rgba(4, 29, 77, 0.2); }
+body.panel-theme-light .panel-rail-toggle:disabled{ opacity: .35; cursor: default; }
+body.panel-theme-light .panel-rail-toggle svg{ width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+
+body.panel-theme-light .panel-right-preview{ margin-top: 0; padding-top: 0; border-top: 0; }
+body.panel-theme-light .panel-right-preview-text{ margin: 0; max-height: 320px; overflow: auto; padding: 8px; border-radius: 6px; background: rgba(223, 231, 249, 0.7); color: #001130; font-family: var(--font-mono); font-size: var(--text-xs); line-height: 1.5; white-space: pre-wrap; word-break: break-all; }
+/* 计划页：目标不在右栏重复，这里只放计划文档正文。 */
+body.panel-theme-light .panel-right-plan{ display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+body.panel-theme-light .panel-right-plan-text{ margin: 0; max-height: 320px; overflow: auto; padding: 8px; border-radius: 6px; background: rgba(223, 231, 249, 0.7); color: #001130; font-family: var(--font-mono); font-size: var(--text-xs); line-height: 1.5; white-space: pre-wrap; word-break: break-all; }
+body.panel-theme-light .panel-right-rail-tabs{ display: flex; flex: none; align-items: center; gap: 6px; padding: 3px 12px 7px; border-bottom: 1px solid rgba(0, 22, 65, 0.16); }
+body.panel-theme-light .panel-right-rail-tabs button{ flex: 1; min-height: 29px; padding: 0 10px; border: 0; border-radius: 8px; outline: none; color: #172b51; background: transparent; font-size: var(--text-sm) !important; }
+body.panel-theme-light .panel-right-rail-tabs button.is-active{ color: #00050f; background: rgba(0, 28, 80, 0.17); }
+body.panel-theme-light .panel-right-rail-tabs button:focus-visible{ outline: 2px solid rgba(0, 40, 95, 0.6); outline-offset: -2px; }
+body.panel-theme-light .panel-right-market{ display: flex; flex-direction: column; gap: 4px; }
+body.panel-theme-light .panel-right-market-item{ display: flex; align-items: center; gap: 6px; min-width: 0; padding: 5px 6px; border-radius: 6px; background: rgba(207, 219, 245, 0.45); }
+body.panel-theme-light .panel-right-market-kind{ flex: none; padding: 0 5px; border-radius: 4px; color: #2b426c; background: rgba(4, 32, 83, 0.12); font-size: var(--text-2xs); text-transform: uppercase; }
+body.panel-theme-light .panel-right-market-name{ flex: 1; min-width: 0; overflow: hidden; color: #000817; font-size: var(--text-xs); text-overflow: ellipsis; white-space: nowrap; }
+body.panel-theme-light .panel-right-market-source{ flex: none; color: #2b426c; font-size: var(--text-2xs); }
+body.panel-theme-light .panel-right-market-kinds{ display: flex; flex: none; gap: 6px; margin-bottom: 8px; }
+body.panel-theme-light .panel-right-market-kinds button{ flex: 1; min-height: 29px; padding: 0 8px; border: 0; border-radius: 8px; outline: none; color: #172b51; background: transparent; font-size: var(--text-sm) !important; }
+body.panel-theme-light .panel-right-market-kinds button.is-active{ color: #00050f; background: rgba(0, 28, 80, 0.17); }
+body.panel-theme-light .panel-right-market-kinds button:focus-visible{ outline: 2px solid rgba(0, 40, 95, 0.6); outline-offset: -2px; }
+body.panel-theme-light .panel-right-market-item button{ flex: none; padding: 1px 7px; border: 1px solid rgba(0, 41, 112, 0.5); border-radius: 6px; color: #001130; background: rgba(0, 41, 112, 0.12); font-size: var(--text-2xs); }
+body.panel-theme-light .panel-right-goal-edit{ display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+body.panel-theme-light .panel-right-goal-edit span{ color: #2b426c; font-size: var(--text-xs); }
+body.panel-theme-light .panel-right-goal-edit textarea{ width: 100%; min-height: 62px; padding: 6px 8px; border: 1px solid rgba(0, 22, 65, 0.24); border-radius: 6px; background: rgba(207, 219, 245, 0.6); color: #000817; font-family: inherit; font-size: var(--text-xs); line-height: 1.5; resize: vertical; }
+body.panel-theme-light .panel-right-goal-edit button{ align-self: flex-start; }
+body.panel-theme-light .panel-library-market svg{ width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }

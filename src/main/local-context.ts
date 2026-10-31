@@ -92,33 +92,14 @@ function mentionAt(line: string, at: number): { mention: Mention; end: number } 
   return value ? { mention: { value, explicit: false }, end } : null
 }
 
-/** Scans only ordinary prose; examples inside Markdown code stay inert. */
+/** Only a message that opens with @ carries a file reference. An @ later in
+ *  the prose stays ordinary text, matching the composer's first-character
+ *  rule, so quoting someone else's @handle never pulls in a file. */
 export function parseFileMentions(input: string): Mention[] {
-  const mentions: Mention[] = []
-  let fence: { marker: string; size: number } | null = null
-  for (const line of input.split(/\r?\n/u)) {
-    const marker = /^\s{0,3}(`{3,}|~{3,})/u.exec(line)?.[1]
-    if (marker) {
-      if (!fence) fence = { marker: marker[0], size: marker.length }
-      else if (marker[0] === fence.marker && marker.length >= fence.size) fence = null
-      continue
-    }
-    if (fence) continue
-    let inInlineCode = false
-    for (let i = 0; i < line.length;) {
-      if (line[i] === '`') {
-        inInlineCode = !inInlineCode
-        i += 1
-        continue
-      }
-      const found = !inInlineCode && line[i] === '@' ? mentionAt(line, i) : null
-      if (found) {
-        mentions.push(found.mention)
-        i = found.end
-      } else i += 1
-    }
-  }
-  return mentions
+  if (!input.startsWith('@')) return []
+  const firstLine = input.split(/\r?\n/u, 1)[0]
+  const found = mentionAt(firstLine, 0)
+  return found ? [found.mention] : []
 }
 
 const IGNORED_SEARCH_DIRS = new Set([

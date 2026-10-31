@@ -1,13 +1,13 @@
 import { randomUUID } from 'node:crypto'
 import type { AgentCapabilities, AppSnapshot, ApprovalMode, AskAnswers, ContextUsageSnapshot, ConversationBatchAction, ConversationBatchResult, ModelMode, ModelProfile, TimelineEntry, UserAttachment } from '../shared/contracts'
-import { AUTO_COMPACT_DEFAULT_PERCENT, normalizeModelMode } from '../shared/contracts'
-import { CLAUDE_BASE_URL, DEFAULT_CLAUDE_MODEL } from './claude-code'
+import { AUTO_COMPACT_DEFAULT_PERCENT, normalizeApprovalMode, normalizeModelMode } from '../shared/contracts'
+import { DEEPSEEK_ANTHROPIC_BASE_URL, DEEPSEEK_DEFAULT_MODEL } from './deepseek-endpoint'
 import { deleteTurnEntries, type AgentRuntime } from './agent-runtime'
 import type { DialogueLine } from './deepseek'
 import { containsSensitiveData } from './memory-service'
 import { attachmentContext, validAttachmentList } from './local-context'
 import { snapshotSessionMentions } from './session-context'
-import { parseLibraryMentions } from '../shared/libraries'
+import { parseLibraryMentions, stripLibraryMentions } from '../shared/libraries'
 import type { ConversationTarget } from './conversation-tools'
 import {
   ConversationStore,
@@ -31,6 +31,8 @@ export interface ConversationExport {
 
 /** A draft longer than one message could ever be is capped instead of rejected
  *  — the panel saves on a debounce and must never fail loudly mid-typing. */
+/** 未归档会话上限：第 9 个不允许创建或恢复。 */
+const UNARCHIVED_LIMIT = 8
 const MAX_DRAFT_CHARS = 8_000
 
 export interface CompletedTurn {
@@ -84,6 +86,15 @@ function visiblePending(message: PendingMessage): PendingMessage {
  * switching it never touches a runtime, so any number of conversations can be
  * working in parallel while the panel shows whichever one the user picked.
  */
+/** 后台会话空闲多久释放 ACP 子进程。0 或负数关闭回收。
+ *  默认 15 分钟：一个空转的 DSH 进程仍占约 200MB，常驻桌面没必要一直养着。 */
+function idleDisposeMs(): number {
+  const raw = process.env.DESKTOP_PET_IDLE_DISPOSE_MS
+  if (raw === undefined) return 15 * 60_000
+  const value = Number(raw)
+  return Number.isFinite(value) ? value : 15 * 60_000
+}
+
 export class ConversationController {
   private initialized = false
   private initialization: Promise<void> | null = null
@@ -92,6 +103,8 @@ export class ConversationController {
   private activeId: string | null = null
   /** One live runtime per conversation that has sent or been restored. */
   private readonly runtimes = new Map<string, AgentRuntime>()
+  /** 空闲回收定时器：按会话分别计时，活跃会话不断续期。 */
+  private readonly idleTimers = new Map<string, ReturnType<typeof setTimeout>>()
   /** Queue + drain bookkeeping, per conversation. */
   private readonly pending = new Map<string, PendingMessage[]>()
   private readonly drains = new Map<string, { promise: Promise<void>; generation: number }>()
@@ -338,6 +351,7 @@ export class ConversationController {
     if (!this.pending.has(id)) this.pending.set(id, structuredClone(rec.pendingMessages))
     const snap = runtime.getSnapshot()
     this.readiness = { modelReady: snap.modelReady, dshReady: snap.dshReady }
+    this.scheduleIdleDisposal(id)
     return runtime
   }
 
@@ -371,9 +385,21 @@ export class ConversationController {
    *  Keep this separate from stopAll: stopping preserves the transcript, while
    *  disposal releases the child processes and loopback servers. */
   async disposeAll(): Promise<void> {
+    for (const timer of this.idleTimers.values()) clearTimeout(timer)
+    this.idleTimers.clear()
     const runtimes = [...this.runtimes.values()]
     this.runtimes.clear()
     await Promise.allSettled(runtimes.map((runtime) => runtime.dispose()))
+  }
+
+  /** 分页取历史：热会话读运行时，冷会话读记录，都不改内存里的窗口。 */
+  async timelinePage(id: string, before: number, limit: number): Promise<TimelineEntry[]> {
+    const all = this.runtimes.get(id)?.exportConversationState().timeline
+      ?? (await this.store.getConversation(id))?.timeline
+      ?? []
+    const end = Math.max(0, Math.min(Math.floor(before), all.length))
+    const start = Math.max(0, end - Math.max(1, Math.floor(limit)))
+    return structuredClone(all.slice(start, end))
   }
 
   /** Writes every live conversation's current timeline before the app exits.
@@ -420,6 +446,9 @@ export class ConversationController {
     const availableMode = savedMode === 'live' && this.readiness.modelReady ? 'live' : 'dsh'
     return {
       mode: availableMode,
+      // 冷会话还没建 runtime，但审批模式必须从记录里带出来；否则启动第一帧
+      // 会显示默认的 workspace-write，直到第一次发消息才被 runtime 纠正。
+      approvalMode: normalizeApprovalMode(record?.approvalMode),
       avatarState: 'idle',
       taskStatus: record?.taskStatus ?? 'idle',
       timeline: structuredClone(record?.timeline ?? []),
@@ -444,6 +473,35 @@ export class ConversationController {
       this.persistGoalChange(id, runtime)
       this.persistSubagents(id, runtime)
     }
+    // 正在显示的会话算活跃；后台会话靠到期时的 isRunning 检查兜底。
+    if (this.activeId) this.scheduleIdleDisposal(this.activeId)
+    this.emit()
+  }
+
+  /** 空闲到期后释放运行时。会话记录里保留了 sdkSessionId，下次发送时
+   *  ensureRuntime 会重建进程并恢复同一会话，上下文不丢。 */
+  private scheduleIdleDisposal(id: string): void {
+    const threshold = idleDisposeMs()
+    if (threshold <= 0) return
+    const existing = this.idleTimers.get(id)
+    if (existing) clearTimeout(existing)
+    const timer = setTimeout(() => {
+      this.idleTimers.delete(id)
+      void this.disposeIdleRuntime(id)
+    }, threshold)
+    timer.unref?.()
+    this.idleTimers.set(id, timer)
+  }
+
+  private async disposeIdleRuntime(id: string): Promise<void> {
+    const runtime = this.runtimes.get(id)
+    if (!runtime) return
+    if (runtime.isRunning() || (this.pending.get(id)?.length ?? 0) > 0 || this.drains.has(id)) {
+      this.scheduleIdleDisposal(id)
+      return
+    }
+    this.runtimes.delete(id)
+    await runtime.dispose().catch(() => undefined)
     this.emit()
   }
 
@@ -574,11 +632,13 @@ export class ConversationController {
   /** Makes `id` the displayed conversation. No runtime is created or touched:
    *  a running conversation keeps running in the background. */
   private async setDisplayed(id: string): Promise<ConversationRecord> {
-    let record = await this.store.getConversation(id)
+    let record = await this.store.getConversationRef(id)
     if (!record) {
       record = await this.store.createConversation('新对话', 'dsh')
     }
     const nextLibrary = await this.store.getState()
+    // active 的持久化在 selectConversation 里异步做；这里先让本轮的 snapshot 正确。
+    nextLibrary.activeConversationId = record.id
     const previousId = this.activeId
     this.activeId = record.id
     if (previousId !== record.id) {
@@ -662,6 +722,10 @@ export class ConversationController {
       throw new ConversationStoreError('INVALID_INPUT', '不支持的发送方式。')
     }
     const clean = validateMessage(text, attachments)
+    // 库引用的 token 只用于解析出条目，不交给内核：DSH 会把 @skill:... 当
+    // 文件引用去找，报“找不到引用文件”。正文里剔除，空正文给一句兜底。
+    const libraryRefs = parseLibraryMentions(clean)
+    const messageText = libraryRefs.length ? (stripLibraryMentions(clean) || '使用已选技能。') : clean
     const sessionContext = await snapshotSessionMentions(clean, id, async (sourceId) => {
       const record = await this.store.getConversation(sourceId)
       if (!record) return null
@@ -671,7 +735,7 @@ export class ConversationController {
       return { ...record, ...sourceRuntime.exportConversationState() }
     })
     const message: PendingMessage = {
-      id: randomUUID(), text: clean, attachments: structuredClone(attachments), createdAt: new Date().toISOString(),
+      id: randomUUID(), text: messageText, attachments: structuredClone(attachments), createdAt: new Date().toISOString(),
       ...(divider ? { divider: true } : {}),
       ...(sessionContext ? { sessionContext } : {})
     }
@@ -688,7 +752,7 @@ export class ConversationController {
       await runtime.releaseForegroundSubagents().catch(() => undefined)
       // @ references add library entries to this conversation. Installed keys
       // persist; unknown ones are ignored rather than failing the send.
-      const mentioned = parseLibraryMentions(clean).map((ref) => `${ref.kind}:${ref.id}`)
+      const mentioned = libraryRefs.map((ref) => `${ref.kind}:${ref.id}`)
       if (this.resolveLibraries && (mentioned.length || target.activeLibraries?.length)) {
         const launch = await this.resolveLibraries([...new Set([...(target.activeLibraries ?? []), ...mentioned])])
         const previous = target.activeLibraries ?? []
@@ -895,6 +959,22 @@ export class ConversationController {
     })
   }
 
+  /** 拖拽排序：把一条待发送消息移到 beforeId 之前，beforeId 为 null 时移到末尾。 */
+  async moveQueued(id: string, beforeId: string | null): Promise<void> {
+    await this.initialize()
+    return this.serialize(async () => {
+      const owner = this.ownerOfQueued(id)
+      if (!owner) throw new ConversationStoreError('NOT_FOUND', '找不到这条待发送消息。')
+      const queue = this.queueOf(owner)
+      const from = queue.findIndex((message) => message.id === id)
+      if (from < 0) return
+      const [message] = queue.splice(from, 1)
+      const to = beforeId === null ? queue.length : queue.findIndex((entry) => entry.id === beforeId)
+      queue.splice(to < 0 ? queue.length : to, 0, message)
+      await this.persistConversation(owner)
+    })
+  }
+
   /** Delivers a queued message into the running turn right now (native steer).
    *  When the turn cannot take it, the message jumps to the front of the queue
    *  instead — it is never dropped. */
@@ -926,6 +1006,10 @@ export class ConversationController {
   async createConversation(title = '新对话'): Promise<ConversationRecord> {
     await this.initialize()
     return this.serialize(async () => {
+      const activeCount = this.library?.conversations.filter((item) => !item.archivedAt).length ?? 0
+      if (activeCount >= UNARCHIVED_LIMIT) {
+        throw new Error(`未归档最多 ${UNARCHIVED_LIMIT} 个会话，先归档一个再新建。`)
+      }
       const mode = this.displayedRuntime()?.getSnapshot().mode
         ?? this.library?.conversations.find((item) => item.id === this.activeId)?.mode
         ?? 'dsh'
@@ -937,8 +1021,10 @@ export class ConversationController {
   async selectConversation(id: string): Promise<ConversationRecord> {
     await this.initialize()
     return this.serialize(async () => {
-      await this.store.setActiveConversation(id)
-      return this.setDisplayed(id)
+      // 先切显示，active 标记异步落盘：切换的体感不能被写 library.json 拖住。
+      const record = await this.setDisplayed(id)
+      void this.store.setActiveConversation(id).catch(() => undefined)
+      return record
     })
   }
 
@@ -965,6 +1051,10 @@ export class ConversationController {
   async restoreConversation(id: string): Promise<ConversationLibraryState> {
     await this.initialize()
     return this.serialize(async () => {
+      const activeCount = this.library?.conversations.filter((item) => !item.archivedAt).length ?? 0
+      if (activeCount >= UNARCHIVED_LIMIT) {
+        throw new Error(`未归档最多 ${UNARCHIVED_LIMIT} 个会话，先归档一个再恢复。`)
+      }
       await this.store.restoreConversation(id)
       await this.setDisplayed(id)
       return structuredClone(this.library!)
@@ -1158,6 +1248,29 @@ export class ConversationController {
     })
   }
 
+  /** 只结束当前会话正在跑的命令进程，不取消回合；没有命令或匹配不到时返回 false。 */
+  async stopRunningCommand(conversationId?: string): Promise<boolean> {
+    await this.initialize()
+    const id = conversationId ?? this.activeId
+    if (!id) return false
+    return this.serialize(async () => {
+      const runtime = await this.ensureRuntime(id)
+      return runtime.stopRunningCommand()
+    })
+  }
+
+  /** 暂停/恢复目标：只影响对话停下后是否自动发继续消息。 */
+  async setGoalPaused(paused: boolean, conversationId?: string): Promise<void> {
+    await this.initialize()
+    const id = conversationId ?? this.activeId
+    if (!id) return
+    await this.serialize(async () => {
+      const runtime = await this.ensureRuntime(id)
+      runtime.setGoalPaused(paused)
+      await this.persistConversation(id)
+    })
+  }
+
   /** Creates or updates a model profile; the first one becomes active. */
   async saveModelProfile(profile: ModelProfile): Promise<void> {
     await this.initialize()
@@ -1245,15 +1358,15 @@ export class ConversationController {
     const active = this.activeProfile()
     const apiKey = active?.apiKey?.trim() ?? ''
     if (!apiKey) throw new Error('当前模型配置没有可用的 API Key，无法直接切换；请先重新输入 Key。')
-    const existing = settings.modelProfiles.find((profile) => profile.baseUrl === CLAUDE_BASE_URL)
+    const existing = settings.modelProfiles.find((profile) => profile.baseUrl === DEEPSEEK_ANTHROPIC_BASE_URL)
     const profile: ModelProfile = existing
       ? { ...existing, apiKey: existing.apiKey || apiKey }
       : {
         id: randomUUID(),
         name: 'DeepSeek 官方',
-        baseUrl: CLAUDE_BASE_URL,
+        baseUrl: DEEPSEEK_ANTHROPIC_BASE_URL,
         apiKey,
-        model: DEFAULT_CLAUDE_MODEL
+        model: DEEPSEEK_DEFAULT_MODEL
       }
     await this.saveModelProfile(profile)
     if (this.library!.settings.activeModelProfileId !== profile.id) await this.setModelProfile(profile.id)
@@ -1366,11 +1479,23 @@ export class ConversationController {
     await runtime.answerPlan(id, approved)
   }
 
-  async answerPermission(id: string, allow: boolean, conversationId?: string): Promise<void> {
+  async answerPermission(id: string, decision: 'once' | 'always' | 'deny', conversationId?: string): Promise<void> {
     await this.initialize()
     const runtime = this.runtimeIfAny(conversationId ?? this.activeId)
     if (!runtime) throw new Error('找不到这个会话。')
-    await runtime.answerPermission(id, allow)
+    await runtime.answerPermission(id, decision)
+  }
+
+  async listAlwaysAllowed(conversationId?: string): Promise<string[]> {
+    await this.initialize()
+    const runtime = this.runtimeIfAny(conversationId ?? this.activeId)
+    return runtime?.listAlwaysAllowed() ?? []
+  }
+
+  async clearAlwaysAllowed(kind?: string, conversationId?: string): Promise<void> {
+    await this.initialize()
+    const runtime = this.runtimeIfAny(conversationId ?? this.activeId)
+    runtime?.clearAlwaysAllowed(kind)
   }
 
   /** Moves one foreground subagent to the background; the main turn resumes. */
