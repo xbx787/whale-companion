@@ -13,6 +13,56 @@ const https = require('node:https')
 
 const TOOLS = [
   {
+    name: 'ask_user',
+    description: '在对话里弹出提问卡（小型对话窗口），让用户选择或填写答案。用于让用户批准计划、选择方案。返回 answers；用户跳过或超时返回 null。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        questions: {
+          type: 'array',
+          minItems: 1,
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string', description: '问题 id；不填用问题文本' },
+              question: { type: 'string', description: '问题文本' },
+              header: { type: 'string', description: '简短标题' },
+              multiSelect: { type: 'boolean', description: '是否多选' },
+              options: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    label: { type: 'string', description: '选项文字' },
+                    description: { type: 'string', description: '选项说明' }
+                  },
+                  required: ['label'],
+                  additionalProperties: false
+                }
+              }
+            },
+            required: ['question'],
+            additionalProperties: false
+          }
+        }
+      },
+      required: ['questions'],
+      additionalProperties: false
+    }
+  },
+  {
+    name: 'submit_plan',
+    description: '计划模式下把完整计划提交给用户批准。用户批准后自动退出计划模式，你再开始执行；被退回时保持计划模式，按用户的修改意见调整后重新提交。只在计划模式下使用。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        plan: { type: 'string', description: '完整的计划文本（Markdown），写清步骤、涉及文件、验证方式' }
+      },
+      required: ['plan'],
+      additionalProperties: false
+    }
+  },
+  {
     name: 'conversations_list',
     description: '列出本应用里的其他对话及其运行状态。仅在需要给另一个对话转达消息时使用；返回 id、标题、是否正在运行。',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false }
@@ -57,19 +107,6 @@ const TOOLS = [
       properties: {
         version: { type: 'string', description: '要启动的发布版本号，例如 0.0.88；不传则重启当前版本' }
       },
-      additionalProperties: false
-    }
-  },
-  {
-    name: 'request_approval',
-    description: '在角色旁弹出一个小批准卡（绿勾批准、红叉拒绝），用于打包、重启、自我更新这类必须先征得用户同意的操作。返回 approved:true/false；超时返回 approved:null。',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        title: { type: 'string', description: '一句话说明要批准什么' },
-        detail: { type: 'string', description: '补充说明，最多 300 字' }
-      },
-      required: ['title'],
       additionalProperties: false
     }
   },
@@ -124,7 +161,7 @@ function replyError(id, code, message) {
   send({ jsonrpc: '2.0', id, error: { code, message } })
 }
 
-function post(url, token, body) {
+function post(url, token, body, path = '/call') {
   return new Promise((resolve, reject) => {
     let parsed
     try {
@@ -138,7 +175,7 @@ function post(url, token, body) {
     const request = transport.request({
       hostname: parsed.hostname,
       port: parsed.port,
-      path: '/call',
+      path,
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -208,12 +245,25 @@ async function handle(message) {
     return
   }
   if (method === 'tools/list') {
+    const endpoint = process.env.PET_BRIDGE_URL
+    const token = process.env.PET_BRIDGE_TOKEN
+    if (endpoint && token) {
+      try {
+        const result = await post(endpoint, token, {}, '/tools')
+        if (result && Array.isArray(result.tools) && result.tools.length) {
+          reply(id, { tools: result.tools })
+          return
+        }
+      } catch {
+        // 宿主暂时不可用时回退到静态表。
+      }
+    }
     reply(id, { tools: TOOLS })
     return
   }
   if (method === 'tools/call') {
     const name = typeof params.name === 'string' ? params.name : ''
-    if (!TOOLS.some((tool) => tool.name === name)) {
+    if (!TOOLS.some((tool) => tool.name === name) && !name.startsWith('win_')) {
       replyError(id, -32602, `未知工具：${name}`)
       return
     }

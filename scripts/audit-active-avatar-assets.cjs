@@ -124,6 +124,9 @@ function assetInventory(root = ROOT) {
     const content = fs.readFileSync(source, 'utf8')
     for (const match of content.matchAll(/new URL\(['"](\.\/assets\/[^'"]+\.png)['"],\s*import\.meta\.url\)/g)) {
       const rel = match[1]
+      // @2x 是 build-avatar-mips.ps1 生成的派生素材，尺寸按舞台显示走，
+      // 不参与原画布/呆毛的几何审计。
+      if (/@2x\.png$/u.test(rel)) continue
       refs.push({ name: path.basename(rel), file: path.resolve(path.dirname(source), rel), role: roleOfAsset(rel) })
     }
   }

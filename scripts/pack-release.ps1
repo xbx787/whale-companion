@@ -3,6 +3,13 @@ param([switch]$NoShortcutSwitch, [string]$ReleaseRoot)
 $ErrorActionPreference = 'Stop'
 $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 Set-Location -LiteralPath $projectRoot
+# esbuild 在系统 Temp 里删自己的临时文件会被拒（杀软/索引锁），
+# 表现为 [vite:define] remove ...: Access is denied，构建随机失败、打包反复重试。
+# 把临时目录指到项目内，构建就稳定了。
+$buildTemp = Join-Path $projectRoot '.tmp\esbuild-temp'
+New-Item -ItemType Directory -Force -Path $buildTemp | Out-Null
+$env:TEMP = $buildTemp
+$env:TMP = $buildTemp
 $version = (& node -p "require('./package.json').version").Trim()
 if ($LASTEXITCODE -ne 0 -or $version -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid package version.' }
 
@@ -62,14 +69,18 @@ if (-not (Test-Path -LiteralPath $exe) -or -not (Test-Path -LiteralPath $icon)) 
 }
 
 # 用已验证的 win-unpacked 生成安装包：不重新打包，避免把修复前的链接带进去。
-$nsisTemp = Join-Path $releaseDir '.nsis-temp'
-New-Item -ItemType Directory -Force -Path $nsisTemp | Out-Null
-$env:TEMP = $nsisTemp
-$env:TMP = $nsisTemp
+# 安装器先输出到 .tmp：部分机器上 7za 直接写 release 目录会被拦（拒绝访问）。
+$nsisOut = Join-Path $projectRoot '.tmp\nsis-out'
+Remove-Item -LiteralPath $nsisOut -Recurse -Force -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Force -Path $nsisOut | Out-Null
+$env:TEMP = $nsisOut
+$env:TMP = $nsisOut
 $env:ELECTRON_BUILDER_CACHE = Join-Path $projectRoot '.cache\electron-builder'
-& npx electron-builder --win nsis "--prepackaged=$unpacked" "--config.directories.output=$releaseDir"
+& npx electron-builder --win nsis "--prepackaged=$unpacked" "--config.directories.output=$nsisOut"
 if ($LASTEXITCODE -ne 0) { throw 'Installer build failed.' }
-Remove-Item -LiteralPath $nsisTemp -Recurse -Force -ErrorAction SilentlyContinue
+$setup = Get-ChildItem -LiteralPath $nsisOut -Filter '*.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+if ($null -eq $setup) { throw 'Installer output is missing.' }
+Copy-Item -LiteralPath $setup.FullName -Destination $releaseDir -Force
 
 if (-not $NoShortcutSwitch) {
   if ((Split-Path -Leaf $releaseBase) -ne 'release') { throw 'Shortcut switch needs a release root named release.' }

@@ -274,6 +274,45 @@ apply(
   `${anchorAnswerRequest}.onRequest("session/plan", (value) => value, ({ params }) => implementation.setPlan(params))`
 )
 
+// ---- session/subagent_interrupt / prompt：把单个子代理的控制交给 subagents 服务 ----
+const subagentControl = `\t/** 宿主停止一个子代理。 */
+\tasync interruptSubagent(params) {
+\t\tthis.assertActive();
+\t\tconst subagents = this.ctx.get("subagents");
+\t\tif (subagents === void 0) throw internalError$1("subagent service is unavailable");
+\t\tsubagents.interrupt(params.childSessionId, { kind: "ancestor", agent: this.agent });
+\t\treturn { accepted: true };
+\t}
+\t/** 宿主给一个可续聊的子代理发消息。 */
+\tasync promptSubagent(params) {
+\t\tthis.assertActive();
+\t\tconst subagents = this.ctx.get("subagents");
+\t\tif (subagents === void 0) throw internalError$1("subagent service is unavailable");
+\t\tconst receipt = await subagents.prompt({
+\t\t\trequestId: brandString("subagent-" + this.agent.session.id + "-" + params.childSessionId + "-" + Date.now()),
+\t\t\tparentSessionId: this.agent.session.id,
+\t\t\tchildSessionId: params.childSessionId,
+\t\t\tmode: "continuable",
+\t\t\tdelivery: params.delivery === "steer" ? "steer" : "queue",
+\t\t\tcontent: [{ type: "text", text: String(params.text ?? "") }]
+\t\t}, AbortSignal.timeout(30000));
+\t\treturn { accepted: receipt !== void 0 };
+\t}
+`
+apply(
+  'AcpSession.subagentControl',
+  'subagent service is unavailable',
+  '\t/** 把 user-questions 的提问交给 ACP 客户端并等待答案。 */',
+  `${subagentControl}\t/** 把 user-questions 的提问交给 ACP 客户端并等待答案。 */`
+)
+const anchorPlanRequest = `${anchorAnswerRequest}.onRequest("session/plan", (value) => value, ({ params }) => implementation.setPlan(params))`
+apply(
+  'session/subagent_interrupt 注册',
+  'session/subagent_interrupt',
+  anchorPlanRequest,
+  `${anchorPlanRequest}.onRequest("session/subagent_interrupt", (value) => value, ({ params }) => implementation.interruptSubagent(params)).onRequest("session/subagent_prompt", (value) => value, ({ params }) => implementation.promptSubagent(params))`
+)
+
 // ---- session/question：user-questions 的宿主应答通道 ----
 const hostAskMethod = `\t/** 把 user-questions 的提问交给 ACP 客户端并等待答案。 */
 \tasync askHost(request) {
@@ -310,7 +349,7 @@ const planMethod = `\t/** 宿主的计划模式开关：交给 DSH 的 planMode 
 
 apply(
   'AcpSession.setPlan',
-  'async setPlan(params)',
+  'plan mode service is unavailable',
   '\tasync askHost(request) {',
   `${planMethod}\tasync askHost(request) {`
 )

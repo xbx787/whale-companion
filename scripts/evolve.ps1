@@ -39,6 +39,9 @@ $stderrPath = Join-Path $resultRoot 'app.err.log'
 New-Item -ItemType Directory -Force -Path $resultRoot | Out-Null
 Remove-Item -LiteralPath $resultPath, $stdoutPath, $stderrPath -Force -ErrorAction SilentlyContinue
 
+# 从 Electron 宿主继承的 ELECTRON_RUN_AS_NODE 会让 exe 按 Node 模式启动，--self-test 被判非法参数。
+Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+
 if ($NoSelfTest) {
   # 定时/迁移任务要在启动后由 resumeEvolveTask 接管；--self-test 会跳过恢复。
   Start-Process -FilePath $exe -WorkingDirectory $releaseDir `

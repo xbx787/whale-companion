@@ -909,24 +909,40 @@ class ControlBlocked(RuntimeError):`
             keybd_event(key[0], scanCode, flags, 0)`
       }
     ]
+  },
+  {
+    // 只读截屏不该申请桌面租约：加进后台工具白名单后，Screenshot / Snapshot
+    // 只画蓝色标注框，不弹「正在控制这台电脑」横幅，也不抢键鼠。
+    file: 'tools/control_notifications.py',
+    hunks: [
+      {
+        old: `_BACKGROUND_TOOLS = frozenset({"PowerShell", "FileSystem", "Process", "Registry"})`,
+        new: `_BACKGROUND_TOOLS = frozenset({"PowerShell", "FileSystem", "Process", "Registry", "Screenshot", "Snapshot", "DisplayInventory"})`
+      }
+    ]
   }
 ]
 
 const checkOnly = process.argv.includes('--check')
 let applied = 0
 let skipped = 0
+let drifted = 0
 
 for (const { file, hunks } of PATCHES) {
   const target = path.join(PKG, file)
   if (!existsSync(target)) throw new Error('not found (windows-mcp installed?): ' + target)
-  let text = readFileSync(target, 'utf8')
+  // Git 检出的文件常是 CRLF，补丁锚点按 LF 写；先归一化再匹配。
+  let text = readFileSync(target, 'utf8').replace(/\r\n/g, '\n')
   let dirty = false
   hunks.forEach((hunk, index) => {
     if (text.includes(hunk.present ?? hunk.new)) { skipped++; return }
     const anchors = Array.isArray(hunk.old) ? hunk.old : [hunk.old]
     const anchor = anchors.find(old => text.includes(old))
     if (!anchor) {
-      throw new Error(`${file} hunk #${index + 1}: anchor not found — upstream text drifted, re-check the patch`)
+      // 上游升级后旧锚点会漂移；跳过它，别让后面的补丁（例如截屏白名单）也轮不到。
+      console.warn(`${file} hunk #${index + 1}: anchor not found — skipped (upstream drifted)`)
+      drifted++
+      return
     }
     text = text.replace(anchor, hunk.new)
     dirty = true
@@ -939,8 +955,8 @@ for (const { file, hunks } of PATCHES) {
   }
 }
 
-console.log(`${checkOnly ? '[check] ' : ''}hunks applied: ${applied}, already in place: ${skipped}`)
-if (checkOnly) process.exit(applied === 0 && skipped > 0 ? 0 : 0)
+console.log(`${checkOnly ? '[check] ' : ''}hunks applied: ${applied}, already in place: ${skipped}, drifted: ${drifted}`)
+if (checkOnly) process.exit(drifted > 0 ? 1 : 0)
 
 // The exe imports every module at startup — let it prove the patched files parse.
 const exe = path.join(os.homedir(), '.local', 'bin', 'windows-mcp.exe')
