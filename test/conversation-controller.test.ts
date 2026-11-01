@@ -1220,7 +1220,8 @@ describe('parallel conversations', () => {
     expect(delivered).toMatchObject({ id: target.id, title: '开发1' })
     await controller.selectConversation(target.id)
     await until(() => controller.getSnapshot().timeline.some((entry) =>
-      entry.kind === 'user' && entry.text.includes('【来自对话「开发2」】') && entry.text.includes('打包一下')), 'delivered message')
+      entry.kind === 'user' && entry.text.includes('[开发2 → 开发1]') && entry.text.includes('打包一下') &&
+      entry.sender?.target === '开发1'), 'delivered message')
     // A conversation cannot message itself, and the body keeps its source.
     await expect(controller.sendToConversation('开发2', 'x', source.id)).rejects.toThrow('不能给当前对话自己发消息')
   })

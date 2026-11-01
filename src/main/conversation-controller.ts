@@ -1581,8 +1581,12 @@ export class ConversationController {
     if (sourceId === destination.id) throw new ConversationStoreError('INVALID_INPUT', '不能给当前对话自己发消息。')
     // 转达限流已按主人要求解除：不再按每分钟 3 条拦截。
     const source = sourceId ? library.conversations.find((item) => item.id === sourceId) : undefined
-    const body = source ? `【来自对话「${source.title}」】\n${clean}` : clean
-    await this.sendMessage(body, [], 'queue', destination.id)
+    // 接收方要看到「来源 → 目标」两个色块，所以正文头和 sender 一起带过去。
+    const sender = source
+      ? { name: source.title, badge: source.title.slice(0, 1), target: destination.title, side: 'internal' as const }
+      : undefined
+    const body = source ? `[${source.title} → ${destination.title}]\n${clean}` : clean
+    await this.sendMessage(body, [], 'queue', destination.id, false, sender)
     return { id: destination.id, title: destination.title }
   }
 
