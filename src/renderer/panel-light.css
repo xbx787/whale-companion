@@ -460,6 +460,11 @@ body.panel-theme-light .panel-quick-tab[aria-disabled="true"]{ cursor: default; 
 body.panel-theme-light .panel-feed::-webkit-scrollbar{ width: 5px; }
 body.panel-theme-light .panel-feed::-webkit-scrollbar-thumb{ border-radius: 9px; background: rgba(10, 35, 85, 0.38); }
 body.panel-theme-light .panel-event{
+  --route-chip-h: 35px;
+  --route-gap: 8px;
+  --route-gap-x: 6px;
+  /* 弧线半径小一些，弯完接一段竖直线再到箭头，过渡更顺。 */
+  --route-radius: 10px;
   display: grid;
   grid-template-columns: 33px minmax(0, 1fr);
   gap: 9px;
@@ -468,6 +473,11 @@ body.panel-theme-light .panel-event{
      conversation otherwise re-shapes every message on each streaming update. */
   content-visibility: auto;
   contain-intrinsic-size: auto 64px;
+}
+/* 带色块/来源标签的消息，正文整体下推给色块让位；头像要跟着降到同一行，
+   否则会孤零零停在色块上方。 */
+body.panel-theme-light .panel-event:has(.panel-event-route) .panel-event-avatar, body.panel-theme-light .panel-event:has(.panel-event-tag-slot) .panel-event-avatar{
+  margin-top: calc(48px - var(--route-chip-h) - var(--route-gap));
 }
 /* content-visibility 会连绘制一起裁剪，跨端消息上方的弧线正好伸出气泡，
    这条规则让它照常溢出显示；这类消息很少，不靠跳过它省渲染。 */
@@ -520,11 +530,6 @@ body.panel-theme-light .panel-event-user .panel-event-glyph{ color: #f4d8c2; bac
 body.panel-theme-light .panel-event-tool .panel-event-glyph{ font-size: var(--glyph-md); font-weight: 400; }
 body.panel-theme-light .panel-event-time{ color: #2d4571; font-family: var(--font-ui); font-size: var(--text-xs); font-variant-numeric: tabular-nums; line-height: 1; }
 body.panel-theme-light .panel-event-body{
-  --route-chip-h: 35px;
-  --route-gap: 8px;
-  --route-gap-x: 6px;
-  /* 弧线半径小一些，弯完接一段竖直线再到箭头，过渡更顺。 */
-  --route-radius: 10px;
   position: relative;
   min-width: 0;
   padding-top: 1px;
