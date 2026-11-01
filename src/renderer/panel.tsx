@@ -1562,6 +1562,8 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
       rememberVisibleSide();
       activeConversationIdRef.current = item.id;
       destinationRef.current = 'main';
+      // 切到目标对话时恢复它自己保存的输入框展开状态，不再永远回到收起。
+      setComposerOpenRaw(composerOpenByConversation.current.get(item.id) ?? false);
       sideChatRef.current = null;
       setSideChat(null);
       setLibraryOpen(false);
