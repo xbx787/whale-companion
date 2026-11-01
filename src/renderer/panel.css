@@ -727,10 +727,8 @@ body.panel-placement-right .panel-bubble::after { display: none; }
 /* 省略号在 17px 行盒里按文字基线会偏下，补一点下内边距把它提回中心。 */
 /* 运行中的三个点用圆点元素画，flex 垂直居中，不受字体基线影响。 */
 .panel-tool-dots { display: inline-flex; align-items: center; gap: 2px; line-height: 0; vertical-align: middle; color: #a9c6f7; }
-.panel-tool-dots i { width: 3px; height: 3px; border-radius: 50%; background: #a9c6f7; animation: panel-dot-bounce 1.2s ease-in-out infinite; }
-.panel-tool-dots i:nth-child(2) { animation-delay: .15s; }
-.panel-tool-dots i:nth-child(3) { animation-delay: .3s; }
-@keyframes panel-dot-bounce { 0%, 80%, 100% { opacity: .35; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-2px); } }
+/* 工具行末尾的三点只是状态提示，保持静止，不跟着跳。 */
+.panel-tool-dots i { width: 3px; height: 3px; border-radius: 50%; background: currentColor; }
 .panel-tool-result.is-running { color: #f0c47b; }
 .panel-tool-result.is-error { color: #f3a1aa; }
 /* A command past the minute mark gets a kill switch in its own row. It replaces
@@ -806,10 +804,12 @@ body.panel-placement-right .panel-bubble::after { display: none; }
 /* 首点（宽 5）的中心落在 16.5px 的同一条轴上（14 + 2.5）——和上面的状态点、
    统计点一列。 */
 .panel-working { position: relative; display: flex; align-items: center; gap: 9px; margin: 1px 0 15px; padding-left: 14px; color: #9fb7df; font-size: var(--text-sm); }
-.panel-working-dots { display: inline-flex; align-items: center; flex: none; gap: 2px; vertical-align: middle; }
-.panel-working-dots i { width: 3px; height: 3px; border-radius: 50%; background: #a9c6f7; animation: panel-dot-bounce 1.2s ease-in-out infinite; }
-.panel-working-dots i:nth-child(2) { animation-delay: .15s; }
-.panel-working-dots i:nth-child(3) { animation-delay: .3s; }
+.panel-working-dots { display: inline-flex; align-items: center; flex: none; gap: 3px; vertical-align: middle; }
+/* 三个点各用一种颜色，相位错开依次跳起——这是老版本的原样。 */
+.panel-working-dots i { width: 5px; height: 5px; border-radius: 50%; background: #7fd8ff; animation: panel-working-bounce 1.2s ease-in-out infinite; }
+.panel-working-dots i:nth-child(2) { background: #a9b6ff; animation-delay: .18s; }
+.panel-working-dots i:nth-child(3) { background: #c9b8ff; animation-delay: .36s; }
+@keyframes panel-working-bounce { 0%, 100% { transform: translateY(0); opacity: .4; } 50% { transform: translateY(-3px); opacity: 1; } }
 .panel-working-text { color: #dbe8ff; }
 .panel-working-time { color: #90a8d4; font-variant-numeric: tabular-nums; }
 /* 子任务：每个 Task 子 agent 一个机器人头，点开是只读详情与它自己的步骤。 */
