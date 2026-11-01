@@ -254,7 +254,11 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
   const [busy, setBusy] = useState<'approve' | 'reject' | 'stop' | null>(null);
   const [sendingConversationIds, setSendingConversationIds] = useState<Set<string | null>>(() => new Set());
   const composerExit = useExitAnimation(150);
-  const [composerOpen, setComposerOpenRaw] = useState(false);
+  const [composerOpen, setComposerOpenRaw] = useState(() => {
+    const id = snapshot?.conversationLibrary?.activeConversationId
+    if (!id) return false
+    return readComposerOpenPrefs().get(id) ?? false
+  });
   const composerOpenByConversation = useRef<Map<string, boolean>>(readComposerOpenPrefs());
   const [autoCompactPreview, setAutoCompactPreview] = useState<number | null>(null);
   function setComposerOpen(open: boolean) {
