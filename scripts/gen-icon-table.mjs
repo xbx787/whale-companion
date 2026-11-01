@@ -6,7 +6,7 @@ import { resolve } from 'node:path'
 
 const iconsSource = readFileSync('D:/DesktopPetProject/.worktrees/dsh-p0/src/renderer/panel-icons.tsx', 'utf8')
 // 已经换成新图标的那几项，从上一个提交里取旧的线框 SVG。
-const legacySource = execSync('git show HEAD^:src/renderer/panel-icons.tsx', {
+const legacySource = execSync('git show 64af72f~1:src/renderer/panel-icons.tsx', {
   cwd: 'D:/DesktopPetProject/.worktrees/dsh-p0',
   encoding: 'utf8'
 })
@@ -31,7 +31,7 @@ const rows = [
   ['删除会话', 'DeleteIcon', 'material-symbols/delete'],
   ['归档会话', 'ArchiveIcon', 'material-symbols/archive'],
   ['恢复归档', 'ArchiveIcon', 'material-symbols/refresh'],
-  ['置顶会话', 'PinIcon', 'material-symbols/push-pin'],
+  ['置顶会话', 'PinIcon', 'material-symbols/keep'],
   ['会话列表', 'ConversationsIcon', 'material-symbols/chat'],
   ['模型切换', 'ModelIcon', 'material-symbols/tune'],
   ['上下文占用', 'ContextMeter', 'material-symbols/data-usage'],
@@ -58,30 +58,22 @@ const rows = [
   ['回车确认', 'ReturnIcon', 'material-symbols/keyboard-return'],
   ['拖拽手柄', 'GripIcon', 'material-symbols/drag-indicator'],
   ['多选', 'SelectIcon', 'material-symbols/check-box'],
-  ['导入配置', 'ImportIcon', 'material-symbols/file-upload'],
-  ['导出配置', 'ExportIcon', 'material-symbols/file-download']
+  ['导入配置', 'ImportIcon', 'material-symbols/upload'],
+  ['导出配置', 'ExportIcon', 'material-symbols/download']
 ]
 
 const base = 'https://api.iconify.design'
 
-async function fetchSvg(id) {
-  try {
-    const response = await fetch(`${base}/${id}.svg?height=24&color=currentColor`)
-    if (!response.ok) return null
-    const text = await response.text()
-    if (!text.trim().startsWith('<svg')) return null
-    // 统一成 fill=currentColor、去掉尺寸，由 HTML 控制。
-    return text
-      .replace(/width="[^"]*"/, '')
-      .replace(/height="[^"]*"/, '')
-      .replace('<svg', '<svg fill="currentColor" stroke="none"')
-  } catch {
-    return null
-  }
+function fetchSvg(id) {
+  const local = JSON.parse(readFileSync("D:/DesktopPetProject/.worktrees/dsh-p0/node_modules/@iconify-json/material-symbols/icons.json", "utf8"))
+  const name = id.replace("material-symbols/", "")
+  const body = local.icons[name] && local.icons[name].body
+  if (!body) return null
+  return "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 " + local.width + " " + local.height + "\" fill=\"currentColor\" stroke=\"none\">" + body + "</svg>"
 }
-
 const items = []
 for (let index = 0; index < rows.length; index += 1) {
+  await new Promise((resolveDelay) => setTimeout(resolveDelay, 300))
   const [scene, oldName, newId] = rows[index]
   items.push({
     no: index + 1,
@@ -197,3 +189,8 @@ const missingNew = items.filter((item) => !item.new).map((item) => item.no)
 console.log(`wrote ${target} rows=${items.length}`)
 console.log(missingOld.length ? `missing old: ${missingOld.join(', ')}` : 'all old icons found')
 console.log(missingNew.length ? `missing new: ${missingNew.join(', ')}` : 'all new icons loaded')
+
+
+
+
+
