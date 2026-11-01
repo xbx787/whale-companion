@@ -667,21 +667,23 @@ export class ConversationController {
 
   /** Records a message from another local conversation without starting a
    *  model turn in this one. */
-  async appendExternalMessage(text: string, from: { name: string; badge: string },
+  async appendExternalMessage(text: string, from: TimelineEntry['sender'],
     conversationId?: string): Promise<void> {
     await this.initialize()
     const id = conversationId ?? this.activeId
     if (!id) throw new ConversationStoreError('NOT_FOUND', '找不到这个会话。')
     const clean = text.trim()
     if (!clean) return
+    if (!from) throw new ConversationStoreError('INVALID_INPUT', '消息来源无效。')
     const name = from.name.trim().slice(0, 40)
     const badge = from.badge.trim().slice(0, 2)
     if (!name || !badge) throw new ConversationStoreError('INVALID_INPUT', '消息来源无效。')
+    const stamped = { ...from, name, badge }
     await this.serialize(async () => {
       const target = await this.store.getConversation(id)
       if (!target) throw new ConversationStoreError('NOT_FOUND', '找不到这个会话。')
       const runtime = await this.ensureRuntime(id, target)
-      runtime.appendExternalMessage({ name, badge }, clean.slice(0, 8_000))
+      runtime.appendExternalMessage(stamped, clean.slice(0, 8_000))
       await this.persistConversation(id)
     })
   }
@@ -712,7 +714,8 @@ export class ConversationController {
     await runtime.sendMessage(text, [], '', undefined, true)
   }
 
-  async sendMessage(text: string, attachments: UserAttachment[] = [], strategy: SendStrategy = 'queue', conversationId?: string, divider = false): Promise<PendingMessage> {
+  async sendMessage(text: string, attachments: UserAttachment[] = [], strategy: SendStrategy = 'queue', conversationId?: string, divider = false,
+    sender?: TimelineEntry['sender']): Promise<PendingMessage> {
     await this.initialize()
     const id = conversationId ?? this.activeId
     if (!id) throw new ConversationStoreError('NOT_FOUND', '找不到这个会话。')
@@ -735,6 +738,7 @@ export class ConversationController {
     const message: PendingMessage = {
       id: randomUUID(), text: messageText, attachments: structuredClone(attachments), createdAt: new Date().toISOString(),
       ...(divider ? { divider: true } : {}),
+      ...(sender ? { sender } : {}),
       ...(sessionContext ? { sessionContext } : {})
     }
     return this.serialize(async () => {
@@ -853,7 +857,7 @@ export class ConversationController {
           ? (next.text.split(/\r?\n/u, 1)[0].trim() || `附件：${next.attachments[0]?.name ?? '对话'}`).slice(0, 60)
           : undefined
         const beforeCount = runtime.exportConversationState().timeline.length
-        const run = runtime.sendMessage(next.text, next.attachments, next.sessionContext, undefined, false, next.divider === true)
+        const run = runtime.sendMessage(next.text, next.attachments, next.sessionContext, undefined, false, next.divider === true, next.sender)
         try {
           await this.persistConversation(id, title)
         } catch (error) {

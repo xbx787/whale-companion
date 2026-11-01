@@ -38,7 +38,7 @@ describe('inbox watcher', () => {
     await watcher.poll()
     expect(appendExternalMessage).toHaveBeenCalledWith(
       '【来自对话「开发二」】\n全部改完。',
-      { name: '开发二', badge: '开' },
+      { name: '开发二', badge: '开', side: 'internal' },
       undefined
     )
     expect(await fs.readdir(testRoot)).toEqual([])
@@ -89,7 +89,7 @@ describe('inbox watcher', () => {
     } as never, 50)
     await watcher.poll()
     expect(appendExternalMessage).toHaveBeenCalledWith(
-      '全部改完。', { name: '开发2', badge: '开' }, undefined
+      '全部改完。', { name: '开发2', badge: '开', side: 'internal' }, undefined
     )
   })
 })

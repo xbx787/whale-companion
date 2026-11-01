@@ -106,7 +106,14 @@ export class InboxWatcher {
             // The prefix is rendered as a sender badge instead of prose.
             await this.controller.sendMessage(`【定时任务】\n${message.text}`, [], 'queue', message.conversationId)
           } else {
-            await this.controller.appendExternalMessage(message.text, from, message.conversationId)
+            const target = message.conversationId
+              ? this.controller.conversationSender(message.conversationId)
+              : undefined
+            await this.controller.appendExternalMessage(message.text, {
+              ...from,
+              side: 'internal',
+              ...(target ? { target: target.name } : {})
+            }, message.conversationId)
           }
           await fsp.unlink(file)
         } catch {

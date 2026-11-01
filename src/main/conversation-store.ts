@@ -30,6 +30,8 @@ export interface PendingMessage {
   sessionContext?: string
   /** A restart divider: opens a new segment but renders as a cut line. */
   divider?: boolean
+  /** 跨端/内部转发的来源与目标；发送时落到用户条目上。 */
+  sender?: TimelineEntry['sender']
 }
 
 export interface ConversationRecord {

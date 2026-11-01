@@ -180,7 +180,14 @@ export const TimelineItem = memo(function TimelineItem({ entry, running = false,
     ? entry.sender ?? (sourceName ? { name: sourceName, badge: senderBadge(sourceName), ...(labelOnly ? { keepAvatar: true } : {}) } : undefined)
     : undefined;
   const senderFace = sender?.keepAvatar ? undefined : sender;
-  const bodyEntry = sourceMatch ? { ...entry, text: entry.text.slice(sourceMatch[0].length) } : entry;
+  // 跨端消息的正文里还留着 [来源 → 目标] 一行头，模型需要看到它，
+  // 但界面上已经渲染成双框，正文里要剥掉，避免重复一遍。
+  const routePrefix = entry.sender?.target
+    ? /^\[[^\]\n]{1,60}?→[^\]\n]{1,60}\]\r?\n?/u.exec(entry.text)
+    : null;
+  const bodyEntry = routePrefix
+    ? { ...entry, text: entry.text.slice(routePrefix[0].length) }
+    : sourceMatch ? { ...entry, text: entry.text.slice(sourceMatch[0].length) } : entry;
   return (
     <article className={`panel-event panel-event-${entry.kind}`} data-entry-id={entry.id} aria-label={`${sender ? sender.name : kindLabels[entry.kind]}，${timeLabel}`}>
       <div className="panel-event-avatar" aria-hidden="true" onContextMenu={onAvatarMenu}>
@@ -194,7 +201,13 @@ export const TimelineItem = memo(function TimelineItem({ entry, running = false,
         <span className="panel-event-line" />
       </div>
       <div className="panel-event-body">
-        {sender && <span className="panel-event-sender">{sender.name}</span>}
+        {sender && (sender.target
+          ? <span className="panel-event-route">
+              <span className={`route-box ${routeTone(sender.side, 'from')}`}>{sender.name}</span>
+              <span className="route-arrow" aria-hidden="true">→</span>
+              <span className={`route-box ${routeTone(sender.side, 'to')}`}>{sender.target}</span>
+            </span>
+          : <span className="panel-event-sender">{sender.name}</span>)}
         <MessageBody entry={bodyEntry} running={running} onOpenImage={onOpenImage} />
       </div>
     </article>
@@ -207,6 +220,13 @@ export const TimelineItem = memo(function TimelineItem({ entry, running = false,
   prev.display.expandEditsByDefault === next.display.expandEditsByDefault &&
   prev.display.toolRowDetail === next.display.toolRowDetail &&
   (prev.display.workspace ?? null) === (next.display.workspace ?? null));
+
+/** 跨端/内部转发消息的两个框各用哪种色：来源橙、目标按对方端。 */
+function routeTone(side: 'pc' | 'phone' | 'internal' | undefined, slot: 'from' | 'to'): string {
+  if (side === 'phone') return slot === 'from' ? 'is-phone' : 'is-pc';
+  if (side === 'pc') return slot === 'from' ? 'is-pc' : 'is-phone';
+  return slot === 'from' ? 'is-pc' : 'is-pc-target';
+}
 
 /** Thinking entries get their own expandable row; everything else keeps the message layout. */
 export function EntryItem({ entry, running, onOpenImage, onKill, display }: { entry: TimelineEntry; running: boolean; onOpenImage?: (name: string, url: string) => void; onKill?: () => void; display: RowDisplay }) {

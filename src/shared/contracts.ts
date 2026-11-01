@@ -118,7 +118,16 @@ export interface TimelineEntry {
   images?: Array<{ name: string; path: string }>
   /** Present when another local conversation/agent injected this message.
    *  The badge is shown where the user's avatar normally sits. */
-  sender?: { name: string; badge: string; /** true 时只显示名字标签，头像仍用当前用户头像。 */ keepAvatar?: boolean }
+  sender?: {
+    name: string
+    badge: string
+    /** true 时只显示名字标签，头像仍用当前用户头像。 */
+    keepAvatar?: boolean
+    /** 目标端名字。有值时这一行渲染成「来源框 → 目标框」的双圆角矩形。 */
+    target?: string
+    /** 来源端：phone 手机端、pc 电脑端、internal 电脑端内部转发；缺省按旧单标签渲染。 */
+    side?: 'pc' | 'phone' | 'internal'
+  }
   tool?: {
     toolUseId: string
     name: string
@@ -354,6 +363,8 @@ export interface PendingMessage {
   createdAt: string
   /** A restart divider: opens a new segment but renders as a cut line. */
   divider?: boolean
+  /** 跨端/内部转发的来源与目标；发送时落到用户条目上。 */
+  sender?: TimelineEntry['sender']
 }
 
 export interface ContextUsageSnapshot {

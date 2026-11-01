@@ -105,7 +105,7 @@ export async function startPhoneApi(options: PhoneApiOptions): Promise<PhoneApiH
         '',
         'GET  /api/list?token=            列出全部会话：id、标题、状态',
         'GET  /api/read?token=&id=&limit= 读某个会话最近消息，limit 默认 40 最大 200',
-        'POST /api/send?token=            body {"id":"...","text":"..."} 往该会话发一句话',
+        'POST /api/send?token=            body {"id":"...","text":"...","mode":"steer|queue"} 往该会话发一句话；mode 默认 steer（插话，当前回合下一步就能看到），queue 排队到回合结束',
         'POST /api/interrupt?token=       body {"id":"..."} 停止该会话当前回合'
       ].join('\n'))
       return
@@ -148,10 +148,16 @@ export async function startPhoneApi(options: PhoneApiOptions): Promise<PhoneApiH
       const raw = await readBody(request)
       let id = ''
       let text = ''
+      let mode: 'queue' | 'steer' = 'steer'
       try {
-        const parsed = JSON.parse(raw) as { id?: unknown; text?: unknown }
+        const parsed = JSON.parse(raw) as { id?: unknown; text?: unknown; mode?: unknown }
         id = typeof parsed.id === 'string' ? parsed.id : ''
         text = typeof parsed.text === 'string' ? parsed.text : ''
+        if (parsed.mode === 'queue' || parsed.mode === 'steer') mode = parsed.mode
+        else if (parsed.mode !== undefined) {
+          sendJson(response, 400, { error: 'mode 只能是 queue 或 steer。' })
+          return
+        }
       } catch {
         sendJson(response, 400, { error: '请求体不是合法 JSON。' })
         return
@@ -166,8 +172,20 @@ export async function startPhoneApi(options: PhoneApiOptions): Promise<PhoneApiH
         return
       }
       const controller = options.controller()
-      await controller.sendMessage(clean, [], 'queue', id)
-      sendJson(response, 200, { ok: true })
+      // 手机消息统一带跨端头：[来源端·对话名 → 目标端·对话名]。
+      // 有头就按头里的来源渲染；没头按手机端兜底，保证每条都走双框。
+      const title = (await controller.listConversations()).find((item) => item.id === id)?.title ?? id
+      const route = /^\[([^\]\n]{1,60}?)\s*→\s*([^\]\n]{1,60})\]\r?\n?/u.exec(clean)
+      const from = route?.[1]?.trim() || '手机端'
+      const to = route?.[2]?.trim() || `电脑端·${title}`
+      const side = from.startsWith('手机端') ? 'phone' : from.startsWith('电脑端') ? 'pc' : 'internal'
+      await controller.sendMessage(clean, [], mode, id, false, {
+        name: from,
+        badge: from.startsWith('手机端') ? '手' : from.startsWith('电脑端') ? '电' : from.slice(0, 1),
+        target: to,
+        side
+      })
+      sendJson(response, 200, { ok: true, mode })
       return
     }
 

@@ -882,7 +882,8 @@ export class AgentRuntime {
     }
   }
 
-  async sendMessage(rawText: string, attachments: UserAttachment[] = [], sessionContext = '', displayText?: string, hiddenUser = false, divider = false): Promise<void> {
+  async sendMessage(rawText: string, attachments: UserAttachment[] = [], sessionContext = '', displayText?: string, hiddenUser = false, divider = false,
+    sender?: TimelineEntry['sender']): Promise<void> {
     const text = rawText.trim()
     if (!validAttachmentList(attachments)) {
       this.addSystem('附件数量或大小超过限制。', 'error')
@@ -937,7 +938,7 @@ export class AgentRuntime {
         return this.addSystem('已重启，继续执行目标', undefined, undefined, '重启恢复').id
       })()
       : (() => {
-        const entry = this.add('user', displayText ?? (attachments.length ? `${text || '请阅读附件并帮助我。'}\n附件：${attachments.map(({ name }) => name).join('、')}` : text), messageImages(attachments))
+        const entry = this.add('user', displayText ?? (attachments.length ? `${text || '请阅读附件并帮助我。'}\n附件：${attachments.map(({ name }) => name).join('、')}` : text), messageImages(attachments), sender)
         if (divider) {
           entry.divider = true
           this.markTimelineDirty(entry)
@@ -1689,7 +1690,7 @@ export class AgentRuntime {
 
   /** Shows a message from another local conversation/agent without starting a
    *  model turn. It is a visible notice, not part of the dialogue history. */
-  appendExternalMessage(from: { name: string; badge: string }, text: string): void {
+  appendExternalMessage(from: TimelineEntry['sender'], text: string): void {
     if (!text.trim()) return
     this.add('user', text.trim().slice(0, 8_000), undefined, from)
   }

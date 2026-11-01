@@ -1238,6 +1238,14 @@ body.panel-placement-right .panel-bubble::after { display: none; }
 /* 另一个对话/代理注入的消息：头像位显示来源徽章，正文前标出名字。 */
 .panel-event-sender { display: inline-flex; align-items: center; margin: 0 0 3px; padding: 1px 6px; border-radius: 5px; color: #f0c68c; background: rgba(240, 196, 123, .12); font-size: var(--text-2xs); line-height: 1.4; }
 
+/* 跨端/内部转发：来源框 → 目标框，两个圆角矩形各用一种色。 */
+.panel-event-route { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 0 0 6px; max-width: 100%; }
+.route-box { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 9px; font-size: var(--text-md); line-height: 1.45; white-space: nowrap; max-width: 46%; overflow: hidden; text-overflow: ellipsis; }
+.route-box.is-pc { color: #d98a4f; background: rgba(217, 138, 79, .16); }
+.route-box.is-pc-target { color: #c0527e; background: rgba(192, 82, 126, .16); }
+.route-box.is-phone { color: #4ea37a; background: rgba(78, 163, 122, .16); }
+.route-arrow { color: #8b93a3; font-size: var(--text-md); line-height: 1; }
+
 /* 重启分割条：线—文字—线，表示上一段到此结束。 */
 .panel-timeline-divider { display: flex; align-items: center; gap: 10px; margin: 20px 0; color: #9db4d8; font-size: var(--text-xs); }
 .panel-timeline-divider::before, .panel-timeline-divider::after { content: ''; flex: 1; height: 1px; background: rgba(150, 180, 230, .28); }
