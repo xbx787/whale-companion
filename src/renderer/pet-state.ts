@@ -50,6 +50,7 @@ export function usePetState() {
     let active = true;
     let unsubscribe: (() => void) | undefined;
     let retryTimer: number | undefined;
+    let onFocus: (() => void) | undefined;
 
     try {
       const bridge = petBridge();
@@ -134,6 +135,11 @@ export function usePetState() {
         })
       }
       pull(0)
+      // 窗口重新回到前台时再拉一次：启动那几秒主进程可能还没把历史灌进
+      // 快照，只靠启动时的轮询会在超时后停在空面板上。
+      const onWindowFocus = (): void => { resync() }
+      onFocus = onWindowFocus
+      window.addEventListener('focus', onWindowFocus)
     } catch (cause) {
       setError(errorText(cause));
     }
@@ -141,6 +147,7 @@ export function usePetState() {
     return () => {
       active = false;
       window.clearTimeout(retryTimer);
+      if (onFocus) window.removeEventListener('focus', onFocus);
       unsubscribe?.();
     };
   }, []);

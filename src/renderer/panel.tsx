@@ -1675,7 +1675,9 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
   // what the owner wants to do next.
   const compactEmpty = empty && !sideSessionId && !expanded && !modelPickerOpen && !suggestionOpen && recentSessions.length > 0;
   const layout: BubbleLayout = !compactEmpty ? 'full' : !composerOpen ? 'empty' : attachments.length ? 'composer_attachments' : 'composer';
-  const compactComposerHeight = Math.max(112, composeDockHeight || (112 + composerHeight + (attachments.length ? 26 : 0)));
+  // 首帧测量常常偏小（字体还没落位），底部那排按钮会被窗口裁掉一截；
+  // 留几像素余量，宁可窗口略高也不要切到控件。
+  const compactComposerHeight = Math.max(120, (composeDockHeight || (112 + composerHeight + (attachments.length ? 26 : 0))) + 6);
   // 30fps 的呼吸式动效：扫光与脉冲点改用 CSS 变量推进，值每 1/30 秒走一步——
   // 合成器只在步进的帧上提交新内容（60fps 时是每帧），dwm 的合成次数减半。
   // 没有动效在跑时这个计时器根本不启动，变量停在各自的静止位。
