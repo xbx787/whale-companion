@@ -189,7 +189,7 @@ export const TimelineItem = memo(function TimelineItem({ entry, running = false,
     ? { ...entry, text: entry.text.slice(routePrefix[0].length) }
     : sourceMatch ? { ...entry, text: entry.text.slice(sourceMatch[0].length) } : entry;
   return (
-    <article className={`panel-event panel-event-${entry.kind}`} data-entry-id={entry.id} aria-label={`${sender ? sender.name : kindLabels[entry.kind]}，${timeLabel}`}>
+    <article className={`panel-event panel-event-${entry.kind}${sender && entry.kind === 'user' ? ' is-foreign' : ''}`} data-entry-id={entry.id} aria-label={`${sender ? sender.name : kindLabels[entry.kind]}，${timeLabel}`}>
       <div className="panel-event-avatar" aria-hidden="true" onContextMenu={onAvatarMenu}>
         {entry.kind === 'user' || entry.kind === 'assistant'
           ? <AvatarGlyph kind={entry.kind}

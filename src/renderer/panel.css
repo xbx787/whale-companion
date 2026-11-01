@@ -487,6 +487,8 @@ body.panel-placement-right .panel-bubble::after { display: none; }
    stretched (the flex default) a one-line bubble matched the avatar column —
    clock and thread included — and read as a mysteriously tall box. */
 .panel-event-user { display: flex; flex-direction: row-reverse; align-items: flex-start; gap: 8px; width: fit-content; max-width: 88%; margin-left: auto; }
+/* 来源是别的对话或代理时，头像属于对方而不是主人，一律回到左边。 */
+.panel-event-user.is-foreign { flex-direction: row; margin-left: 0; }
 .panel-event-user .panel-event-body { min-width: 0; padding: 2px 10px 3px; border: 1px solid rgba(190, 213, 253, .18); border-radius: 12px 4px 12px 12px; background: rgba(154, 185, 242, .12); }
 /* 用户气泡收紧到半行留白：首段不再额外顶开，多段之间也只留半行。 */
 .panel-event-user .panel-event-body p { margin: 0; }
@@ -1288,7 +1290,9 @@ img.panel-markdown-image { display: block; max-width: 100%; margin: 6px 0; borde
   align-items: center;
   gap: var(--route-gap-x);
 }
-.panel-event-user .panel-event-route { bottom: calc(100% + var(--route-gap) + 1px); }
+/* 气泡带 1px 边框，绝对定位的参照是 padding box，所以要往外让 1px，
+   色块左缘才和气泡外边框重合。 */
+.panel-event-user .panel-event-route { left: -1px; bottom: calc(100% + var(--route-gap) + 1px); }
 /* 连接件只负责弧线和圆点，本身不占流。它挂在色块组右端：右上角是
    右侧色块右缘的中点，左下角正好落在气泡上边线上，弧线凸向右下。 */
 .route-link {
