@@ -206,7 +206,7 @@ export function TimelineNav({ marks, onJump, windowSize = NAV_WINDOW_WIDE, baseW
         const boost = expanded && active !== null ? navBoost(Math.abs(index - active)) : 0;
         const scale = boost ? (baseWidth + boost) / baseWidth : 1;
         const ordinal = ordinalBase + index + 1;
-        return <span key={mark.id} className="panel-nav-row">
+        return <span key={mark.id} className="panel-nav-row" onClick={(event) => { event.stopPropagation(); onJump(mark.id); }}>
           <i
             aria-hidden="true"
             className={`${navMarkClass(expanded, index === active)}${ordinal === marks.length ? ' is-latest' : ''}`}

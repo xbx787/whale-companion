@@ -34,4 +34,17 @@ describe('the rail’s ordinal ticks', () => {
     const labels = [...host.querySelectorAll('.panel-nav-count')].map((node) => node.textContent)
     expect(labels).toEqual(['10', '20', '30', '40'])
   })
+
+  it('jumps from the clicked tick even when no tick was hovered first', async () => {
+    const jumps: string[] = []
+    await act(async () => {
+      root.render(<TimelineNav marks={marks} onJump={(id) => jumps.push(id)} />)
+    })
+    const nav = host.querySelector<HTMLElement>('.panel-nav')!
+    await act(async () => { nav.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })) })
+    const row = host.querySelectorAll<HTMLElement>('.panel-nav-row')[3]
+    // 只点击、不先 hover：横杠本身要能直接响应。
+    await act(async () => { row.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+    expect(jumps.length).toBe(1)
+  })
 })
