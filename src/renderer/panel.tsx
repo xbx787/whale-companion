@@ -1711,6 +1711,9 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
   useEffect(() => { setHistoryEntries(INITIAL_HISTORY_ENTRIES) }, [snapshot?.conversationId]);
   // 主进程全量只发尾部一段；更早的历史按需拉回来，拼在这里。
   const [olderEntries, setOlderEntries] = useState<typeof timeline>([]);
+  // 跳转循环里要读到最新的已加载条数，state 在闭包里是旧值。
+  const olderCountRef = useRef(0);
+  olderCountRef.current = olderEntries.length;
   useEffect(() => { setOlderEntries([]) }, [snapshot?.conversationId]);
   const mergedTimeline = useMemo(
     () => olderEntries.length ? [...olderEntries, ...timeline] : timeline,
@@ -1761,7 +1764,9 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
   }
   const loadingOlderRef = useRef(false);
   async function loadOlderPage(): Promise<void> {
-    await loadOlderPageImpl({ conversationId: snapshot?.conversationId, total: snapshot?.timelineTotal, loaded: mergedTimeline.length, loadingRef: loadingOlderRef, onPage: (page) => setOlderEntries((previous) => [...page, ...previous]), pageSize: HISTORY_STEP_ENTRIES });
+    // loaded 必须读 ref：连续翻页时闭包里的 mergedTimeline 还是旧长度，
+    // 会用同一个 before 把同一页反复拉回来。
+    await loadOlderPageImpl({ conversationId: snapshot?.conversationId, total: snapshot?.timelineTotal, loaded: timeline.length + olderCountRef.current, loadingRef: loadingOlderRef, onPage: (page) => setOlderEntries((previous) => [...page, ...previous]), pageSize: HISTORY_STEP_ENTRIES });
   }
   /** The rail's click: scroll to a message, widening the rendered window to
    *  include it first when it lies in the folded history above. */
@@ -1780,7 +1785,21 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
     const fullIndex = allGroups.findIndex((group) => group.kind === 'turn'
       ? group.user.id === id || group.items.some((item) => item.id === id)
       : group.entry.id === id);
-    if (fullIndex < 0) return;
+    if (fullIndex < 0) {
+      // 目标还在没拉回来的更早历史里：一页页往回翻，等它进入已加载范围，
+      // pendingJump 会在它渲染出来后滚过去。
+      if (mergedTimeline.length >= (snapshot?.timelineTotal ?? 0)) return;
+      pendingJumpRef.current = id;
+      void (async () => {
+        for (let attempt = 0; attempt < 40; attempt += 1) {
+          if (feedRef.current?.querySelector(`[data-entry-id="${id}"]`)) return;
+          if (timeline.length + olderCountRef.current >= (snapshot?.timelineTotal ?? 0)) return;
+          await loadOlderPage();
+          await new Promise((resolve) => setTimeout(resolve, 120));
+        }
+      })();
+      return;
+    }
     const renderedGroups = timelineGroups.length;
     const missing = Math.max(0, allGroups.length - renderedGroups);
     if (fullIndex < missing) {
