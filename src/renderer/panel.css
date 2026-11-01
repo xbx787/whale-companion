@@ -32,13 +32,13 @@
 
 .panel-bubble:not([hidden]) { animation: panel-appear .19s cubic-bezier(.22, .75, .25, 1) both; }
 .panel-bubble[hidden] { display: none; }
-.panel-bubble.is-empty { right: 56px; width: 64px; height: 56px; border-radius: 21px; }
-.panel-bubble.is-empty.is-composing { right: 10px; width: min(332px, calc(100vw - 20px)); border-radius: 16px; }
+.panel-bubble.is-compact { right: 56px; width: 64px; height: 56px; border-radius: 21px; }
+.panel-bubble.is-compact.is-composing { right: 10px; width: min(332px, calc(100vw - 20px)); border-radius: 16px; }
 .panel-bubble.is-expanded { width: calc(100vw - 20px); height: calc(100vh - 200px); --panel-inline: calc(100vw - 20px); }
 /* 面板窗口本身就是一个贴合面板的矩形：窗口内只剩 7px 给小三角，面板填满。 */
 body.panel-window .panel-bubble,
-body.panel-window .panel-bubble.is-empty,
-body.panel-window .panel-bubble.is-empty.is-composing,
+body.panel-window .panel-bubble.is-compact,
+body.panel-window .panel-bubble.is-compact.is-composing,
 body.panel-window .panel-bubble.is-expanded {
   right: 0;
   bottom: 10px;
@@ -53,8 +53,8 @@ body.panel-window .panel-bubble.is-expanded {
 /* 人物在上半屏时面板向下展开：窗口顶边贴着人物底边，面板贴在窗口顶部，
    小三角移到面板上缘、指向人物。 */
 body.panel-direction-down .panel-bubble,
-body.panel-direction-down .panel-bubble.is-empty,
-body.panel-direction-down .panel-bubble.is-empty.is-composing,
+body.panel-direction-down .panel-bubble.is-compact,
+body.panel-direction-down .panel-bubble.is-compact.is-composing,
 body.panel-direction-down .panel-bubble.is-expanded {
   top: 8px;
   bottom: auto;
@@ -115,14 +115,14 @@ body.is-resizing-panel .panel-resize-grip::before {
 .panel-window-action:hover { color: #fff; background: rgba(178, 203, 251, .18); }
 .panel-window-close:hover { color: #fff; background: rgba(191, 88, 109, .35); }
 .panel-window-action svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-.panel-bubble.is-empty::after { right: calc(50% - 6.5px); }
-.panel-bubble.is-empty.is-composing::after { right: 74px; }
+.panel-bubble.is-compact::after { right: calc(50% - 6.5px); }
+.panel-bubble.is-compact.is-composing::after { right: 74px; }
 /* The wrap itself goes: hidden feed alone still held flex space and pushed
    the composer to the very bottom of the small bubble. */
-.panel-bubble.is-empty .panel-feed-wrap { display: none; }
-.panel-bubble.is-empty .panel-compose-dock { flex: 1; min-height: 0; align-items: center; justify-content: center; padding: 8px; }
-.panel-bubble.is-empty.is-composing .panel-compose-dock { padding: 40px 12px 10px; }
-.panel-bubble.is-empty .panel-workspace { border-radius: inherit; }
+.panel-bubble.is-compact .panel-feed-wrap { display: none; }
+.panel-bubble.is-compact .panel-compose-dock { flex: 1; min-height: 0; align-items: center; justify-content: center; padding: 8px; }
+.panel-bubble.is-compact.is-composing .panel-compose-dock { padding: 40px 12px 10px; }
+.panel-bubble.is-compact .panel-workspace { border-radius: inherit; }
 .panel-bubble::after {
   content: "";
   position: absolute;
@@ -240,7 +240,7 @@ body.panel-placement-right .panel-bubble::after { display: none; }
 .panel-task-dot-cancelled { background: #a9b5ce; }
 .panel-stop-square { width: 10px; height: 10px; border-radius: 2px; background: currentColor; }
 .panel-toast-stack { position: absolute; z-index: 20; left: 50%; top: 45px; transform: translateX(-50%); display: flex; flex-direction: column; gap: 6px; width: max-content; max-width: min(320px, calc(100vw - 24px)); pointer-events: none; }
-.panel-bubble.is-empty .panel-toast-stack { top: 8px; max-width: min(280px, calc(100vw - 90px)); }
+.panel-bubble.is-compact .panel-toast-stack { top: 8px; max-width: min(280px, calc(100vw - 90px)); }
 .panel-toast { pointer-events: auto; padding: 7px 11px; border-radius: 10px; font-size: var(--text-sm); line-height: 1.45; overflow-wrap: anywhere; box-shadow: 0 6px 20px rgba(0, 0, 0, .45); animation: toast-appear .18s cubic-bezier(.22, .75, .25, 1) both; }
 .panel-toast-error { color: #ffced3; background: linear-gradient(155deg, rgba(105, 32, 67, .97), rgba(76, 22, 50, .97)); border: 1px solid rgba(243, 167, 170, .45); }
 .panel-toast-voice { color: #ffe8c2; background: linear-gradient(155deg, rgba(110, 75, 20, .97), rgba(76, 52, 14, .97)); border: 1px solid rgba(255, 200, 130, .45); }
@@ -934,7 +934,7 @@ img.panel-markdown-image { display: block; max-width: 100%; margin: 6px 0; borde
   padding: 0;
 }
 .panel-compose-dock.is-open { min-height: 0; align-items: stretch; justify-content: stretch; padding: 8px 12px 10px; }
-.panel-bubble.is-empty.is-composing .panel-compose-dock.is-open { min-height: 0; padding: 40px 12px 10px; }
+.panel-bubble.is-compact.is-composing .panel-compose-dock.is-open { min-height: 0; padding: 40px 12px 10px; }
 .panel-compose-trigger { display: grid; place-items: center; width: 37px; height: 37px; border: 1px solid rgba(210, 228, 255, .88); border-radius: 50%; color: #fff; background: rgba(77, 113, 183, .97); }
 .panel-compose-trigger:hover { background: rgba(99, 136, 204, .96); transform: translateY(-1px); }
 .panel-compose-trigger svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }

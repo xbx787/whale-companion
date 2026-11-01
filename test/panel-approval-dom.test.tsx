@@ -68,7 +68,7 @@ describe('the approval-mode control', () => {
     await act(async () => {
       root.render(<PanelBubble visible snapshot={snapshot} error={null} run={async (action) => { await action(window.pet); return true }} />)
     })
-    await act(async () => { host.querySelector<HTMLElement>('.panel-compose-trigger')!.click() })
+    await act(async () => { host.querySelector<HTMLElement>('.panel-compose-trigger')?.click() })
     const trigger = host.querySelector<HTMLElement>('.panel-approval-button')!
     // Icon only: the mode lives in the aria-label/title, not as a word on the bar.
     expect(trigger.textContent).toBe('')
@@ -86,7 +86,7 @@ describe('the approval-mode control', () => {
     await act(async () => {
       root.render(<PanelBubble visible snapshot={snapshot} error={null} run={async (action) => { await action(window.pet); return true }} />)
     })
-    await act(async () => { host.querySelector<HTMLElement>('.panel-compose-trigger')!.click() })
+    await act(async () => { host.querySelector<HTMLElement>('.panel-compose-trigger')?.click() })
     await act(async () => { host.querySelector<HTMLElement>('.panel-approval-button')!.click() })
     const picks = [...host.querySelectorAll<HTMLElement>('.panel-approval-pick')]
     const readonly = picks.find((item) => item.textContent?.includes('手动审批'))!
@@ -99,7 +99,7 @@ describe('the approval-mode control', () => {
     await act(async () => {
       root.render(<PanelBubble visible snapshot={snapshot} error={null} run={async (action) => { await action(window.pet); return true }} />)
     })
-    await act(async () => { host.querySelector<HTMLElement>('.panel-compose-trigger')!.click() })
+    await act(async () => { host.querySelector<HTMLElement>('.panel-compose-trigger')?.click() })
     await act(async () => { host.querySelector<HTMLElement>('.panel-model-button')!.click() })
     const toggles = [...host.querySelectorAll<HTMLElement>('.panel-popover-modes .panel-mode-toggle')]
     expect(toggles.map((item) => item.querySelector('.panel-mode-toggle-main')?.textContent))
@@ -119,7 +119,7 @@ describe('the approval-mode control', () => {
     await act(async () => {
       root.render(<PanelBubble visible snapshot={strict} error={null} run={async (action) => { await action(window.pet); return true }} />)
     })
-    await act(async () => { host.querySelector<HTMLElement>('.panel-compose-trigger')!.click() })
+    await act(async () => { host.querySelector<HTMLElement>('.panel-compose-trigger')?.click() })
     await act(async () => { host.querySelector<HTMLElement>('.panel-approval-button')!.click() })
     const bypass = [...host.querySelectorAll<HTMLElement>('.panel-approval-pick')]
       .find((item) => item.textContent?.includes('完全访问'))!
@@ -138,7 +138,7 @@ describe('the approval-mode control', () => {
     await act(async () => {
       root.render(<PanelBubble visible snapshot={snapshot} error={null} run={async (action) => { await action(window.pet); return true }} />)
     })
-    await act(async () => { host.querySelector<HTMLElement>('.panel-compose-trigger')!.click() })
+    await act(async () => { host.querySelector<HTMLElement>('.panel-compose-trigger')?.click() })
     await act(async () => { host.querySelector<HTMLElement>('.panel-approval-button')!.click() })
     const bypass = [...host.querySelectorAll<HTMLElement>('.panel-approval-pick')]
       .find((item) => item.textContent?.includes('完全访问'))!
@@ -151,7 +151,7 @@ describe('the approval-mode control', () => {
     await act(async () => {
       root.render(<PanelBubble visible snapshot={snapshot} error={null} run={async (action) => { await action(window.pet); return true }} />)
     })
-    await act(async () => { host.querySelector<HTMLElement>('.panel-compose-trigger')!.click() })
+    await act(async () => { host.querySelector<HTMLElement>('.panel-compose-trigger')?.click() })
     await act(async () => { host.querySelector<HTMLElement>('.panel-approval-button')!.click() })
     const evolve = [...host.querySelectorAll<HTMLElement>('.panel-approval-pick')]
       .find((item) => item.textContent?.includes('自我进化'))!

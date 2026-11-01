@@ -7,6 +7,15 @@ import { PanelBubble } from '../src/renderer/panel'
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
+// 输入框始终展开后，输入区的高度测量会用到 ResizeObserver；jsdom 没有实现。
+if (!('ResizeObserver' in globalThis)) {
+  (globalThis as { ResizeObserver?: unknown }).ResizeObserver = class {
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+  }
+}
+
 /** The panel with nothing to show: a bubble that still has conversations folds
  *  into the little ball, but once the last one is closed the full panel stays —
  *  the ball has no tab strip and no room for the "+", and starting a fresh
@@ -75,8 +84,10 @@ describe('the empty panel with no conversations left', () => {
     expect(host.querySelectorAll('.panel-quick-tab[data-tab-id]')).toHaveLength(0)
   })
 
-  it('still folds into the ball when an empty conversation exists', async () => {
+  it('keeps the full composer instead of folding into a ball', async () => {
     await mount(snapshotWith([summary('a', null)], 'a'))
-    expect(host.querySelector('.panel-bubble')!.className).toContain('is-empty')
+    const bubble = host.querySelector('.panel-bubble')!
+    expect(bubble.className).not.toContain('is-empty')
+    expect(host.querySelector('.panel-composer')).toBeTruthy()
   })
 })

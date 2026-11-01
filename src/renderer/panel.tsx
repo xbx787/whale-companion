@@ -254,10 +254,12 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
   const [busy, setBusy] = useState<'approve' | 'reject' | 'stop' | null>(null);
   const [sendingConversationIds, setSendingConversationIds] = useState<Set<string | null>>(() => new Set());
   const composerExit = useExitAnimation(150);
-  const [composerOpen, setComposerOpenRaw] = useState(false);
+  const [composerOpen, setComposerOpenRaw] = useState(true);
   const composerOpenByConversation = useRef<Map<string, boolean>>(readComposerOpenPrefs());
   const [autoCompactPreview, setAutoCompactPreview] = useState<number | null>(null);
   function setComposerOpen(open: boolean) {
+    // 不再有收起形态：紧凑面板永远保持完整输入框，收起请求一律忽略。
+    open = true;
     if (!open) composerExit.beginClose();
     if (destinationRef.current === 'side') {
       const id = sideChatRef.current?.sessionId;
@@ -403,9 +405,9 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
         setCaretIndex(restored.draft.length);
         const goalDraftOpen = Boolean(nextId && goalPromptStash.current.get(nextId));
         setGoalPrompting(goalDraftOpen);
-        const rememberedOpen = nextId ? composerOpenByConversation.current.get(nextId) : undefined;
-        mainComposerOpenRef.current = rememberedOpen ?? Boolean(restored.draft || restored.attachments.length || goalDraftOpen);
-        setComposerOpenRaw(mainComposerOpenRef.current);
+        // 紧凑面板没有收起形态，切换会话也始终展开输入框。
+        mainComposerOpenRef.current = true;
+        setComposerOpenRaw(true);
         // 切到正在思考或运行的会话时，直接落到最新一条。
         const targetRunning = nextId
           ? library?.conversations.find((item) => item.id === nextId)?.taskStatus !== 'idle'
@@ -464,8 +466,7 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
       setModelPickerOpen(false);
       setContextMenuOpen(false);
       setGoalPrompting(nextDestination === 'main' && Boolean(goalPromptStash.current.get(activeConversationIdRef.current ?? '')));
-      setComposerOpenRaw(nextDestination === 'side'
-        ? sideComposerOpenRef.current.get(next.sessionId!) ?? true : mainComposerOpenRef.current);
+      setComposerOpenRaw(true);
       destinationRef.current = nextDestination;
     }
     setSideChat(next);
@@ -1678,7 +1679,8 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
   // 一个会话都没有时仍然回到 full（那里要露出新建按钮）。
   const compactEmpty = empty && !sideSessionId && !expanded && !modelPickerOpen && !suggestionOpen &&
     (!snapshot || recentSessions.length > 0);
-  const layout: BubbleLayout = !compactEmpty ? 'full' : !composerOpen ? 'empty' : attachments.length ? 'composer_attachments' : 'composer';
+  // 不再有 empty 布局：紧凑态永远是完整的输入框小窗，不会再缩成一个按钮。
+  const layout: BubbleLayout = !compactEmpty ? 'full' : attachments.length ? 'composer_attachments' : 'composer';
   // 首帧测量常常偏小（字体还没落位），底部那排按钮会被窗口裁掉一截；
   // 留几像素余量，宁可窗口略高也不要切到控件。
   const compactComposerHeight = Math.max(120, (composeDockHeight || (112 + composerHeight + (attachments.length ? 26 : 0))) + 6);
@@ -2017,7 +2019,7 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
   const approvalMode = normalizeApprovalMode(snapshot?.approvalMode);
 
   return (
-    <section className={`panel-bubble${compactEmpty ? ' is-empty' : ''}${expanded ? ' is-expanded' : ''}${sideExpanded ? ' is-side-chat' : ''}${composerOpen || composerExit.closing || ask || plan ? ' is-composing' : ''}${attachments.length ? ' has-attachments' : ''}${modelPickerOpen ? ' is-choosing-model' : ''}`} style={compactEmpty && (composerOpen || composerExit.closing) ? { height: compactComposerHeight } : undefined} aria-label="交互气泡" hidden={!visible} onPointerDown={beginWindowDrag} onDragOver={(event) => { if (event.dataTransfer.types.includes('files')) event.preventDefault(); }} onDrop={(event) => {
+    <section className={`panel-bubble${compactEmpty ? ' is-compact' : ''}${expanded ? ' is-expanded' : ''}${sideExpanded ? ' is-side-chat' : ''}${composerOpen || composerExit.closing || ask || plan ? ' is-composing' : ''}${attachments.length ? ' has-attachments' : ''}${modelPickerOpen ? ' is-choosing-model' : ''}`} style={compactEmpty && (composerOpen || composerExit.closing) ? { height: compactComposerHeight } : undefined} aria-label="交互气泡" hidden={!visible} onPointerDown={beginWindowDrag} onDragOver={(event) => { if (event.dataTransfer.types.includes('files')) event.preventDefault(); }} onDrop={(event) => {
       if (!event.dataTransfer.files?.length) return;
       event.preventDefault();
       if (libraryOpen) return;

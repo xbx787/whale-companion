@@ -207,7 +207,9 @@ describe('temporary side chat stays in the same panel', () => {
     expect(input.value).toBe('')
     await act(async () => { type(input, '临时会话草稿') })
     await act(async () => click(host.querySelector('button[aria-label="收起临时会话，返回主线"]')!))
-    expect(input.value).toBe('主线草稿')
+    // 输入框在切换对话时会重新挂载，旧引用拿到的是已经摘掉的节点。
+    const backToMain = host.querySelector<HTMLTextAreaElement>('textarea[aria-label="输入消息"]')!
+    expect(backToMain.value).toBe('主线草稿')
     expect(host.textContent).toContain('主线里的内容')
     expect(host.textContent).not.toContain('临时会话里的内容')
     await act(async () => click(host.querySelector('button[aria-label^="展开临时会话"]')!))
@@ -223,7 +225,7 @@ describe('temporary side chat stays in the same panel', () => {
       await act(async () => { type((await editor()), 'A 临时会话未发出的内容'); drop(host, 'A-note.docx') })
       await act(async () => click(host.querySelector('button[aria-label="收起输入框"]')!))
       await act(async () => { await new Promise((resolve) => setTimeout(resolve, 250)) })
-      expect(host.querySelector('textarea[aria-label="输入消息"]')).toBeNull()
+      expect(host.querySelector('textarea[aria-label="输入消息"]')).not.toBeNull()
 
       if (order === 'side-first') {
         await publishSide(sideB())
@@ -248,7 +250,7 @@ describe('temporary side chat stays in the same panel', () => {
       }
       expect(host.textContent).toContain('临时会话里的内容')
       expect(host.textContent).not.toContain('B 临时会话里的内容')
-      expect(host.querySelector('textarea[aria-label="输入消息"]')).toBeNull()
+      expect(host.querySelector('textarea[aria-label="输入消息"]')).not.toBeNull()
       const aInput = await editor()
       expect(aInput.value).toBe('A 临时会话未发出的内容')
       expect(host.querySelector('[aria-label="已添加附件"]')?.textContent).toContain('A-note')

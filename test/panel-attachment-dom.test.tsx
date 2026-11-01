@@ -63,7 +63,7 @@ describe('附件选择入口', () => {
     await act(async () => {
       root.render(<PanelBubble visible snapshot={snapshot} error={null} run={async (action) => { await action(window.pet); return true }} />)
     })
-    await act(async () => { host.querySelector<HTMLElement>('.panel-compose-trigger')!.click() })
+    await act(async () => { host.querySelector<HTMLElement>('.panel-compose-trigger')?.click() })
     const button = host.querySelector<HTMLButtonElement>('.panel-attachment-button')
     const input = host.querySelector<HTMLInputElement>('.panel-attachment-input')
     expect(button?.getAttribute('aria-label')).toBe('添加附件')

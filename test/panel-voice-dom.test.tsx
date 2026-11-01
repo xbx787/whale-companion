@@ -65,7 +65,7 @@ describe('panel voice button', () => {
   async function openComposer(): Promise<void> {
     await act(async () => root.render(<PanelBubble visible snapshot={snapshot} error={null}
       run={async (action) => { await action(bridge); return true }} />))
-    await act(async () => host.querySelector<HTMLElement>('.panel-compose-trigger')!.click())
+    await act(async () => host.querySelector<HTMLElement>('.panel-compose-trigger')?.click())
     await act(async () => { await Promise.resolve() })
   }
 

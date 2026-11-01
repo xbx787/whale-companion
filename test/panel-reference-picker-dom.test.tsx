@@ -84,7 +84,7 @@ describe('Claudian style composer discovery', () => {
   it('shows $ skills separately and offers files, folders and completed sessions for @', async () => {
     await act(async () => root.render(<PanelBubble visible snapshot={snapshot} error={null}
       run={async (action) => { await action(bridge); return true }} />))
-    await act(async () => host.querySelector<HTMLElement>('.panel-compose-trigger')!.click())
+    await act(async () => host.querySelector<HTMLElement>('.panel-compose-trigger')?.click())
 
     await type('$')
     expect([...host.querySelectorAll('.panel-suggestion-item')].map((item) => item.textContent)).toEqual(['$review技能，用户，代码审查'])
@@ -104,7 +104,7 @@ describe('Claudian style composer discovery', () => {
   it('completes the highlighted suggestion with Tab instead of moving focus', async () => {
     await act(async () => root.render(<PanelBubble visible snapshot={snapshot} error={null}
       run={async (action) => { await action(bridge); return true }} />))
-    await act(async () => host.querySelector<HTMLElement>('.panel-compose-trigger')!.click())
+    await act(async () => host.querySelector<HTMLElement>('.panel-compose-trigger')?.click())
 
     const editor = await type('/comp')
     expect([...host.querySelectorAll('.panel-suggestion-item')].map((item) => item.textContent)).toEqual(['/compact命令，内置，压缩对话'])
