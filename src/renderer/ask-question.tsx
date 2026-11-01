@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { AskAnswers, AskQuestion, AskQuestionRequest } from '../shared/contracts'
+import { MessageMarkdown } from './message-markdown'
 
 /** Picked labels × free text, one entry per answered question — the exact shape
  *  the CLI reads back from updatedInput.answers. Free text wins a single-choice
@@ -116,7 +117,7 @@ export function AskQuestionPanel({ request, onSubmit, onSkip }: {
       </div>
     </section> : <section className="panel-ask-block">
       {question.header && <span className="panel-ask-header">{question.header}</span>}
-      <p className="panel-ask-text">{question.question}</p>
+      <div className="panel-ask-text"><MessageMarkdown text={question.question} /></div>
       <div className="panel-ask-options" role={question.multiSelect ? 'group' : 'radiogroup'} aria-label={question.question}>
         {question.options.map((option) => {
           const active = chosen.includes(option.label)

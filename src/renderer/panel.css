@@ -865,6 +865,7 @@ body.panel-placement-right .panel-bubble::after { display: none; }
 .panel-markdown .katex-display > .katex { min-width: max-content; }
 .panel-markdown input[type="checkbox"] { pointer-events: none; }
 .panel-markdown-image { color: #a9bee7; font-style: italic; }
+img.panel-markdown-image { display: block; max-width: 100%; margin: 6px 0; border-radius: 8px; color: inherit; font-style: normal; }
 
 .panel-approval {
   margin: 15px 0 5px 37px;

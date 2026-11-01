@@ -854,6 +854,7 @@ body.panel-theme-light .panel-markdown .katex-display{ max-width: 100%; margin: 
 body.panel-theme-light .panel-markdown .katex-display > .katex{ min-width: max-content; }
 body.panel-theme-light .panel-markdown input[type="checkbox"]{ pointer-events: none; }
 body.panel-theme-light .panel-markdown-image{ color: #182d56; font-style: italic; }
+body.panel-theme-light img.panel-markdown-image{ display: block; max-width: 100%; margin: 6px 0; border-radius: 8px; color: inherit; font-style: normal; }
 
 body.panel-theme-light .panel-approval{
   margin: 15px 0 5px 37px;

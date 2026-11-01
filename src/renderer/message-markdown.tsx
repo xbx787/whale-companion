@@ -17,6 +17,16 @@ function safeMarkdownUrl(value: string): string {
   }
 }
 
+/** 只放行本地图片：绝对路径、file:// 或项目内的相对路径；远程地址一律不加载。 */
+function localImageUrl(value: string): string {
+  if (!value) return '';
+  if (value.startsWith('file://')) return value;
+  if (/^[a-zA-Z]:[\\/]/.test(value)) return `file:///${value.replace(/\\/g, '/')}`;
+  if (value.startsWith('/')) return `file://${value}`;
+  if (/^\.{0,2}\//.test(value)) return value;
+  return '';
+}
+
 function nodeText(node: ReactNode): string {
   if (typeof node === 'string' || typeof node === 'number') return String(node);
   if (Array.isArray(node)) return node.map(nodeText).join('');
@@ -67,7 +77,12 @@ function CopyCodeButton({ text }: { text: string }) {
 
 const components: Components = {
   // Message text should never trigger a remote image request.
-  img: ({ alt }) => <span className="panel-markdown-image">{alt ? `[图片：${alt}]` : '[图片]'}</span>,
+  img: ({ alt, src }) => {
+    const local = localImageUrl(typeof src === 'string' ? src : '');
+    return local
+      ? <img className="panel-markdown-image" src={local} alt={alt ?? ''} loading="lazy" />
+      : <span className="panel-markdown-image">{alt ? `[图片：${alt}]` : '[图片]'}</span>;
+  },
   a: ({ href, children }) => href
     ? <a href={href} title={href} onClick={(event) => {
         event.preventDefault();
