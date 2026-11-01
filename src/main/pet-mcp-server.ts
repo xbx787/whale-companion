@@ -12,6 +12,7 @@
  *  with `mcp__pet__`.
  */
 import { randomBytes } from 'node:crypto'
+import { readFeatureFlags } from './feature-flags'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import type { ConversationBridge } from './conversation-tools'
 import type { EvolveBridge } from './evolve-tools'
@@ -214,7 +215,7 @@ export class PetMcpBridge {
   webSearchEnabled = true
   readonly token = randomBytes(24).toString('hex')
 
-  constructor(private readonly deepseekApiKey?: string) {
+  constructor(private readonly deepseekApiKey?: string, private readonly dataRoot?: string) {
     this.deepseekKey = deepseekApiKey?.trim() || undefined
   }
 
@@ -535,7 +536,8 @@ export class PetMcpBridge {
       // 一分钟窗口内每个发送方最多 10 条；双方各自受限，合计就是 20 条（10 轮）。
       const now = Date.now()
       const recent = (this.sendHistory.get(target) ?? []).filter((time) => now - time < 60_000)
-      if (recent.length >= 10) {
+      const limit = readFeatureFlags(this.dataRoot).sessionSendLimit
+      if (limit > 0 && recent.length >= limit) {
         this.sendHistory.set(target, recent)
         return fail('达到限额：一分钟内与该对话已互发 20 条（10 轮），请稍后再试。')
       }

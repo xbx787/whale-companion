@@ -557,7 +557,7 @@ body.panel-placement-right .panel-bubble::after { display: none; }
 .panel-thought.is-streaming .panel-thought-icon, .panel-tool-activity.is-running .panel-tool-icon { stroke: #f0c47b; }
 .panel-thought-label { color: #cddcf8; font-weight: 400; }
 .panel-thought-label.panel-live-label { font-weight: 700; }
-.panel-thought-time { color: #9fb7df; font-variant-numeric: tabular-nums; }
+.panel-thought-time { flex: none; min-width: 34px; color: #9fb7df; font-variant-numeric: tabular-nums; text-align: right; }
 .panel-thought-state { margin-left: auto; flex: none; color: #9bd8ad; font-size: var(--glyph-sm); line-height: 1; }
 .panel-thought-state.is-running { color: #f0c47b; opacity: calc(1 - .5 * var(--panel-pulse-p, 0)); transform: scale(calc(1 - .15 * var(--panel-pulse-p, 0))); }
 /* The opened thought body lines up under the "已思考" label — icon 14 px plus
@@ -681,7 +681,7 @@ body.panel-placement-right .panel-bubble::after { display: none; }
 /* What the call acts on, dimmed next to the name; the row expands to the result only. */
 .panel-tool-argument { flex: 1; min-width: 0; overflow: hidden; color: #8199c2; font: var(--text-sm)/1.4 var(--font-mono); text-overflow: ellipsis; white-space: nowrap; }
 /* 时间不参与收缩：description 先被截，耗时永远完整。 */
-.panel-tool-time { flex: none; color: #8fa6cf; font-size: var(--text-2xs); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.panel-tool-time { flex: none; min-width: 34px; color: #8fa6cf; font-size: var(--text-2xs); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 /* Added and removed lines for the file-writing tools, GitHub style. */
 .panel-tool-diff { display: flex; flex: none; gap: 6px; font: var(--text-sm)/1.4 var(--font-mono); font-variant-numeric: tabular-nums; }
 .panel-tool-diff-add { color: #86d9a0; }

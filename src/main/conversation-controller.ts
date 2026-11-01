@@ -111,8 +111,6 @@ export class ConversationController {
   private readonly drainGenerations = new Map<string, number>()
   /** Explicit stop and goal budget pauses retain the pending queue on disk. */
   private readonly pausedQueues = new Map<string, string>()
-  /** Timestamps of recent cross-conversation sends, keyed source→target. */
-  private readonly crossSends = new Map<string, number[]>()
   /** A displayed conversation without a runtime is served from this record. */
   private displayedRecord: ConversationRecord | null = null
   /** The last goal key written per conversation (see persistGoalChange). */
@@ -1548,12 +1546,7 @@ export class ConversationController {
     if (destination.archivedAt !== null) throw new ConversationStoreError('ARCHIVED_CONVERSATION', '目标对话已归档，请先恢复。')
     const sourceId = sourceConversationId ?? this.activeId ?? undefined
     if (sourceId === destination.id) throw new ConversationStoreError('INVALID_INPUT', '不能给当前对话自己发消息。')
-    const key = `${sourceId ?? '-'}>${destination.id}`
-    const now = Date.now()
-    const recent = (this.crossSends.get(key) ?? []).filter((at) => now - at < 60_000)
-    if (recent.length >= 3) throw new ConversationStoreError('INVALID_INPUT', '转达太频繁，请稍后再试。')
-    recent.push(now)
-    this.crossSends.set(key, recent)
+    // 转达限流已按主人要求解除：不再按每分钟 3 条拦截。
     const source = sourceId ? library.conversations.find((item) => item.id === sourceId) : undefined
     const body = source ? `【来自对话「${source.title}」】\n${clean}` : clean
     await this.sendMessage(body, [], 'queue', destination.id)

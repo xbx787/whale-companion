@@ -547,7 +547,7 @@ body.panel-theme-light .panel-tool-icon{ stroke: #153970; }
 body.panel-theme-light .panel-thought.is-streaming .panel-thought-icon, body.panel-theme-light .panel-tool-activity.is-running .panel-tool-icon{ stroke: #f0c47b; }
 body.panel-theme-light .panel-thought-label{ color: #071632; font-weight: 400; }
 body.panel-theme-light .panel-thought-label.panel-live-label{ font-weight: 700; }
-body.panel-theme-light .panel-thought-time{ color: #203860; font-variant-numeric: tabular-nums; }
+body.panel-theme-light .panel-thought-time{ flex: none; min-width: 34px; color: #203860; font-variant-numeric: tabular-nums; text-align: right; }
 body.panel-theme-light .panel-thought-state{ margin-left: auto; flex: none; color: #276439; font-size: var(--glyph-sm); line-height: 1; }
 body.panel-theme-light .panel-thought-state.is-running{ color: #f0c47b; opacity: calc(1 - .5 * var(--panel-pulse-p, 0)); transform: scale(calc(1 - .15 * var(--panel-pulse-p, 0))); }
 /* The opened thought body lines up under the "已思考" label — icon 14 px plus
@@ -671,7 +671,7 @@ body.panel-theme-light .panel-tool-activity summary code.panel-live-label{ font-
 /* What the call acts on, dimmed next to the name; the row expands to the result only. */
 body.panel-theme-light .panel-tool-argument{ flex: 1; min-width: 0; overflow: hidden; color: #3d557e; font: var(--text-sm)/1.4 var(--font-mono); text-overflow: ellipsis; white-space: nowrap; }
 /* 时间不参与收缩：description 先被截，耗时永远完整。 */
-body.panel-theme-light .panel-tool-time{ flex: none; color: #304770; font-size: var(--text-2xs); font-variant-numeric: tabular-nums; white-space: nowrap; }
+body.panel-theme-light .panel-tool-time{ flex: none; min-width: 34px; color: #304770; font-size: var(--text-2xs); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 /* Added and removed lines for the file-writing tools, GitHub style. */
 body.panel-theme-light .panel-tool-diff{ display: flex; flex: none; gap: 6px; font: var(--text-sm)/1.4 var(--font-mono); font-variant-numeric: tabular-nums; }
 body.panel-theme-light .panel-tool-diff-add{ color: #267940; }

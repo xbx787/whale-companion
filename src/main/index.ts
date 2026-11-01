@@ -17,6 +17,7 @@ import { setPersonaDirectory } from './persona'
 import { seedMemoryDocument } from './memory-document'
 import { BUBBLE_BOTTOM, computeStageBounds, STAGE_HEIGHT, STAGE_WIDTH, TRIANGLE_ROOM } from './stage-bounds'
 import { runSelfTest } from './self-test'
+import { readFeatureFlags } from './feature-flags'
 import { startInputActivity, stopInputActivity } from './input-activity'
 import { EvolveStore } from './evolve-store'
 import type { EvolveBridge } from './evolve-tools'
@@ -766,7 +767,7 @@ const createRuntime = (conversationId: string, onChange: () => void, persistSess
   const key = deepseekKey ?? apiKey ?? ''
   const dshModel = useDshKernel() && dshBin
     ? (() => {
-      const bridge = new PetMcpBridge(key)
+      const bridge = new PetMcpBridge(key, dataRoot)
       // 打包/重启这类请示走角色旁的小批准卡，绿勾批准、红叉拒绝。
       bridge.setApprovalBridge({ request: (title, detail) => requestApproval(title, detail) })
       // 宿主侧提问卡：和内核提问共用面板上的同一张卡片，用来批准计划或选择方案。
@@ -1349,8 +1350,10 @@ async function resumeEvolveTask(): Promise<void> {
     if (next) {
       evolveStore.updateStep(next.id, { status: 'done' })
       // 重启后只发一条普通消息：prompt 原文。不拼「已重启，继续执行目标」，
-      // 也不走目标模式；自检就是这一条消息，模型收到后直接去查结果。
-      await controller?.sendMessage(next.text, [], 'queue', id)
+      // 也不走目标模式；是否自动发由 data/features.json 的 restartAutoSend 控制。
+      if (readFeatureFlags(dataRoot).restartAutoSend) {
+        await controller?.sendMessage(next.text, [], 'queue', id)
+      }
     }
     // 不再自动恢复 /goal：目标模式由主人自己开，重启只负责把待办消息发出来。
     if (!notes.length && !next && !refreshed.goalCondition) {
