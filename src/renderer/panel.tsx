@@ -1777,42 +1777,21 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
       target.scrollIntoView({ block: 'start' });
       return;
     }
-    // 刻度按全量对话生成，目标可能还没渲染：先用全量分组定位，再折算
-    // 需要多展开多少组，交给 pendingJump 的 effect 滚过去。
-    // 刻度是按合并后的完整时间线画的，这里也必须用同一份去找位置，
-    // 否则落在更早分页里的那条永远算不出索引，点击等于没反应。
-    const allGroups = groupTimeline(mergedTimeline, liveTurnStartMs);
-    const fullIndex = allGroups.findIndex((group) => group.kind === 'turn'
-      ? group.user.id === id || group.items.some((item) => item.id === id)
-      : group.entry.id === id);
-    if (fullIndex < 0) {
-      // 目标还在没拉回来的更早历史里。直接调分页接口容易拿到空页而空转，
-      // 改成滚到顶去触发那条已经在用的「滚到顶就加载」路径，加载一层再
-      // 滚回顶部，直到目标被渲染出来，pendingJump 会把它滚进视野。
-      pendingJumpRef.current = id;
-      followFeedRef.current = false;
-      if (feedRef.current) feedRef.current.scrollTop = 0;
-      void (async () => {
-        for (let attempt = 0; attempt < 40; attempt += 1) {
-          await new Promise((resolve) => setTimeout(resolve, 200));
-          if (feedRef.current?.querySelector(`[data-entry-id="${id}"]`)) return;
-          if (feedRef.current && feedRef.current.scrollTop > 0) feedRef.current.scrollTop = 0;
-        }
-      })();
-      return;
-    }
-    const renderedGroups = timelineGroups.length;
-    const missing = Math.max(0, allGroups.length - renderedGroups);
-    if (fullIndex < missing) {
-      pendingJumpRef.current = id;
-      setEarlierGroups((count) => count + (missing - fullIndex));
-      return;
-    }
-    const groupIndex = fullIndex - missing;
-    const visibleStart = renderedGroups - visibleGroups.length;
-    if (groupIndex >= visibleStart) return; // Rendered but somehow not found; leave it be.
+    // 目标还没渲染：可能是被折叠了，也可能是更早的一页还没拉回来。
+    // 不再赌某一条路径，边展开渲染窗口边按页往回收，直到目标出现，
+    // 再由 pendingJump 的 effect 把它滚进视野。
     pendingJumpRef.current = id;
-    setEarlierGroups((count) => count + (visibleStart - groupIndex));
+    followFeedRef.current = false;
+    let tries = 0;
+    const step = (): void => {
+      if (feedRef.current?.querySelector(`[data-entry-id="${id}"]`)) return;
+      if (tries >= 40) return;
+      tries += 1;
+      setEarlierGroups((count) => count + 20);
+      void loadOlderPage();
+      window.setTimeout(step, 150);
+    };
+    step();
   }
   let latestTurnIndex = -1;
   for (let index = visibleGroups.length - 1; index >= 0; index--) {
