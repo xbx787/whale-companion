@@ -30,7 +30,19 @@ const icons = {
   archive: ['material-symbols/archive', 'ph/archive-fill'],
   attach: ['material-symbols/attach-file', 'ph/paperclip-fill'],
   mic: ['material-symbols/mic', 'ph/microphone-fill'],
-  panel: ['material-symbols/right-panel-open', 'ph/sidebar-simple-fill']
+  panel: ['material-symbols/right-panel-open', 'ph/sidebar-simple-fill'],
+  target: ['material-symbols/target', 'ph/target-fill'],
+  checklist: ['material-symbols/checklist', 'ph/list-checks-fill'],
+  language: ['material-symbols/language', 'ph/globe-fill'],
+  dragIndicator: ['material-symbols/drag-indicator', 'ph/dots-six-vertical-fill'],
+  keyboardReturn: ['material-symbols/keyboard-return', 'ph/arrow-elbow-down-left-fill'],
+  tune: ['material-symbols/tune', 'ph/sliders-fill'],
+  checkBox: ['material-symbols/check-box', 'ph/check-square-fill'],
+  download: ['material-symbols/download', 'ph/download-fill'],
+  upload: ['material-symbols/upload', 'ph/upload-fill'],
+  panTool: ['material-symbols/pan-tool', 'ph/hand-fill'],
+  verifiedUser: ['material-symbols/verified-user', 'ph/shield-check-fill'],
+  hexagon: ['material-symbols/hexagon', 'ph/hexagon-fill']
 }
 
 const base = 'https://api.iconify.design'
