@@ -1562,8 +1562,6 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
       rememberVisibleSide();
       activeConversationIdRef.current = item.id;
       destinationRef.current = 'main';
-      // 切到目标对话时恢复它自己保存的输入框展开状态，不再永远回到收起。
-      setComposerOpenRaw(composerOpenByConversation.current.get(item.id) ?? false);
       sideChatRef.current = null;
       setSideChat(null);
       setLibraryOpen(false);
@@ -1578,7 +1576,7 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
         setAttachments(saved.attachments);
         setCaretIndex(saved.draft.length);
         setAttachmentError(saved.attachments.length > 5 ? '已保留全部附件；一次最多发送 5 个，请先移除多余附件。' : null);
-        setComposerOpen(Boolean(saved.draft || saved.attachments.length || goalDraftOpen));
+        setComposerOpenRaw(composerOpenByConversation.current.get(item.id) ?? Boolean(saved.draft || saved.attachments.length || goalDraftOpen));
         const targetSide = sideSnapshots.current.get(item.id);
         if (targetSide) applySideSnapshotRef.current(targetSide);
         return;
@@ -1590,7 +1588,7 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
       setAttachments([]);
       setCaretIndex(0);
       setAttachmentError(null);
-      setComposerOpen(goalDraftOpen);
+      setComposerOpenRaw(composerOpenByConversation.current.get(item.id) ?? goalDraftOpen);
       let bridge: PetAPI;
       try { bridge = petBridge(); } catch { return; }
       void bridge.getDraft(item.id).then((text) => {
