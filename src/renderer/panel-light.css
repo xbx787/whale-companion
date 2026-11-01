@@ -1202,6 +1202,8 @@ body.panel-theme-light .panel-attachments{ display: flex; flex: none; gap: 5px; 
 body.panel-theme-light .panel-attachments::-webkit-scrollbar{ display: none; }
 body.panel-theme-light .panel-attachment-chip{ display: inline-flex; align-items: center; gap: 4px; max-width: 160px; min-height: 20px; padding: 0 4px 0 7px; border: 1px solid rgba(2, 25, 65, 0.18); border-radius: 7px; color: #000b23; background: rgba(16, 51, 114, 0.12); font-size: var(--text-xs); }
 body.panel-theme-light .panel-attachment-chip i{ flex: none; color: #2b426c; font-size: var(--text-2xs); font-style: normal; letter-spacing: .06em; }
+/* 图片附件直接在输入区显示缩略图，不再只给文件名。 */
+body.panel-theme-light .panel-attachment-thumb{ flex: none; width: 24px; height: 24px; object-fit: cover; border-radius: 5px; display: block; }
 body.panel-theme-light .panel-attachment-chip span{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 body.panel-theme-light .panel-attachment-chip button{ display: grid; place-items: center; width: 16px; height: 16px; padding: 0; border: 0; border-radius: 5px; color: #0b1b3b; background: transparent; font-size: var(--glyph-sm); line-height: 1; }
 body.panel-theme-light .panel-attachment-error{ flex: none; overflow: hidden; color: #390e11; font-size: var(--text-xs); line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }

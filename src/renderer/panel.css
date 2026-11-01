@@ -1218,6 +1218,8 @@ img.panel-markdown-image { display: block; max-width: 100%; margin: 6px 0; borde
 .panel-attachments::-webkit-scrollbar { display: none; }
 .panel-attachment-chip { display: inline-flex; align-items: center; gap: 4px; max-width: 160px; min-height: 20px; padding: 0 4px 0 7px; border: 1px solid rgba(190, 213, 253, .18); border-radius: 7px; color: #dce7ff; background: rgba(141, 176, 239, .12); font-size: var(--text-xs); }
 .panel-attachment-chip i { flex: none; color: #93aad4; font-size: var(--text-2xs); font-style: normal; letter-spacing: .06em; }
+/* 图片附件直接在输入区显示缩略图，不再只给文件名。 */
+.panel-attachment-thumb { flex: none; width: 24px; height: 24px; object-fit: cover; border-radius: 5px; display: block; }
 .panel-attachment-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .panel-attachment-chip button { display: grid; place-items: center; width: 16px; height: 16px; padding: 0; border: 0; border-radius: 5px; color: #c4d4f4; background: transparent; font-size: var(--glyph-sm); line-height: 1; }
 .panel-attachment-error { flex: none; overflow: hidden; color: #f1c6c9; font-size: var(--text-xs); line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
