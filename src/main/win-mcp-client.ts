@@ -14,6 +14,9 @@ export interface WinToolDefinition {
   inputSchema: Record<string, unknown>
 }
 
+/** windows-mcp 里不转给模型的工具（名称小写后比对）。 */
+const HIDDEN_TOOLS = new Set(['wait'])
+
 interface Pending {
   resolve: (value: unknown) => void
   reject: (error: Error) => void
@@ -75,6 +78,8 @@ export class WinMcpClient {
       const record = item && typeof item === 'object' ? item as Record<string, unknown> : {}
       const name = typeof record.name === 'string' ? record.name : ''
       if (!name) return []
+      // 不对外暴露等待工具：等多久由调用方自己决定，不在桌面工具里多一个空转入口。
+      if (HIDDEN_TOOLS.has(name.toLowerCase())) return []
       return [{
         name,
         description: typeof record.description === 'string' ? record.description : '',
