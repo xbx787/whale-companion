@@ -1250,7 +1250,9 @@ img.panel-markdown-image { display: block; max-width: 100%; margin: 6px 0; borde
 .panel-event-sender { display: inline-flex; align-items: center; margin: 0 0 3px; padding: 1px 6px; border-radius: 5px; color: #f0c68c; background: rgba(240, 196, 123, .12); font-size: var(--text-2xs); line-height: 1.4; }
 
 /* 跨端/内部转发：来源框 → 目标框，两个圆角矩形各用一种色。 */
-.panel-event-route { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 0 0 6px; max-width: 100%; }
+.panel-event-route { position: relative; display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 10px 0 0 2px; padding-left: 16px; max-width: 100%; }
+/* 从正文左下角弯到色块的四分之一圆弧。 */
+.panel-event-route::before { content: ""; position: absolute; left: 0; top: -9px; width: 13px; height: 13px; border-left: 1px solid rgba(169, 198, 247, .45); border-bottom-left-radius: 13px; }
 .route-box { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 9px; font-size: var(--text-md); line-height: 1.45; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .route-box.is-pc { color: #f2a560; background: rgba(242, 165, 96, .2); }
 .route-box.is-pc-target { color: #e57a9f; background: rgba(229, 122, 159, .2); }
