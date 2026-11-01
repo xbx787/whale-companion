@@ -60,6 +60,10 @@ function messageImages(attachments: readonly UserAttachment[]): Array<{ name: st
   return images.length ? images : undefined
 }
 
+/** 错误提示在面板上的上限与存活时间：最多 5 条，最多 20 秒。 */
+const ERROR_NOTICE_LIMIT = 5
+const ERROR_NOTICE_TTL_MS = 20_000
+
 /** Deletes one turn from a timeline and the history that mirrors it — the
  *  user's message through to the entry before the next user line. The Nth
  *  user entry maps to the Nth history user line: the send and steer paths
@@ -114,6 +118,8 @@ export class AgentRuntime {
    *  records and settings still parse. */
   private goalMaxMinutes = 0
   private goalTimer?: ReturnType<typeof setTimeout>
+  /** 每条错误提示的清理定时器，按条目 id 记。 */
+  private readonly errorTimers = new Map<string, ReturnType<typeof setTimeout>>()
   private queuePauseReason: string | null = null
   private goalSessionInvalidated = false
   /** Kernels without a native goal driver (DSH) run the loop here. */
@@ -667,7 +673,7 @@ export class AgentRuntime {
     const prompt = [text, context].filter(Boolean).join('\n\n')
     if (!prompt || prompt.length > 8_000) return false
     const model = this.model as (ModelClient & {
-      steer?: (text: string) => Promise<boolean | { accepted: boolean; messageId?: string }> | boolean | { accepted: boolean; messageId?: string }
+      steer?: (text: string) => Promise<boolean | { accepted: boolean; messageId?: string; idle?: boolean }> | boolean | { accepted: boolean; messageId?: string; idle?: boolean }
     }) | undefined
     if (!model?.steer) return false
     const expandedText = this.workspaceRoot
@@ -675,7 +681,7 @@ export class AgentRuntime {
       : { prompt: text }
     if (generation !== this.generation || !this.isBusy()) return false
     const expandedPrompt = [expandedText.prompt, context, sessionContext].filter(Boolean).join('\n\n')
-    let outcome: boolean | { accepted: boolean; messageId?: string }
+    let outcome: boolean | { accepted: boolean; messageId?: string; idle?: boolean }
     try {
       outcome = await model.steer(expandedPrompt)
     } catch {
@@ -686,6 +692,8 @@ export class AgentRuntime {
     if (generation !== this.generation || !this.isBusy()) return false
     const accepted = typeof outcome === 'boolean' ? outcome : outcome.accepted
     if (!accepted) {
+      // 回合已经收尾：消息退回队列会被接着发出去，这不是错误，不弹提示。
+      if (typeof outcome === 'object' && outcome.idle) return false
       this.addSystem('插话未能投递，消息已退回待发送队列。', 'error')
       return false
     }
@@ -1385,6 +1393,8 @@ export class AgentRuntime {
    * conversation's SDK session resumable. */
   async dispose(): Promise<void> {
     this.stop()
+    for (const timer of this.errorTimers.values()) clearTimeout(timer)
+    this.errorTimers.clear()
     this.contextGeneration += 1
     const client = this.dshKernel as (ModelClient & { dispose?: () => Promise<void> | void }) | undefined
     await client?.dispose?.()
@@ -1686,7 +1696,34 @@ export class AgentRuntime {
     const entry = this.add('system', text, undefined, undefined, tone)
     if (retryText) entry.retryText = retryText
     if (tag) entry.tag = tag
+    if (tone === 'error') {
+      this.pruneErrorNotices(ERROR_NOTICE_LIMIT)
+      this.armErrorNotice(entry.id)
+    }
     return entry
+  }
+
+  /** 错误提示最多在面板上叠 5 条；再多了从最旧的开始丢，避免一次连发刷屏。 */
+  private pruneErrorNotices(keep: number): void {
+    const errors = this.state.timeline.filter((entry) => entry.kind === 'system' && entry.tone === 'error')
+    for (const entry of errors.slice(0, Math.max(0, errors.length - keep))) {
+      const timer = this.errorTimers.get(entry.id)
+      if (timer) { clearTimeout(timer); this.errorTimers.delete(entry.id) }
+      const at = this.state.timeline.indexOf(entry)
+      if (at >= 0) this.state.timeline.splice(at, 1)
+    }
+  }
+
+  /** 每条错误提示只留 20 秒，过时自己消失。 */
+  private armErrorNotice(id: string): void {
+    const timer = setTimeout(() => {
+      this.errorTimers.delete(id)
+      const at = this.state.timeline.findIndex((entry) => entry.id === id)
+      if (at < 0) return
+      this.state.timeline.splice(at, 1)
+      this.emit()
+    }, ERROR_NOTICE_TTL_MS)
+    this.errorTimers.set(id, timer)
   }
 
   /** Shows a message from another local conversation/agent without starting a

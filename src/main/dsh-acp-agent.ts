@@ -1177,10 +1177,12 @@ export class DshAcpAgentClient implements ModelClient {
   }
 
   /** 原生插队：修补后的 DSH 支持 session/steer，把消息插到当前回合的下一步。
-   *  返回投递结果；请求本身失败时让异常冒泡，宿主按“无法确认”处理。 */
-  async steer(rawText: string): Promise<{ accepted: boolean; messageId?: string }> {
+   *  返回投递结果；请求本身失败时让异常冒泡，宿主按“无法确认”处理。
+   *  回合已经收尾时返回 idle，调用方据此退回队列而不是报错。 */
+  async steer(rawText: string): Promise<{ accepted: boolean; messageId?: string; idle?: boolean }> {
     const text = rawText.trim()
-    if (!text || !this.busy || !this.sessionId) return { accepted: false }
+    if (!text || !this.sessionId) return { accepted: false }
+    if (!this.busy) return { accepted: false, idle: true }
     const result = await this.runtime.steer(this.sessionId, [{ type: 'text', text }])
     return {
       accepted: result.queued,
