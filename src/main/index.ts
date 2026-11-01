@@ -27,6 +27,7 @@ import { normalizeDshModel } from './dsh-model'
 import { DshAcpRuntime, toAcpMcpServer, type DshAcpMcpServer } from './dsh-acp-runtime'
 import { DshAcpAgentClient } from './dsh-acp-agent'
 import { PetMcpBridge } from './pet-mcp-server'
+import { startPhoneApi } from './phone-api'
 import { WinMcpClient } from './win-mcp-client'
 import { registerSettingsIpc } from './ipc-settings'
 import { registerLibrariesIpc } from './ipc-libraries'
@@ -229,7 +230,9 @@ function applyPointerShape(): void {
   // 面板打开时，从命中形状里裁掉与面板重叠的部分。头像窗口永远置顶，形状
   // 里那片透明区会把面板底部按钮的点击先吃掉；裁剪后角色不再压住面板，
   // 层级不变，按钮的整个盒都能点。
-  const panel = panelWindow && !panelWindow.isDestroyed() && panelWindow.isVisible()
+  // 用 panelOpen 而不是 isVisible()：hide() 之后 isVisible 还会短暂为 true，
+  // 那样头像的裁剪形状不会立刻恢复，收起后的第一次点击会被透明区吃掉。
+  const panel = panelOpen && panelWindow && !panelWindow.isDestroyed()
     ? panelWindow.getBounds()
     : null
   if (panel) {
@@ -913,6 +916,15 @@ function schedulePostTurn(task: () => Promise<void>): void {
     console.error('Conversation post-turn work failed:', error)
   })
 }
+
+// 手机端访问本机对话库的 HTTP 接口：token 在 data/phone-api.json。
+// 方向和 phone-dsh.mjs 相反，让手机上的 DSH 也能 list/read/send 这边。
+void startPhoneApi({
+  dataRoot,
+  controller: () => activeController()
+}).catch((error: unknown) => {
+  console.error('Phone API failed to start:', error)
+})
 
 controller.setTurnHooks({
   memoryContext: () => memory.contextBlock(),
