@@ -206,7 +206,7 @@ export const TimelineItem = memo(function TimelineItem({ entry, running = false,
         {sender?.target && (
           <span className="panel-event-route">
             <svg className="route-arc" viewBox="0 0 16 24" aria-hidden="true">
-              <path d="M1.5 1.5V10a8.5 8.5 0 0 0 8.5 8.5h6" />
+              <path d="M1.5 1.5V10a8.5 8.5 0 0 0 8.5 8.5" />
               <circle cx="1.5" cy="1.5" r="2" />
               <circle cx="16" cy="18.5" r="2" />
             </svg>
