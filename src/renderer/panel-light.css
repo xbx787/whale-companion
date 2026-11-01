@@ -579,7 +579,7 @@ body.panel-theme-light .panel-thought.is-streaming .panel-thought-icon, body.pan
 body.panel-theme-light .panel-thought-label{ color: #071632; font-weight: 400; }
 body.panel-theme-light .panel-thought-label.panel-live-label{ font-weight: 700; }
 body.panel-theme-light .panel-thought-time{ flex: none; min-width: 34px; color: #203860; font-variant-numeric: tabular-nums; text-align: right; }
-body.panel-theme-light .panel-thought-state{ margin-left: auto; flex: none; color: #276439; font-size: var(--glyph-sm); line-height: 1; }
+body.panel-theme-light .panel-thought-state{ margin-left: auto; flex: none; display: grid; place-items: center; width: 17px; height: 17px; color: #276439; font-size: var(--glyph-sm); line-height: 1; }
 body.panel-theme-light .panel-thought-state.is-running{ color: #f0c47b; opacity: calc(1 - .5 * var(--panel-pulse-p, 0)); transform: scale(calc(1 - .15 * var(--panel-pulse-p, 0))); }
 /* The opened thought body lines up under the "已思考" label — icon 14 px plus
    the summary's 8 px gap — instead of hanging flush against the window edge. */
@@ -768,7 +768,7 @@ body.panel-theme-light .panel-cluster[open] .panel-cluster-chevron{ transform: r
 body.panel-theme-light .panel-cluster-label{ flex: none; color: #071632; white-space: nowrap; }
 body.panel-theme-light .panel-cluster-facts{ display: flex; flex: 1 1 auto; gap: 12px; min-width: 0; overflow: hidden; color: #425680; font-size: var(--text-xs); }
 body.panel-theme-light .panel-cluster-facts > span{ min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-body.panel-theme-light .panel-cluster-state{ margin-left: auto; flex: none; color: #276439; font-size: var(--glyph-sm); line-height: 1; }
+body.panel-theme-light .panel-cluster-state{ margin-left: auto; flex: none; display: grid; place-items: center; width: 17px; height: 17px; color: #276439; font-size: var(--glyph-sm); line-height: 1; }
 body.panel-theme-light .panel-cluster-state.is-running{ color: #f0c47b; opacity: calc(1 - .5 * var(--panel-pulse-p, 0)); transform: scale(calc(1 - .15 * var(--panel-pulse-p, 0))); }
 body.panel-theme-light .panel-cluster-body{ position: relative; margin: 2px 0 6px; padding-left: 22px; }
 /* One spine from the first row down past the last one, ending just above the
@@ -796,7 +796,7 @@ body.panel-theme-light .panel-cluster-body .panel-thought, body.panel-theme-ligh
 body.panel-theme-light .panel-working{ position: relative; display: flex; align-items: center; gap: 9px; margin: 1px 0 15px; padding-left: 14px; color: #203860; font-size: var(--text-sm); }
 body.panel-theme-light .panel-working-dots{ display: inline-flex; align-items: center; flex: none; gap: 3px; vertical-align: middle; }
 /* 三点同色同大小，不做各自的相位跳动：之前的透明度差看着就像大小不一。 */
-body.panel-theme-light .panel-working-dots i{ width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: .7; }
+body.panel-theme-light .panel-working-dots i{ width: 5px; height: 5px; border-radius: 50%; background: #f0c47b; opacity: 1; }
 body.panel-theme-light .panel-working-text{ color: #000d24; }
 body.panel-theme-light .panel-working-time{ color: #2b436f; font-variant-numeric: tabular-nums; }
 /* 子任务：每个 Task 子 agent 一个机器人头，点开是只读详情与它自己的步骤。 */

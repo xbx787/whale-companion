@@ -591,7 +591,7 @@ body.panel-placement-right .panel-bubble::after { display: none; }
 .panel-thought-label { color: #cddcf8; font-weight: 400; }
 .panel-thought-label.panel-live-label { font-weight: 700; }
 .panel-thought-time { flex: none; min-width: 34px; color: #9fb7df; font-variant-numeric: tabular-nums; text-align: right; }
-.panel-thought-state { margin-left: auto; flex: none; color: #9bd8ad; font-size: var(--glyph-sm); line-height: 1; }
+.panel-thought-state { margin-left: auto; flex: none; display: grid; place-items: center; width: 17px; height: 17px; color: #9bd8ad; font-size: var(--glyph-sm); line-height: 1; }
 .panel-thought-state.is-running { color: #f0c47b; opacity: calc(1 - .5 * var(--panel-pulse-p, 0)); transform: scale(calc(1 - .15 * var(--panel-pulse-p, 0))); }
 /* The opened thought body lines up under the "已思考" label — icon 14 px plus
    the summary's 8 px gap — instead of hanging flush against the window edge. */
@@ -780,7 +780,7 @@ body.panel-placement-right .panel-bubble::after { display: none; }
 .panel-cluster-label { flex: none; color: #cddcf8; white-space: nowrap; }
 .panel-cluster-facts { display: flex; flex: 1 1 auto; gap: 12px; min-width: 0; overflow: hidden; color: #7f93bd; font-size: var(--text-xs); }
 .panel-cluster-facts > span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.panel-cluster-state { margin-left: auto; flex: none; color: #9bd8ad; font-size: var(--glyph-sm); line-height: 1; }
+.panel-cluster-state { margin-left: auto; flex: none; display: grid; place-items: center; width: 17px; height: 17px; color: #9bd8ad; font-size: var(--glyph-sm); line-height: 1; }
 .panel-cluster-state.is-running { color: #f0c47b; opacity: calc(1 - .5 * var(--panel-pulse-p, 0)); transform: scale(calc(1 - .15 * var(--panel-pulse-p, 0))); }
 .panel-cluster-body { position: relative; margin: 2px 0 6px; padding-left: 22px; }
 /* One spine from the first row down past the last one, ending just above the
@@ -808,7 +808,7 @@ body.panel-placement-right .panel-bubble::after { display: none; }
 .panel-working { position: relative; display: flex; align-items: center; gap: 9px; margin: 1px 0 15px; padding-left: 14px; color: #9fb7df; font-size: var(--text-sm); }
 .panel-working-dots { display: inline-flex; align-items: center; flex: none; gap: 3px; vertical-align: middle; }
 /* 三点同色同大小，不做各自的相位跳动：之前的透明度差看着就像大小不一。 */
-.panel-working-dots i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: .7; }
+.panel-working-dots i { width: 5px; height: 5px; border-radius: 50%; background: #f0c47b; opacity: 1; }
 .panel-working-text { color: #dbe8ff; }
 .panel-working-time { color: #90a8d4; font-variant-numeric: tabular-nums; }
 /* 子任务：每个 Task 子 agent 一个机器人头，点开是只读详情与它自己的步骤。 */

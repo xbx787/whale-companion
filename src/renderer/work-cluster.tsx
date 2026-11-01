@@ -2,7 +2,6 @@ import { Fragment, memo, useEffect, useRef, useState, type ReactNode } from 'rea
 import type { TimelineEntry } from '../shared/contracts'
 import { toolLabel } from '../shared/tool-labels'
 import { thinkingDurationText, thinkingElapsedSeconds } from './thinking-item'
-import { RunningDots } from './running-dots'
 import { toolArgumentPreview } from './tool-arguments'
 import { sameTimelineEntry, type TurnSegment } from './timeline-groups'
 
@@ -157,7 +156,7 @@ export const WorkCluster = memo(function WorkCluster({ items, running, renderEnt
       <Chevron />
       <ClusterLabel running={running} label="work" />
       {parts.length > 0 && <span className="panel-cluster-facts">{parts.map((part) => <span key={part}>{part}</span>)}</span>}
-      <span className={`panel-cluster-state${running ? ' is-running' : ''}`} aria-hidden="true">{running ? <RunningDots /> : '✓'}</span>
+      <span className={`panel-cluster-state${running ? ' is-running' : ''}`} aria-hidden="true">{running ? null : '✓'}</span>
     </summary>
     <div className="panel-cluster-body">{items.map((entry, index) => <Fragment key={entry.id}>{renderEntry(entry, running && index === items.length - 1)}</Fragment>)}</div>
     {/* 展开时最底下的一行：箭头落在竖线的中轴上，点它把整段收起。
