@@ -458,6 +458,7 @@ body.panel-placement-right .panel-bubble::after { display: none; }
 /* 加号没有按钮框，只留符号本身。 */
 .panel-quick-tab-new { flex: 0 0 26px; max-width: 26px; padding: 0; border-color: transparent; background: transparent; color: #c5d7f6; }
 .panel-quick-tab-new:hover { background: transparent; color: #fff; }
+.panel-quick-tab-new:disabled, .panel-quick-tab-new:disabled:hover { color: #7f92b5; opacity: .55; cursor: not-allowed; }
 .panel-quick-tab-new svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
 .panel-quick-tabs.is-dragging, .panel-quick-tabs.is-dragging .panel-quick-tab { cursor: grabbing; }
 .panel-quick-tab.is-dragging { opacity: .55; }
