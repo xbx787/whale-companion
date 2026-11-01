@@ -1,5 +1,5 @@
 import type { ApprovalMode, ContextUsageSnapshot } from '../shared/contracts'
-import { IconArchive, IconCheckBox, IconChecklist, IconClose, IconDownload, IconDragIndicator, IconEdit, IconHexagon, IconKeyboardReturn, IconLanguage, IconPanTool, IconPin, IconPlus, IconRefresh, IconTarget, IconTrash, IconTune, IconUpload, IconVerifiedUser } from './icons'
+import { IconArchive, IconCheckBox, IconChecklist, IconClose, IconDownload, IconDragIndicator, IconEdit, IconHexagon, IconKeyboardReturn, IconLanguage, IconPanTool, IconPin, IconPinFill, IconPlus, IconRefresh, IconTarget, IconTrash, IconTune, IconUpload, IconVerifiedUser } from './icons'
 
 /** One icon per permission mode: a hand (manual approval), a pencil (workspace
  *  writes), a warning shield (everything runs), a hexagon (self restart). */
@@ -77,16 +77,7 @@ export function ImportIcon() {
 }
 
 export function PinIcon({ pinned }: { pinned: boolean }) {
-  return (
-    <span className="panel-pin-icon">
-      <IconPin size={18} />
-      {pinned && (
-        <svg className="panel-pin-slash" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M4 20 20 4" />
-        </svg>
-      )}
-    </span>
-  );
+  return pinned ? <IconPinFill size={18} /> : <IconPin size={18} />;
 }
 
 export function ContextMeter({ usage, compacting, open, onToggle }: {

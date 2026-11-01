@@ -25,7 +25,8 @@ const icons = {
   warning: 'ph/warning',
   trash: 'ph/trash',
   edit: 'ph/pencil-simple',
-  pin: 'ph/push-pin',
+  pin: 'material-symbols/push-pin',
+  pinFill: 'material-symbols/push-pin',
   archive: 'ph/archive-box',
   attach: 'ph/paperclip',
   mic: 'ph/microphone',
@@ -101,4 +102,7 @@ const target = resolve('D:/DesktopPetProject/.worktrees/dsh-p0/src/renderer/icon
 writeFileSync(target, file, 'utf8')
 console.log(`wrote ${target} (${resolved.length} icons)`)
 console.log(missing.length ? `missing: ${missing.join(', ')}` : 'all icons resolved')
+
+
+
 

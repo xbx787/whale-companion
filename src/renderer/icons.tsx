@@ -218,12 +218,22 @@ export const IconEdit = (props: IconProps) => {
   )
 }
 
-/** pin — ph/push-pin */
+/** pin — material-symbols/push-pin */
 export const IconPin = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
-      <path d="m235.32 81.37l-60.69-60.68a16 16 0 0 0-22.63 0l-53.63 53.8c-10.66-3.34-35-7.37-60.4 13.14a16 16 0 0 0-1.29 23.78L85 159.71l-42.66 42.63a8 8 0 0 0 11.32 11.32L96.29 171l48.29 48.29A16 16 0 0 0 155.9 224h1.13a15.93 15.93 0 0 0 11.64-6.33c19.64-26.1 17.75-47.32 13.19-60L235.33 104a16 16 0 0 0-.01-22.63M224 92.69l-57.27 57.46a8 8 0 0 0-1.49 9.22c9.46 18.93-1.8 38.59-9.34 48.62L48 100.08c12.08-9.74 23.64-12.31 32.48-12.31A40.1 40.1 0 0 1 96.81 91a8 8 0 0 0 9.25-1.51L163.32 32L224 92.68Z" />
+    <svg viewBox="0 0 24 24" aria-hidden="true" {...sized}>
+      <path d="m16 12l2 2v2h-5v6l-1 1l-1-1v-6H6v-2l2-2V5H7V3h10v2h-1z" />
+    </svg>
+  )
+}
+
+/** pinFill — material-symbols/push-pin */
+export const IconPinFill = (props: IconProps) => {
+  const sized = withSize(props)
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" {...sized}>
+      <path d="m16 12l2 2v2h-5v6l-1 1l-1-1v-6H6v-2l2-2V5H7V3h10v2h-1z" />
     </svg>
   )
 }
