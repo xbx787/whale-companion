@@ -9,7 +9,11 @@ export function registerWindowStateIpc(deps: WindowStateIpcDeps): void {
     if (layout !== 'empty' && layout !== 'composer' && layout !== 'composer_attachments' && layout !== 'composer_models' && layout !== 'full') throw new Error('气泡布局无效。')
     if (height !== undefined && (typeof height !== 'number' || !Number.isFinite(height) || height < 100 || height > 260)) throw new Error('气泡高度无效。')
     const nextHeight = (layout === 'composer' || layout === 'composer_attachments') && typeof height === 'number' ? Math.round(height) : undefined
-    if (deps.bubbleLayout === layout && deps.compactBubbleHeight === nextHeight) return
+    if (deps.bubbleLayout === layout && deps.compactBubbleHeight === nextHeight) {
+      // 布局没变也算报到了：面板该在真实尺寸上亮出来。
+      deps.revealPanel()
+      return
+    }
     const size = deps.stageBounds ?? { x: 0, y: 0, ...deps.stageSize }
     const previous = deps.bubbleRegion(deps.bubbleLayout, size, deps.compactBubbleHeight, deps.panelDirection)
     deps.bubbleLayout = layout
@@ -27,6 +31,8 @@ export function registerWindowStateIpc(deps: WindowStateIpcDeps): void {
     } else {
       deps.applyPointerShape()
     }
+    // 第一次布局到位了：面板可以在正确的尺寸上亮出来，不会先闪一个占位小窗。
+    deps.revealPanel()
   })
   ipcMain.handle('pet:set-bubble-expanded', (event, expanded: unknown) => {
     if (!deps.trusted(event)) throw new Error('无效的界面请求。')

@@ -111,6 +111,15 @@ let balanceWindowReady = false
 let tray: Tray | undefined
 let contextMenu: Menu | undefined
 let panelOpen = false
+/** 面板已显示但还透明着，等渲染层报上第一次布局再亮出，避免先闪一个占位小窗。 */
+let panelRevealPending = false
+function revealPanel(): void {
+  if (!panelRevealPending) return
+  panelRevealPending = false
+  if (!panelOpen || !panelWindow || panelWindow.isDestroyed()) return
+  panelWindow.setOpacity(1)
+  panelWindow.focus()
+}
 let balanceOpen = false
 let bubbleLayout: BubbleLayout = 'empty'
 let compactBubbleHeight: number | undefined
@@ -1408,11 +1417,10 @@ function showPanel(): void {
       panelWindow.show()
       // show 之后窗口才 isVisible，命中形状这时才能按面板矩形裁掉重叠区。
       applyPointerShape()
-      setTimeout(() => {
-        if (!panelOpen || !panelWindow || panelWindow.isDestroyed()) return
-        panelWindow.setOpacity(1)
-        panelWindow.focus()
-      }, 16)
+      // 亮不亮由第一次布局上报决定：先亮会露出 empty 的小窗，紧接着再
+      // 变成完整输入框。兜底 600ms，布局一直不上报也不会永远透明。
+      panelRevealPending = true
+      setTimeout(revealPanel, 600)
     }
     avatarWindow?.webContents.send('pet:panel-open', true)
   } else {
@@ -2203,6 +2211,7 @@ function buildWindowStateIpcDeps() {
     stageSize,
     bubbleRegion,
     syncPanelBounds,
+    revealPanel,
     applyPointerShape,
     get shapeShrinkTimer() { return shapeShrinkTimer },
     set shapeShrinkTimer(value: typeof shapeShrinkTimer) { shapeShrinkTimer = value },
