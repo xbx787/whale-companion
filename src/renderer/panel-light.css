@@ -1242,11 +1242,11 @@ body.panel-theme-light .panel-event-sender{ display: inline-flex; align-items: c
 
 /* 跨端/内部转发：来源框 → 目标框，两个圆角矩形各用一种色。 */
 body.panel-theme-light .panel-event-route{ position: absolute; left: 0; top: calc(100% + 8px); display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-left: 16px; max-width: 100%; }
-/* 从气泡底边弯到色块横向中线的四分之一圆，实色、不透明。 */
-body.panel-theme-light .panel-event-route::before{ content: ""; position: absolute; left: 0; top: auto; bottom: 50%; width: 13px; height: 22px; border-left: 2px solid #082556; border-bottom: 2px solid #082556; border-bottom-left-radius: 13px; }
-/* 用户消息靠右：色块右对齐气泡右边界，弧线也换到右边。 */
-body.panel-theme-light .panel-event-user .panel-event-route{ left: auto; right: 0; justify-content: flex-end; padding-left: 0; padding-right: 16px; }
-body.panel-theme-light .panel-event-user .panel-event-route::before{ left: auto; right: 0; border-left: 0; border-right: 2px solid #082556; border-bottom-left-radius: 0; border-bottom-right-radius: 13px; }.route-box { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 9px; font-size: var(--text-md); line-height: 1.45; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+/* 从气泡底边弯到色块横向中线的四分之一圆，SVG 画，两端各一个实心圆点。 */
+body.panel-theme-light .route-arc{ position: absolute; left: 0; bottom: 50%; width: 16px; height: 24px; color: #082556; fill: #082556; stroke: #082556; stroke-width: 1.6; stroke-linecap: round; }
+body.panel-theme-light .route-arc path{ fill: none; }
+/* 用户消息靠右：色块右对齐气泡右边界；弧线仍在色块左端，跟着色块走。 */
+body.panel-theme-light .panel-event-user .panel-event-route{ left: auto; right: 0; justify-content: flex-end; padding-left: 0; padding-right: 16px; }.route-box { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 9px; font-size: var(--text-md); line-height: 1.45; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 body.panel-theme-light .route-box.is-pc{ color: #9f520d; background: rgba(159, 82, 13, 0.2); }
 body.panel-theme-light .route-box.is-pc-target{ color: #851a3f; background: rgba(133, 26, 63, 0.2); }
 body.panel-theme-light .route-box.is-phone{ color: #2c905c; background: rgba(44, 144, 92, 0.2); }

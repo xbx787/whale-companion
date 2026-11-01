@@ -1258,11 +1258,11 @@ img.panel-markdown-image { display: block; max-width: 100%; margin: 6px 0; borde
 
 /* 跨端/内部转发：来源框 → 目标框，两个圆角矩形各用一种色。 */
 .panel-event-route { position: absolute; left: 0; top: calc(100% + 8px); display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-left: 16px; max-width: 100%; }
-/* 从气泡底边弯到色块横向中线的四分之一圆，实色、不透明。 */
-.panel-event-route::before { content: ""; position: absolute; left: 0; top: auto; bottom: 50%; width: 13px; height: 22px; border-left: 2px solid #a9c6f7; border-bottom: 2px solid #a9c6f7; border-bottom-left-radius: 13px; }
-/* 用户消息靠右：色块右对齐气泡右边界，弧线也换到右边。 */
-.panel-event-user .panel-event-route { left: auto; right: 0; justify-content: flex-end; padding-left: 0; padding-right: 16px; }
-.panel-event-user .panel-event-route::before { left: auto; right: 0; border-left: 0; border-right: 2px solid #a9c6f7; border-bottom-left-radius: 0; border-bottom-right-radius: 13px; }.route-box { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 9px; font-size: var(--text-md); line-height: 1.45; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+/* 从气泡底边弯到色块横向中线的四分之一圆，SVG 画，两端各一个实心圆点。 */
+.route-arc { position: absolute; left: 0; bottom: 50%; width: 16px; height: 24px; color: #a9c6f7; fill: #a9c6f7; stroke: #a9c6f7; stroke-width: 1.6; stroke-linecap: round; }
+.route-arc path { fill: none; }
+/* 用户消息靠右：色块右对齐气泡右边界；弧线仍在色块左端，跟着色块走。 */
+.panel-event-user .panel-event-route { left: auto; right: 0; justify-content: flex-end; padding-left: 0; padding-right: 16px; }.route-box { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 9px; font-size: var(--text-md); line-height: 1.45; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .route-box.is-pc { color: #f2a560; background: rgba(242, 165, 96, .2); }
 .route-box.is-pc-target { color: #e57a9f; background: rgba(229, 122, 159, .2); }
 .route-box.is-phone { color: #6fd39f; background: rgba(111, 211, 159, .2); }
