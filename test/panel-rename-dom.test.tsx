@@ -104,6 +104,8 @@ describe('renaming a conversation from the library', () => {
     const input = host.querySelector('.panel-session-edit input') as HTMLInputElement
     await act(async () => type(input, '改过的名字'))
     await act(async () => click(save))
+    // 全量并发时保存走的是异步微任务，断言前先让队列排空，避免时序抖动。
+    await act(async () => { await Promise.resolve() })
     expect(renameConversation).toHaveBeenCalledWith('a', '改过的名字')
   })
 
