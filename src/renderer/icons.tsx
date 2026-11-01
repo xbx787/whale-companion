@@ -1,389 +1,389 @@
 // 由 scripts/gen-icons.mjs 生成，请勿手改。
-// 主用 Material Symbols，缺失的用 Phosphor Fill 补；颜色跟随 currentColor。
+// 统一 Phosphor Regular 细线图标；颜色跟随 currentColor。
 import type { CSSProperties, SVGProps } from 'react'
 
 export type IconProps = SVGProps<SVGSVGElement> & { size?: number; style?: CSSProperties }
 
 function withSize({ size = 18, style, ...rest }: IconProps) {
-  return { ...rest, style: { width: size, height: size, flex: 'none', fill: 'currentColor', stroke: 'none', ...style } }
+  return { ...rest, style: { width: size, height: size, flex: 'none', fill: 'currentColor', ...style } }
 }
 
-/** home — material-symbols/home */
+/** home — ph/house */
 export const IconHome = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...sized}>
-      <path d="M4 21V9l8-6l8 6v12h-6v-7h-4v7z" />
+    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
+      <path d="m219.31 108.68l-80-80a16 16 0 0 0-22.62 0l-80 80A15.87 15.87 0 0 0 32 120v96a8 8 0 0 0 8 8h64a8 8 0 0 0 8-8v-56h32v56a8 8 0 0 0 8 8h64a8 8 0 0 0 8-8v-96a15.87 15.87 0 0 0-4.69-11.32M208 208h-48v-56a8 8 0 0 0-8-8h-48a8 8 0 0 0-8 8v56H48v-88l80-80l80 80Z" />
     </svg>
   )
 }
 
-/** settings — material-symbols/settings */
+/** settings — ph/gear */
 export const IconSettings = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...sized}>
-      <path d="m9.25 22l-.4-3.2q-.325-.125-.612-.3t-.563-.375L4.7 19.375l-2.75-4.75l2.575-1.95Q4.5 12.5 4.5 12.338v-.675q0-.163.025-.338L1.95 9.375l2.75-4.75l2.975 1.25q.275-.2.575-.375t.6-.3l.4-3.2h5.5l.4 3.2q.325.125.613.3t.562.375l2.975-1.25l2.75 4.75l-2.575 1.95q.025.175.025.338v.674q0 .163-.05.338l2.575 1.95l-2.75 4.75l-2.95-1.25q-.275.2-.575.375t-.6.3l-.4 3.2zm2.8-6.5q1.45 0 2.475-1.025T15.55 12t-1.025-2.475T12.05 8.5q-1.475 0-2.488 1.025T8.55 12t1.013 2.475T12.05 15.5" />
+    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
+      <path d="M128 80a48 48 0 1 0 48 48a48.05 48.05 0 0 0-48-48m0 80a32 32 0 1 1 32-32a32 32 0 0 1-32 32m88-29.84q.06-2.16 0-4.32l14.92-18.64a8 8 0 0 0 1.48-7.06a107.2 107.2 0 0 0-10.88-26.25a8 8 0 0 0-6-3.93l-23.72-2.64q-1.48-1.56-3-3L186 40.54a8 8 0 0 0-3.94-6a107.7 107.7 0 0 0-26.25-10.87a8 8 0 0 0-7.06 1.49L130.16 40h-4.32L107.2 25.11a8 8 0 0 0-7.06-1.48a107.6 107.6 0 0 0-26.25 10.88a8 8 0 0 0-3.93 6l-2.64 23.76q-1.56 1.49-3 3L40.54 70a8 8 0 0 0-6 3.94a107.7 107.7 0 0 0-10.87 26.25a8 8 0 0 0 1.49 7.06L40 125.84v4.32L25.11 148.8a8 8 0 0 0-1.48 7.06a107.2 107.2 0 0 0 10.88 26.25a8 8 0 0 0 6 3.93l23.72 2.64q1.49 1.56 3 3L70 215.46a8 8 0 0 0 3.94 6a107.7 107.7 0 0 0 26.25 10.87a8 8 0 0 0 7.06-1.49L125.84 216q2.16.06 4.32 0l18.64 14.92a8 8 0 0 0 7.06 1.48a107.2 107.2 0 0 0 26.25-10.88a8 8 0 0 0 3.93-6l2.64-23.72q1.56-1.48 3-3l23.78-2.8a8 8 0 0 0 6-3.94a107.7 107.7 0 0 0 10.87-26.25a8 8 0 0 0-1.49-7.06Zm-16.1-6.5a74 74 0 0 1 0 8.68a8 8 0 0 0 1.74 5.48l14.19 17.73a91.6 91.6 0 0 1-6.23 15l-22.6 2.56a8 8 0 0 0-5.1 2.64a74 74 0 0 1-6.14 6.14a8 8 0 0 0-2.64 5.1l-2.51 22.58a91.3 91.3 0 0 1-15 6.23l-17.74-14.19a8 8 0 0 0-5-1.75h-.48a74 74 0 0 1-8.68 0a8 8 0 0 0-5.48 1.74l-17.78 14.2a91.6 91.6 0 0 1-15-6.23L82.89 187a8 8 0 0 0-2.64-5.1a74 74 0 0 1-6.14-6.14a8 8 0 0 0-5.1-2.64l-22.58-2.52a91.3 91.3 0 0 1-6.23-15l14.19-17.74a8 8 0 0 0 1.74-5.48a74 74 0 0 1 0-8.68a8 8 0 0 0-1.74-5.48L40.2 100.45a91.6 91.6 0 0 1 6.23-15L69 82.89a8 8 0 0 0 5.1-2.64a74 74 0 0 1 6.14-6.14A8 8 0 0 0 82.89 69l2.51-22.57a91.3 91.3 0 0 1 15-6.23l17.74 14.19a8 8 0 0 0 5.48 1.74a74 74 0 0 1 8.68 0a8 8 0 0 0 5.48-1.74l17.77-14.19a91.6 91.6 0 0 1 15 6.23L173.11 69a8 8 0 0 0 2.64 5.1a74 74 0 0 1 6.14 6.14a8 8 0 0 0 5.1 2.64l22.58 2.51a91.3 91.3 0 0 1 6.23 15l-14.19 17.74a8 8 0 0 0-1.74 5.53Z" />
     </svg>
   )
 }
 
-/** folder — material-symbols/folder */
+/** folder — ph/folder */
 export const IconFolder = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...sized}>
-      <path d="M4 20q-.825 0-1.412-.587T2 18V6q0-.825.588-1.412T4 4h6l2 2h8q.825 0 1.413.588T22 8v10q0 .825-.587 1.413T20 20z" />
+    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
+      <path d="M216 72h-84.69L104 44.69A15.86 15.86 0 0 0 92.69 40H40a16 16 0 0 0-16 16v144.62A15.4 15.4 0 0 0 39.38 216h177.51A15.13 15.13 0 0 0 232 200.89V88a16 16 0 0 0-16-16M40 56h52.69l16 16H40Zm176 144H40V88h176Z" />
     </svg>
   )
 }
 
-/** file — material-symbols/description */
+/** file — ph/file */
 export const IconFile = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...sized}>
-      <path d="M8 18h8v-2H8zm0-4h8v-2H8zm-2 8q-.825 0-1.412-.587T4 20V4q0-.825.588-1.412T6 2h8l6 6v12q0 .825-.587 1.413T18 22zm7-13h5l-5-5z" />
+    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
+      <path d="m213.66 82.34l-56-56A8 8 0 0 0 152 24H56a16 16 0 0 0-16 16v176a16 16 0 0 0 16 16h144a16 16 0 0 0 16-16V88a8 8 0 0 0-2.34-5.66M160 51.31L188.69 80H160ZM200 216H56V40h88v48a8 8 0 0 0 8 8h48z" />
     </svg>
   )
 }
 
-/** search — material-symbols/search */
+/** search — ph/magnifying-glass */
 export const IconSearch = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...sized}>
-      <path d="m19.6 21l-6.3-6.3q-.75.6-1.725.95T9.5 16q-2.725 0-4.612-1.888T3 9.5t1.888-4.612T9.5 3t4.613 1.888T16 9.5q0 1.1-.35 2.075T14.7 13.3l6.3 6.3zM9.5 14q1.875 0 3.188-1.312T14 9.5t-1.312-3.187T9.5 5T6.313 6.313T5 9.5t1.313 3.188T9.5 14" />
+    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
+      <path d="m229.66 218.34l-50.07-50.06a88.11 88.11 0 1 0-11.31 11.31l50.06 50.07a8 8 0 0 0 11.32-11.32M40 112a72 72 0 1 1 72 72a72.08 72.08 0 0 1-72-72" />
     </svg>
   )
 }
 
-/** user — material-symbols/person */
+/** user — ph/user */
 export const IconUser = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...sized}>
-      <path d="M9.175 10.825Q8 9.65 8 8t1.175-2.825T12 4t2.825 1.175T16 8t-1.175 2.825T12 12t-2.825-1.175M4 20v-2.8q0-.85.438-1.562T5.6 14.55q1.55-.775 3.15-1.162T12 13t3.25.388t3.15 1.162q.725.375 1.163 1.088T20 17.2V20z" />
+    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
+      <path d="M230.92 212c-15.23-26.33-38.7-45.21-66.09-54.16a72 72 0 1 0-73.66 0c-27.39 8.94-50.86 27.82-66.09 54.16a8 8 0 1 0 13.85 8c18.84-32.56 52.14-52 89.07-52s70.23 19.44 89.07 52a8 8 0 1 0 13.85-8M72 96a56 56 0 1 1 56 56a56.06 56.06 0 0 1-56-56" />
     </svg>
   )
 }
 
-/** chat — material-symbols/chat */
+/** chat — ph/chat-circle */
 export const IconChat = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...sized}>
-      <path d="M2 22V4q0-.825.588-1.412T4 2h16q.825 0 1.413.588T22 4v12q0 .825-.587 1.413T20 18H6zm4-8h8v-2H6zm0-3h12V9H6zm0-3h12V6H6z" />
+    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
+      <path d="M128 24a104 104 0 0 0-91.82 152.88l-11.35 34.05a16 16 0 0 0 20.24 20.24l34.05-11.35A104 104 0 1 0 128 24m0 192a87.87 87.87 0 0 1-44.06-11.81a8 8 0 0 0-6.54-.67L40 216l12.47-37.4a8 8 0 0 0-.66-6.54A88 88 0 1 1 128 216" />
     </svg>
   )
 }
 
-/** send — material-symbols/send */
+/** send — ph/paper-plane-tilt */
 export const IconSend = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...sized}>
-      <path d="M3 20v-6l8-2l-8-2V4l19 8z" />
+    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
+      <path d="M227.32 28.68a16 16 0 0 0-15.66-4.08h-.15L19.57 82.84a16 16 0 0 0-2.49 29.8L102 154l41.3 84.87a15.86 15.86 0 0 0 14.44 9.13q.69 0 1.38-.06a15.88 15.88 0 0 0 14-11.51l58.2-191.94v-.15a16 16 0 0 0-4-15.66m-69.49 203.17l-.05.14v-.07l-40.06-82.3l48-48a8 8 0 0 0-11.31-11.31l-48 48l-82.33-40.06h-.07h.14L216 40Z" />
     </svg>
   )
 }
 
-/** play — material-symbols/play-arrow */
+/** play — ph/play */
 export const IconPlay = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...sized}>
-      <path d="M8 19V5l11 7z" />
+    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
+      <path d="M232.4 114.49L88.32 26.35a16 16 0 0 0-16.2-.3A15.86 15.86 0 0 0 64 39.87v176.26A15.94 15.94 0 0 0 80 232a16.07 16.07 0 0 0 8.36-2.35l144.04-88.14a15.81 15.81 0 0 0 0-27ZM80 215.94V40l143.83 88Z" />
     </svg>
   )
 }
 
-/** stop — material-symbols/stop */
+/** stop — ph/stop */
 export const IconStop = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...sized}>
-      <path d="M6 18V6h12v12z" />
+    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
+      <path d="M200 40H56a16 16 0 0 0-16 16v144a16 16 0 0 0 16 16h144a16 16 0 0 0 16-16V56a16 16 0 0 0-16-16m0 160H56V56h144z" />
     </svg>
   )
 }
 
-/** plus — material-symbols/add */
+/** plus — ph/plus */
 export const IconPlus = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...sized}>
-      <path d="M11 13H5v-2h6V5h2v6h6v2h-6v6h-2z" />
+    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
+      <path d="M224 128a8 8 0 0 1-8 8h-80v80a8 8 0 0 1-16 0v-80H40a8 8 0 0 1 0-16h80V40a8 8 0 0 1 16 0v80h80a8 8 0 0 1 8 8" />
     </svg>
   )
 }
 
-/** close — material-symbols/close */
+/** close — ph/x */
 export const IconClose = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...sized}>
-      <path d="M6.4 19L5 17.6l5.6-5.6L5 6.4L6.4 5l5.6 5.6L17.6 5L19 6.4L13.4 12l5.6 5.6l-1.4 1.4l-5.6-5.6z" />
+    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
+      <path d="M205.66 194.34a8 8 0 0 1-11.32 11.32L128 139.31l-66.34 66.35a8 8 0 0 1-11.32-11.32L116.69 128L50.34 61.66a8 8 0 0 1 11.32-11.32L128 116.69l66.34-66.35a8 8 0 0 1 11.32 11.32L139.31 128Z" />
     </svg>
   )
 }
 
-/** chevronDown — material-symbols/keyboard-arrow-down */
+/** chevronDown — ph/caret-down */
 export const IconChevronDown = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...sized}>
-      <path d="m12 15.4l-6-6L7.4 8l4.6 4.6L16.6 8L18 9.4z" />
+    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
+      <path d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32" />
     </svg>
   )
 }
 
-/** chevronRight — material-symbols/keyboard-arrow-right */
+/** chevronRight — ph/caret-right */
 export const IconChevronRight = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...sized}>
-      <path d="M12.6 12L8 7.4L9.4 6l6 6l-6 6L8 16.6z" />
+    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
+      <path d="m181.66 133.66l-80 80a8 8 0 0 1-11.32-11.32L164.69 128L90.34 53.66a8 8 0 0 1 11.32-11.32l80 80a8 8 0 0 1 0 11.32" />
     </svg>
   )
 }
 
-/** more — material-symbols/more-horiz */
+/** more — ph/dots-three */
 export const IconMore = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...sized}>
-      <path d="M6 14q-.825 0-1.412-.587T4 12t.588-1.412T6 10t1.413.588T8 12t-.587 1.413T6 14m6 0q-.825 0-1.412-.587T10 12t.588-1.412T12 10t1.413.588T14 12t-.587 1.413T12 14m6 0q-.825 0-1.412-.587T16 12t.588-1.412T18 10t1.413.588T20 12t-.587 1.413T18 14" />
+    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
+      <path d="M140 128a12 12 0 1 1-12-12a12 12 0 0 1 12 12m56-12a12 12 0 1 0 12 12a12 12 0 0 0-12-12m-136 0a12 12 0 1 0 12 12a12 12 0 0 0-12-12" />
     </svg>
   )
 }
 
-/** refresh — material-symbols/refresh */
+/** refresh — ph/arrows-clockwise */
 export const IconRefresh = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...sized}>
-      <path d="M12 20q-3.35 0-5.675-2.325T4 12t2.325-5.675T12 4q1.725 0 3.3.712T18 6.75V4h2v7h-7V9h4.2q-.8-1.4-2.187-2.2T12 6Q9.5 6 7.75 7.75T6 12t1.75 4.25T12 18q1.925 0 3.475-1.1T17.65 14h2.1q-.7 2.65-2.85 4.325T12 20" />
+    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
+      <path d="M224 48v48a8 8 0 0 1-8 8h-48a8 8 0 0 1 0-16h28.69l-14.63-14.63a79.56 79.56 0 0 0-56.13-23.43h-.45a79.52 79.52 0 0 0-55.89 22.77a8 8 0 0 1-11.18-11.44a96 96 0 0 1 135 .79L208 76.69V48a8 8 0 0 1 16 0m-37.59 135.29a80 80 0 0 1-112.47-.66L59.31 168H88a8 8 0 0 0 0-16H40a8 8 0 0 0-8 8v48a8 8 0 0 0 16 0v-28.69l14.63 14.63A95.43 95.43 0 0 0 130 222.06h.53a95.36 95.36 0 0 0 67.07-27.33a8 8 0 0 0-11.18-11.44Z" />
     </svg>
   )
 }
 
-/** copy — material-symbols/content-copy */
+/** copy — ph/copy */
 export const IconCopy = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...sized}>
-      <path d="M9 18q-.825 0-1.412-.587T7 16V4q0-.825.588-1.412T9 2h9q.825 0 1.413.588T20 4v12q0 .825-.587 1.413T18 18zm-4 4q-.825 0-1.412-.587T3 20V6h2v14h11v2z" />
+    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
+      <path d="M216 32H88a8 8 0 0 0-8 8v40H40a8 8 0 0 0-8 8v128a8 8 0 0 0 8 8h128a8 8 0 0 0 8-8v-40h40a8 8 0 0 0 8-8V40a8 8 0 0 0-8-8m-56 176H48V96h112Zm48-48h-32V88a8 8 0 0 0-8-8H96V48h112Z" />
     </svg>
   )
 }
 
-/** check — material-symbols/check */
+/** check — ph/check */
 export const IconCheck = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...sized}>
-      <path d="m9.55 18l-5.7-5.7l1.425-1.425L9.55 15.15l9.175-9.175L20.15 7.4z" />
+    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
+      <path d="m229.66 77.66l-128 128a8 8 0 0 1-11.32 0l-56-56a8 8 0 0 1 11.32-11.32L96 188.69L218.34 66.34a8 8 0 0 1 11.32 11.32" />
     </svg>
   )
 }
 
-/** warning — material-symbols/warning */
+/** warning — ph/warning */
 export const IconWarning = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...sized}>
-      <path d="M1 21L12 2l11 19zm11.713-3.287Q13 17.425 13 17t-.288-.712T12 16t-.712.288T11 17t.288.713T12 18t.713-.288M11 15h2v-5h-2z" />
+    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
+      <path d="M236.8 188.09L149.35 36.22a24.76 24.76 0 0 0-42.7 0L19.2 188.09a23.51 23.51 0 0 0 0 23.72A24.35 24.35 0 0 0 40.55 224h174.9a24.35 24.35 0 0 0 21.33-12.19a23.51 23.51 0 0 0 .02-23.72m-13.87 15.71a8.5 8.5 0 0 1-7.48 4.2H40.55a8.5 8.5 0 0 1-7.48-4.2a7.59 7.59 0 0 1 0-7.72l87.45-151.87a8.75 8.75 0 0 1 15 0l87.45 151.87a7.59 7.59 0 0 1-.04 7.72M120 144v-40a8 8 0 0 1 16 0v40a8 8 0 0 1-16 0m20 36a12 12 0 1 1-12-12a12 12 0 0 1 12 12" />
     </svg>
   )
 }
 
-/** trash — material-symbols/delete */
+/** trash — ph/trash */
 export const IconTrash = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...sized}>
-      <path d="M7 21q-.825 0-1.412-.587T5 19V6H4V4h5V3h6v1h5v2h-1v13q0 .825-.587 1.413T17 21zm2-4h2V8H9zm4 0h2V8h-2z" />
+    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
+      <path d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0" />
     </svg>
   )
 }
 
-/** edit — material-symbols/edit */
+/** edit — ph/pencil-simple */
 export const IconEdit = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...sized}>
-      <path d="M3 21v-4.25L16.2 3.575q.3-.275.663-.425t.762-.15t.775.15t.65.45L20.425 5q.3.275.438.65T21 6.4q0 .4-.137.763t-.438.662L7.25 21zM17.6 7.8L19 6.4L17.6 5l-1.4 1.4z" />
+    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
+      <path d="m227.31 73.37l-44.68-44.69a16 16 0 0 0-22.63 0L36.69 152A15.86 15.86 0 0 0 32 163.31V208a16 16 0 0 0 16 16h44.69a15.86 15.86 0 0 0 11.31-4.69L227.31 96a16 16 0 0 0 0-22.63M92.69 208H48v-44.69l88-88L180.69 120ZM192 108.68L147.31 64l24-24L216 84.68Z" />
     </svg>
   )
 }
 
-/** pin — material-symbols/push-pin */
+/** pin — ph/push-pin */
 export const IconPin = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...sized}>
-      <path d="m16 12l2 2v2h-5v6l-1 1l-1-1v-6H6v-2l2-2V5H7V3h10v2h-1z" />
+    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
+      <path d="m235.32 81.37l-60.69-60.68a16 16 0 0 0-22.63 0l-53.63 53.8c-10.66-3.34-35-7.37-60.4 13.14a16 16 0 0 0-1.29 23.78L85 159.71l-42.66 42.63a8 8 0 0 0 11.32 11.32L96.29 171l48.29 48.29A16 16 0 0 0 155.9 224h1.13a15.93 15.93 0 0 0 11.64-6.33c19.64-26.1 17.75-47.32 13.19-60L235.33 104a16 16 0 0 0-.01-22.63M224 92.69l-57.27 57.46a8 8 0 0 0-1.49 9.22c9.46 18.93-1.8 38.59-9.34 48.62L48 100.08c12.08-9.74 23.64-12.31 32.48-12.31A40.1 40.1 0 0 1 96.81 91a8 8 0 0 0 9.25-1.51L163.32 32L224 92.68Z" />
     </svg>
   )
 }
 
-/** archive — material-symbols/archive */
+/** archive — ph/archive */
 export const IconArchive = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...sized}>
-      <path d="m12 18l4-4l-1.4-1.4l-1.6 1.6V10h-2v4.2l-1.6-1.6L8 14zm-7 3q-.825 0-1.412-.587T3 19V6.525q0-.35.113-.675t.337-.6L4.7 3.725q.275-.35.687-.538T6.25 3h11.5q.45 0 .863.188t.687.537l1.25 1.525q.225.275.338.6t.112.675V19q0 .825-.587 1.413T19 21zm.4-15h13.2l-.85-1H6.25z" />
+    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
+      <path d="M224 48H32a16 16 0 0 0-16 16v24a16 16 0 0 0 16 16v88a16 16 0 0 0 16 16h160a16 16 0 0 0 16-16v-88a16 16 0 0 0 16-16V64a16 16 0 0 0-16-16m-16 144H48v-88h160Zm16-104H32V64h192zM96 136a8 8 0 0 1 8-8h48a8 8 0 0 1 0 16h-48a8 8 0 0 1-8-8" />
     </svg>
   )
 }
 
-/** attach — material-symbols/attach-file */
+/** attach — ph/paperclip */
 export const IconAttach = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...sized}>
-      <path d="M18 15.75q0 2.6-1.825 4.425T11.75 22t-4.425-1.825T5.5 15.75V6.5q0-1.875 1.313-3.187T10 2t3.188 1.313T14.5 6.5v8.75q0 1.15-.8 1.95t-1.95.8t-1.95-.8t-.8-1.95V6h2v9.25q0 .325.213.538t.537.212t.538-.213t.212-.537V6.5q-.025-1.05-.737-1.775T10 4t-1.775.725T7.5 6.5v9.25q-.025 1.775 1.225 3.013T11.75 20q1.75 0 2.975-1.237T16 15.75V6h2z" />
+    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
+      <path d="M209.66 122.34a8 8 0 0 1 0 11.32l-82.05 82a56 56 0 0 1-79.2-79.21l99.26-100.72a40 40 0 1 1 56.61 56.55L105 193a24 24 0 1 1-34-34l83.3-84.62a8 8 0 1 1 11.4 11.22l-83.31 84.71a8 8 0 1 0 11.27 11.36L192.93 81A24 24 0 1 0 159 47L59.76 147.68a40 40 0 1 0 56.53 56.62l82.06-82a8 8 0 0 1 11.31.04" />
     </svg>
   )
 }
 
-/** mic — material-symbols/mic */
+/** mic — ph/microphone */
 export const IconMic = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...sized}>
-      <path d="M9.875 13.125Q9 12.25 9 11V5q0-1.25.875-2.125T12 2t2.125.875T15 5v6q0 1.25-.875 2.125T12 14t-2.125-.875M11 21v-3.075q-2.6-.35-4.3-2.325T5 11h2q0 2.075 1.463 3.538T12 16t3.538-1.463T17 11h2q0 2.625-1.7 4.6T13 17.925V21z" />
+    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
+      <path d="M128 176a48.05 48.05 0 0 0 48-48V64a48 48 0 0 0-96 0v64a48.05 48.05 0 0 0 48 48M96 64a32 32 0 0 1 64 0v64a32 32 0 0 1-64 0Zm40 143.6V240a8 8 0 0 1-16 0v-32.4A80.11 80.11 0 0 1 48 128a8 8 0 0 1 16 0a64 64 0 0 0 128 0a8 8 0 0 1 16 0a80.11 80.11 0 0 1-72 79.6" />
     </svg>
   )
 }
 
-/** panel — material-symbols/right-panel-open */
+/** panel — ph/sidebar-simple */
 export const IconPanel = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...sized}>
-      <path d="M11.5 16V8l-4 4zM5 21q-.825 0-1.412-.587T3 19V5q0-.825.588-1.412T5 3h14q.825 0 1.413.588T21 5v14q0 .825-.587 1.413T19 21zm9-2V5H5v14z" />
+    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
+      <path d="M216 40H40a16 16 0 0 0-16 16v144a16 16 0 0 0 16 16h176a16 16 0 0 0 16-16V56a16 16 0 0 0-16-16M40 56h40v144H40Zm176 144H96V56h120z" />
     </svg>
   )
 }
 
-/** target — material-symbols/target */
+/** target — ph/target */
 export const IconTarget = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...sized}>
-      <path d="M8.1 21.213q-1.825-.788-3.175-2.138T2.788 15.9T2 12t.788-3.9t2.137-3.175T8.1 2.788T12 2t3.9.788t3.175 2.137T21.213 8.1T22 12t-.788 3.9t-2.137 3.175t-3.175 2.138T12 22t-3.9-.788m9.575-3.537Q20 15.35 20 12t-2.325-5.675T12 4T6.325 6.325T4 12t2.325 5.675T12 20t5.675-2.325M7.75 16.25Q6 14.5 6 12t1.75-4.25T12 6t4.25 1.75T18 12t-1.75 4.25T12 18t-4.25-1.75m7.075-1.425Q16 13.65 16 12t-1.175-2.825T12 8T9.175 9.175T8 12t1.175 2.825T12 16t2.825-1.175m-4.237-1.412Q10 12.825 10 12t.588-1.412T12 10t1.413.588T14 12t-.587 1.413T12 14t-1.412-.587" />
+    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
+      <path d="M221.87 83.16A104.1 104.1 0 1 1 195.67 49l22.67-22.68a8 8 0 0 1 11.32 11.32l-96 96a8 8 0 0 1-11.32-11.32l27.72-27.72a40 40 0 1 0 17.87 31.09a8 8 0 1 1 16-.9a56 56 0 1 1-22.38-41.65l22.75-22.75a87.88 87.88 0 1 0 23.13 29.67a8 8 0 0 1 14.44-6.9" />
     </svg>
   )
 }
 
-/** checklist — material-symbols/checklist */
+/** checklist — ph/list-checks */
 export const IconChecklist = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...sized}>
-      <path d="M5.55 19L2 15.45l1.4-1.4l2.125 2.125l4.25-4.25l1.4 1.425zm0-8L2 7.45l1.4-1.4l2.125 2.125l4.25-4.25l1.4 1.425zM13 17v-2h9v2zm0-8V7h9v2z" />
+    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
+      <path d="M224 128a8 8 0 0 1-8 8h-88a8 8 0 0 1 0-16h88a8 8 0 0 1 8 8m-96-56h88a8 8 0 0 0 0-16h-88a8 8 0 0 0 0 16m88 112h-88a8 8 0 0 0 0 16h88a8 8 0 0 0 0-16M82.34 42.34L56 68.69L45.66 58.34a8 8 0 0 0-11.32 11.32l16 16a8 8 0 0 0 11.32 0l32-32a8 8 0 0 0-11.32-11.32m0 64L56 132.69l-10.34-10.35a8 8 0 0 0-11.32 11.32l16 16a8 8 0 0 0 11.32 0l32-32a8 8 0 0 0-11.32-11.32m0 64L56 196.69l-10.34-10.35a8 8 0 0 0-11.32 11.32l16 16a8 8 0 0 0 11.32 0l32-32a8 8 0 0 0-11.32-11.32" />
     </svg>
   )
 }
 
-/** language — material-symbols/language */
+/** language — ph/globe */
 export const IconLanguage = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...sized}>
-      <path d="M8.125 21.213q-1.825-.788-3.187-2.15t-2.15-3.188T2 11.988t.788-3.875t2.15-3.175t3.187-2.15T12.013 2t3.875.788t3.175 2.15t2.15 3.175t.787 3.875t-.787 3.887t-2.15 3.188t-3.175 2.15t-3.875.787t-3.888-.787M12 19.95q.65-.9 1.125-1.875T13.9 16h-3.8q.3 1.1.775 2.075T12 19.95m-2.6-.4q-.45-.825-.787-1.713T8.05 16H5.1q.725 1.25 1.813 2.175T9.4 19.55m5.2 0q1.4-.45 2.488-1.375T18.9 16h-2.95q-.225.95-.562 1.838T14.6 19.55M4.25 14h3.4q-.075-.5-.112-.987T7.5 12t.038-1.012T7.65 10h-3.4q-.125.5-.187.988T4 12t.063 1.013t.187.987m5.4 0h4.7q.075-.5.113-.987T14.5 12t-.038-1.012T14.35 10h-4.7q-.075.5-.112.988T9.5 12t.038 1.013t.112.987m6.7 0h3.4q.125-.5.188-.987T20 12t-.062-1.012T19.75 10h-3.4q.075.5.113.988T16.5 12t-.038 1.013t-.112.987m-.4-6h2.95q-.725-1.25-1.812-2.175T14.6 4.45q.45.825.788 1.713T15.95 8M10.1 8h3.8q-.3-1.1-.775-2.075T12 4.05q-.65.9-1.125 1.875T10.1 8m-5 0h2.95q.225-.95.563-1.838T9.4 4.45Q8 4.9 6.912 5.825T5.1 8" />
+    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
+      <path d="M128 24a104 104 0 1 0 104 104A104.12 104.12 0 0 0 128 24m88 104a87.6 87.6 0 0 1-3.33 24h-38.51a157.4 157.4 0 0 0 0-48h38.51a87.6 87.6 0 0 1 3.33 24m-114 40h52a115.1 115.1 0 0 1-26 45a115.3 115.3 0 0 1-26-45m-3.9-16a140.8 140.8 0 0 1 0-48h59.88a140.8 140.8 0 0 1 0 48ZM40 128a87.6 87.6 0 0 1 3.33-24h38.51a157.4 157.4 0 0 0 0 48H43.33A87.6 87.6 0 0 1 40 128m114-40h-52a115.1 115.1 0 0 1 26-45a115.3 115.3 0 0 1 26 45m52.33 0h-35.62a135.3 135.3 0 0 0-22.3-45.6A88.29 88.29 0 0 1 206.37 88Zm-98.74-45.6A135.3 135.3 0 0 0 85.29 88H49.63a88.29 88.29 0 0 1 57.96-45.6M49.63 168h35.66a135.3 135.3 0 0 0 22.3 45.6A88.29 88.29 0 0 1 49.63 168m98.78 45.6a135.3 135.3 0 0 0 22.3-45.6h35.66a88.29 88.29 0 0 1-57.96 45.6" />
     </svg>
   )
 }
 
-/** dragIndicator — material-symbols/drag-indicator */
+/** dragIndicator — ph/dots-six-vertical */
 export const IconDragIndicator = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...sized}>
-      <path d="M9 20q-.825 0-1.412-.587T7 18t.588-1.412T9 16t1.413.588T11 18t-.587 1.413T9 20m6 0q-.825 0-1.412-.587T13 18t.588-1.412T15 16t1.413.588T17 18t-.587 1.413T15 20m-6-6q-.825 0-1.412-.587T7 12t.588-1.412T9 10t1.413.588T11 12t-.587 1.413T9 14m6 0q-.825 0-1.412-.587T13 12t.588-1.412T15 10t1.413.588T17 12t-.587 1.413T15 14M9 8q-.825 0-1.412-.587T7 6t.588-1.412T9 4t1.413.588T11 6t-.587 1.413T9 8m6 0q-.825 0-1.412-.587T13 6t.588-1.412T15 4t1.413.588T17 6t-.587 1.413T15 8" />
+    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
+      <path d="M104 60a12 12 0 1 1-12-12a12 12 0 0 1 12 12m60 12a12 12 0 1 0-12-12a12 12 0 0 0 12 12m-72 44a12 12 0 1 0 12 12a12 12 0 0 0-12-12m72 0a12 12 0 1 0 12 12a12 12 0 0 0-12-12m-72 68a12 12 0 1 0 12 12a12 12 0 0 0-12-12m72 0a12 12 0 1 0 12 12a12 12 0 0 0-12-12" />
     </svg>
   )
 }
 
-/** keyboardReturn — material-symbols/keyboard-return */
+/** keyboardReturn — ph/arrow-elbow-down-left */
 export const IconKeyboardReturn = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...sized}>
-      <path d="m9 18l-6-6l6-6l1.4 1.4L6.8 11H19V7h2v6H6.8l3.6 3.6z" />
+    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
+      <path d="M200 32v144a8 8 0 0 1-8 8H67.31l34.35 34.34a8 8 0 0 1-11.32 11.32l-48-48a8 8 0 0 1 0-11.32l48-48a8 8 0 0 1 11.32 11.32L67.31 168H184V32a8 8 0 0 1 16 0" />
     </svg>
   )
 }
 
-/** tune — material-symbols/tune */
+/** tune — ph/sliders */
 export const IconTune = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...sized}>
-      <path d="M11 21v-6h2v2h8v2h-8v2zm-8-2v-2h6v2zm4-4v-2H3v-2h4V9h2v6zm4-2v-2h10v2zm4-4V3h2v2h4v2h-4v2zM3 7V5h10v2z" />
+    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
+      <path d="M64 105V40a8 8 0 0 0-16 0v65a32 32 0 0 0 0 62v49a8 8 0 0 0 16 0v-49a32 32 0 0 0 0-62m-8 47a16 16 0 1 1 16-16a16 16 0 0 1-16 16m80-95V40a8 8 0 0 0-16 0v17a32 32 0 0 0 0 62v97a8 8 0 0 0 16 0v-97a32 32 0 0 0 0-62m-8 47a16 16 0 1 1 16-16a16 16 0 0 1-16 16m104 64a32.06 32.06 0 0 0-24-31V40a8 8 0 0 0-16 0v97a32 32 0 0 0 0 62v17a8 8 0 0 0 16 0v-17a32.06 32.06 0 0 0 24-31m-32 16a16 16 0 1 1 16-16a16 16 0 0 1-16 16" />
     </svg>
   )
 }
 
-/** checkBox — material-symbols/check-box */
+/** checkBox — ph/check-square */
 export const IconCheckBox = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...sized}>
-      <path d="m10.6 16.2l7.05-7.05l-1.4-1.4l-5.65 5.65l-2.85-2.85l-1.4 1.4zM5 21q-.825 0-1.412-.587T3 19V5q0-.825.588-1.412T5 3h14q.825 0 1.413.588T21 5v14q0 .825-.587 1.413T19 21z" />
+    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
+      <path d="M173.66 98.34a8 8 0 0 1 0 11.32l-56 56a8 8 0 0 1-11.32 0l-24-24a8 8 0 0 1 11.32-11.32L112 148.69l50.34-50.35a8 8 0 0 1 11.32 0M224 48v160a16 16 0 0 1-16 16H48a16 16 0 0 1-16-16V48a16 16 0 0 1 16-16h160a16 16 0 0 1 16 16m-16 160V48H48v160z" />
     </svg>
   )
 }
 
-/** download — material-symbols/download */
+/** download — ph/download */
 export const IconDownload = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...sized}>
-      <path d="m12 16l-5-5l1.4-1.45l2.6 2.6V4h2v8.15l2.6-2.6L17 11zm-6 4q-.825 0-1.412-.587T4 18v-3h2v3h12v-3h2v3q0 .825-.587 1.413T18 20z" />
+    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
+      <path d="M240 136v64a16 16 0 0 1-16 16H32a16 16 0 0 1-16-16v-64a16 16 0 0 1 16-16h40a8 8 0 0 1 0 16H32v64h192v-64h-40a8 8 0 0 1 0-16h40a16 16 0 0 1 16 16m-117.66-2.34a8 8 0 0 0 11.32 0l48-48a8 8 0 0 0-11.32-11.32L136 108.69V24a8 8 0 0 0-16 0v84.69L85.66 74.34a8 8 0 0 0-11.32 11.32ZM200 168a12 12 0 1 0-12 12a12 12 0 0 0 12-12" />
     </svg>
   )
 }
 
-/** upload — material-symbols/upload */
+/** upload — ph/upload */
 export const IconUpload = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...sized}>
-      <path d="M11 16V7.85l-2.6 2.6L7 9l5-5l5 5l-1.4 1.45l-2.6-2.6V16zm-5 4q-.825 0-1.412-.587T4 18v-3h2v3h12v-3h2v3q0 .825-.587 1.413T18 20z" />
+    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
+      <path d="M240 136v64a16 16 0 0 1-16 16H32a16 16 0 0 1-16-16v-64a16 16 0 0 1 16-16h48a8 8 0 0 1 0 16H32v64h192v-64h-48a8 8 0 0 1 0-16h48a16 16 0 0 1 16 16M85.66 77.66L120 43.31V128a8 8 0 0 0 16 0V43.31l34.34 34.35a8 8 0 0 0 11.32-11.32l-48-48a8 8 0 0 0-11.32 0l-48 48a8 8 0 0 0 11.32 11.32M200 168a12 12 0 1 0-12 12a12 12 0 0 0 12-12" />
     </svg>
   )
 }
 
-/** panTool — material-symbols/pan-tool */
+/** panTool — ph/hand */
 export const IconPanTool = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...sized}>
-      <path d="M10.05 23q-.75 0-1.4-.337T7.575 21.7L1.2 12.375l.6-.575q.475-.475 1.125-.55t1.175.3L7 13.575V4q0-.425.288-.712T8 3t.713.288T9 4v8h2V2q0-.425.288-.712T12 1t.713.288T13 2v10h2V3q0-.425.288-.712T16 2t.713.288T17 3v9h2V5q0-.425.288-.712T20 4t.713.288T21 5v14q0 1.65-1.175 2.825T17 23z" />
+    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
+      <path d="M188 48a27.75 27.75 0 0 0-12 2.71V44a28 28 0 0 0-54.65-8.6A28 28 0 0 0 80 60v64l-3.82-6.13a28 28 0 0 0-48.6 27.82c16 33.77 28.93 57.72 43.72 72.69C86.24 233.54 103.2 240 128 240a88.1 88.1 0 0 0 88-88V76a28 28 0 0 0-28-28m12 104a72.08 72.08 0 0 1-72 72c-20.38 0-33.51-4.88-45.33-16.85C69.44 193.74 57.26 171 41.9 138.58a6 6 0 0 0-.3-.58a12 12 0 0 1 20.79-12a2 2 0 0 0 .14.23l18.67 30A8 8 0 0 0 96 152V60a12 12 0 0 1 24 0v60a8 8 0 0 0 16 0V44a12 12 0 0 1 24 0v76a8 8 0 0 0 16 0V76a12 12 0 0 1 24 0Z" />
     </svg>
   )
 }
 
-/** verifiedUser — material-symbols/verified-user */
+/** verifiedUser — ph/shield-check */
 export const IconVerifiedUser = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...sized}>
-      <path d="M10.95 15.55L16.6 9.9l-1.425-1.425L10.95 12.7l-2.1-2.1l-1.425 1.425zM12 22q-3.475-.875-5.737-3.988T4 11.1V5l8-3l8 3v6.1q0 3.8-2.262 6.913T12 22" />
+    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
+      <path d="M208 40H48a16 16 0 0 0-16 16v56c0 52.72 25.52 84.67 46.93 102.19c23.06 18.86 46 25.26 47 25.53a8 8 0 0 0 4.2 0c1-.27 23.91-6.67 47-25.53C198.48 196.67 224 164.72 224 112V56a16 16 0 0 0-16-16m0 72c0 37.07-13.66 67.16-40.6 89.42a129.3 129.3 0 0 1-39.4 22.2a128.3 128.3 0 0 1-38.92-21.81C61.82 179.51 48 149.3 48 112V56h160ZM82.34 141.66a8 8 0 0 1 11.32-11.32L112 148.69l50.34-50.35a8 8 0 0 1 11.32 11.32l-56 56a8 8 0 0 1-11.32 0Z" />
     </svg>
   )
 }
 
-/** hexagon — material-symbols/hexagon */
+/** hexagon — ph/hexagon */
 export const IconHexagon = (props: IconProps) => {
   const sized = withSize(props)
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...sized}>
-      <path d="m6.8 21l-5.2-9l5.2-9h10.4l5.2 9l-5.2 9z" />
+    <svg viewBox="0 0 256 256" aria-hidden="true" {...sized}>
+      <path d="m223.68 66.15l-88-48.15a15.88 15.88 0 0 0-15.36 0l-88 48.17a16 16 0 0 0-8.32 14v95.64a16 16 0 0 0 8.32 14l88 48.17a15.88 15.88 0 0 0 15.36 0l88-48.17a16 16 0 0 0 8.32-14V80.18a16 16 0 0 0-8.32-14.03M216 175.82L128 224l-88-48.18V80.18L128 32l88 48.17Z" />
     </svg>
   )
 }
