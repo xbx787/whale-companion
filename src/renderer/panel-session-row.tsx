@@ -55,7 +55,6 @@ export function SessionRow({ item, active, selected, multiSelect, busy, renaming
       <button type="button" aria-label={`删除 ${item.title}`} title={statusRunning(item) ? '这个会话还在运行，结束后才能删除' : '删除'} disabled={busy || statusRunning(item)} onClick={onStartDelete}><DeleteIcon /></button>
     </div>}
     {!multiSelect && <div className="panel-session-meta" aria-hidden="true">
-      <span>{modeLabels[item.mode]}</span>
       <span>创建 {stampText(item.createdAt)}</span>
       <span>活动 {stampText(item.lastActivityAt)}</span>
       <span>{item.messageCount} 条消息</span>

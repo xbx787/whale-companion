@@ -61,10 +61,11 @@ export function ModelPicker({ wrapperRef, open, dsh, sideExpanded, goalOn, planO
           <div className="panel-model-empty">还没有可用的模型配置——<button type="button" className="panel-model-empty-link" onClick={onOpenOnboarding}>打开配置向导</button></div>}
         {enabled.map((profile) => (
           <button key={profile.id} type="button" role="radio" aria-checked={profile.id === activeId}
+            aria-label={profile.name}
             className={`panel-model-pick${profile.id === activeId ? ' is-active' : ''}`}
             disabled={sideExpanded}
             onClick={() => onPickProfile(profile.id)}>
-            <span>{profile.name}</span>{profile.id === activeId && <span className="panel-model-check">✓</span>}
+            {profile.id === activeId && <span className="panel-model-check">✓</span>}
           </button>))}
         <button type="button" className="panel-model-manage" onClick={onManage}>在设置中管理…</button>
       </div>
