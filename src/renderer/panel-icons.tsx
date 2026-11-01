@@ -77,7 +77,8 @@ export function ImportIcon() {
 }
 
 export function PinIcon({ pinned }: { pinned: boolean }) {
-  return pinned ? <IconPinFill size={18} /> : <IconPin size={18} />;
+  // 竖直图钉；已置顶用满亮度，未置顶压淡，避免再用斜杠。
+  return <span className={`panel-pin${pinned ? ' is-pinned' : ''}`}><IconPin size={18} /></span>;
 }
 
 export function ContextMeter({ usage, compacting, open, onToggle }: {

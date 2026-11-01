@@ -281,10 +281,9 @@ body.panel-placement-right .panel-bubble::after { display: none; }
 .panel-nav-role { display: block; margin-bottom: 3px; color: #8fa9d9; font-size: var(--text-2xs); }
 .panel-nav-role.is-user { color: #e2c3a5; }
 .panel-nav-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; margin: 0; color: #d5e1fa; font-size: var(--text-xs); line-height: 1.5; overflow-wrap: anywhere; white-space: pre-wrap; }
-/* 置顶：Material 的 pin 上叠一条斜线，和原来的“已置顶”状态区分。 */
-.panel-pin-icon { position: relative; display: inline-flex; width: 18px; height: 18px; }
-.panel-pin-icon > svg { width: 18px; height: 18px; }
-.panel-pin-slash { position: absolute; inset: 0; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+/* 置顶：竖直图钉，未置顶压淡，已置顶满亮度。 */
+.panel-pin { display: inline-flex; opacity: .45; transition: opacity .15s ease; }
+.panel-pin.is-pinned { opacity: 1; }
 
 /* 外观设置：隐藏来源标签；紧凑行距只压消息行之间的空白，不改变字号。 */
 .panel-feed.is-no-sender .panel-event-route { display: none; }
