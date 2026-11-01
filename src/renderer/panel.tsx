@@ -1786,16 +1786,17 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
       ? group.user.id === id || group.items.some((item) => item.id === id)
       : group.entry.id === id);
     if (fullIndex < 0) {
-      // 目标还在没拉回来的更早历史里：一页页往回翻，等它进入已加载范围，
-      // pendingJump 会在它渲染出来后滚过去。
-      if (mergedTimeline.length >= (snapshot?.timelineTotal ?? 0)) return;
+      // 目标还在没拉回来的更早历史里。直接调分页接口容易拿到空页而空转，
+      // 改成滚到顶去触发那条已经在用的「滚到顶就加载」路径，加载一层再
+      // 滚回顶部，直到目标被渲染出来，pendingJump 会把它滚进视野。
       pendingJumpRef.current = id;
+      followFeedRef.current = false;
+      if (feedRef.current) feedRef.current.scrollTop = 0;
       void (async () => {
         for (let attempt = 0; attempt < 40; attempt += 1) {
+          await new Promise((resolve) => setTimeout(resolve, 200));
           if (feedRef.current?.querySelector(`[data-entry-id="${id}"]`)) return;
-          if (timeline.length + olderCountRef.current >= (snapshot?.timelineTotal ?? 0)) return;
-          await loadOlderPage();
-          await new Promise((resolve) => setTimeout(resolve, 120));
+          if (feedRef.current && feedRef.current.scrollTop > 0) feedRef.current.scrollTop = 0;
         }
       })();
       return;
