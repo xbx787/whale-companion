@@ -241,6 +241,10 @@ export interface ConversationSettings {
   enableAutoTitleGeneration: boolean
   /** Whether message rows show their clock time. */
   showMessageTimestamps: boolean
+  /** 是否在消息头部显示来源/目标标签；默认显示。 */
+  showSenderBadges?: boolean
+  /** 时间线使用紧凑行距；默认关闭。 */
+  compactTimeline?: boolean
   /** What the assistant calls the user, and what the user calls it. */
   userName: string
   assistantName: string

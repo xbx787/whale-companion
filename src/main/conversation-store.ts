@@ -286,6 +286,7 @@ function isPanelTheme(value: unknown): value is PanelTheme {
 
 function readExtendedSettings(settings: Record<string, unknown>): Pick<ConversationSettings,
   'modelProfiles' | 'activeModelProfileId' | 'enableAutoTitleGeneration' | 'showMessageTimestamps' |
+  'showSenderBadges' | 'compactTimeline' |
   'userName' | 'assistantName' | 'userAvatar' | 'assistantAvatar' | 'tabOrder' |
   'goalMaxIterations' | 'goalMaxMinutes' | 'memoryEnabled' | 'panelSize' | 'panelPlacement' | 'panelTheme' | 'uiSize' | 'avatarSize' | 'avatarRenderer' | 'webSearchEnabled' | 'personaId' | 'agentKernel' | 'autoCompactPercent' |
   'toolRowDetail' |
@@ -302,6 +303,8 @@ function readExtendedSettings(settings: Record<string, unknown>): Pick<Conversat
     activeModelProfileId,
     enableAutoTitleGeneration: settings.enableAutoTitleGeneration !== false,
     showMessageTimestamps: settings.showMessageTimestamps !== false,
+    showSenderBadges: settings.showSenderBadges !== false,
+    compactTimeline: settings.compactTimeline === true,
     userName: isDisplayName(settings.userName) ? settings.userName.trim() : '主人',
     assistantName: isDisplayName(settings.assistantName) ? settings.assistantName.trim() : '小鲸',
     userAvatar: isStoredAvatar(settings.userAvatar) ? settings.userAvatar : null,
@@ -699,6 +702,7 @@ export class ConversationStore {
     if (!settings) {
       settings = { visibleConversationTabs: DEFAULT_VISIBLE_TABS, autoArchiveAfterDays: 0, effort: 'max',
         modelProfiles: [], activeModelProfileId: null, enableAutoTitleGeneration: true, showMessageTimestamps: true,
+        showSenderBadges: true, compactTimeline: false,
         userName: '主人', assistantName: '小鲸', userAvatar: null, assistantAvatar: null, tabOrder: [],
         goalMaxIterations: 30, goalMaxMinutes: 0, memoryEnabled: true, uiSize: 'small', avatarSize: 'small', avatarRenderer: 'sprite', agentKernel: 'dsh',
         panelPlacement: 'top', panelTheme: 'dark',

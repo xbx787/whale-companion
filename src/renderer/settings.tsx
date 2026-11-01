@@ -642,6 +642,18 @@ export function SettingsPage() {
             onClick={() => { void update({ showMessageTimestamps: !(settings?.showMessageTimestamps ?? true) }) }} />
         </div>
         <div className="settings-row">
+          <div className="settings-copy"><label id="sender-badges-label">来源标签</label><p>跨端或跨对话转来的消息，在正文上方显示来源与目标。</p></div>
+          <button type="button" role="switch" aria-labelledby="sender-badges-label" aria-checked={settings?.showSenderBadges !== false}
+            className={`settings-switch${settings?.showSenderBadges !== false ? ' is-on' : ''}`} disabled={!settings || busy}
+            onClick={() => { void update({ showSenderBadges: !(settings?.showSenderBadges !== false) }) }} />
+        </div>
+        <div className="settings-row">
+          <div className="settings-copy"><label id="compact-timeline-label">紧凑间距</label><p>缩小对话行之间的间距，一屏显示更多内容。</p></div>
+          <button type="button" role="switch" aria-labelledby="compact-timeline-label" aria-checked={settings?.compactTimeline === true}
+            className={`settings-switch${settings?.compactTimeline === true ? ' is-on' : ''}`} disabled={!settings || busy}
+            onClick={() => { void update({ compactTimeline: !(settings?.compactTimeline === true) }) }} />
+        </div>
+        <div className="settings-row">
           <div className="settings-copy"><label id="load-user-settings-label">加载 Claude 用户设置</label><p>读取 ~/.claude 里的权限、hooks 和输出风格；关闭后只使用项目和本应用设置。</p></div>
           <button type="button" role="switch" aria-labelledby="load-user-settings-label" aria-checked={settings?.loadUserSettings !== false}
             className={`settings-switch${settings?.loadUserSettings !== false ? ' is-on' : ''}`} disabled={!settings || busy}

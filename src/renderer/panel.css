@@ -281,6 +281,12 @@ body.panel-placement-right .panel-bubble::after { display: none; }
 .panel-nav-role { display: block; margin-bottom: 3px; color: #8fa9d9; font-size: var(--text-2xs); }
 .panel-nav-role.is-user { color: #e2c3a5; }
 .panel-nav-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; margin: 0; color: #d5e1fa; font-size: var(--text-xs); line-height: 1.5; overflow-wrap: anywhere; white-space: pre-wrap; }
+/* 外观设置：隐藏来源标签；紧凑行距只压消息行之间的空白，不改变字号。 */
+.panel-feed.is-no-sender .panel-event-route { display: none; }
+.panel-feed.is-compact .panel-event { margin-bottom: 2px; }
+.panel-feed.is-compact .panel-thought,
+.panel-feed.is-compact .panel-tool-activity { margin-bottom: 1px; }
+
 .panel-feed {
   flex: 1;
   min-height: 0;

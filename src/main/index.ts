@@ -1742,7 +1742,7 @@ function isScreenPoint(value: unknown): value is Electron.Point {
 function conversationSettingsPatch(value: unknown): Partial<ConversationSettings> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('会话设置无效。')
   const input = value as Record<string, unknown>
-  const editable = ['visibleConversationTabs', 'autoArchiveAfterDays', 'effort', 'goalMaxIterations', 'goalMaxMinutes', 'memoryEnabled', 'uiSize', 'avatarSize', 'avatarRenderer', 'toolRowDetail', 'webSearchEnabled', 'personaId', 'agentKernel', 'autoCompactPercent', 'assistantAvatar', 'enableAutoTitleGeneration', 'showMessageTimestamps', 'userName', 'assistantName', 'panelPlacement', 'panelTheme',
+  const editable = ['visibleConversationTabs', 'autoArchiveAfterDays', 'effort', 'goalMaxIterations', 'goalMaxMinutes', 'memoryEnabled', 'uiSize', 'avatarSize', 'avatarRenderer', 'toolRowDetail', 'webSearchEnabled', 'personaId', 'agentKernel', 'autoCompactPercent', 'assistantAvatar', 'enableAutoTitleGeneration', 'showMessageTimestamps', 'showSenderBadges', 'compactTimeline', 'userName', 'assistantName', 'panelPlacement', 'panelTheme',
     'outputStyle', 'appendSystemPrompt', 'autoScroll', 'expandFileEditsByDefault', 'sessionSort', 'titleLocale', 'titleModel', 'loadUserSettings']
   if (Object.keys(input).some((key) => !editable.includes(key))) throw new Error('会话设置无效。')
   const patch: Partial<ConversationSettings> = {}
