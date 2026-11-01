@@ -1,5 +1,5 @@
 // 生成渲染层图标模块：统一用 Phosphor Regular（细线），运行时不需要网络。
-import { writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 // 逻辑名 → Phosphor 图标名（regular 变体，无 -fill 后缀）。
@@ -25,9 +25,9 @@ const icons = {
   warning: 'ph/warning',
   trash: 'ph/trash',
   edit: 'ph/pencil-simple',
-  pin: 'material-symbols/push-pin',
-  pinFill: 'material-symbols/push-pin',
-  archive: 'ph/archive-box',
+  pin: 'ph/push-pin',
+  pinFill: 'ph/push-pin-fill',
+  archive: 'ph/archive',
   attach: 'ph/paperclip',
   mic: 'ph/microphone',
   panel: 'ph/sidebar-simple',
@@ -42,25 +42,23 @@ const icons = {
   upload: 'ph/upload',
   panTool: 'ph/hand',
   verifiedUser: 'ph/shield-check',
-  hexagon: 'ph/hexagon'
+  hexagon: 'ph/hexagon',
+  sparkle: 'ph/sparkle'
 }
 
+const phSource = JSON.parse(readFileSync('D:/DesktopPetProject/.worktrees/dsh-p0/node_modules/@iconify-json/ph/icons.json', 'utf8'))
+const msSource = JSON.parse(readFileSync('D:/DesktopPetProject/.worktrees/dsh-p0/node_modules/@iconify-json/material-symbols/icons.json', 'utf8'))
 const base = 'https://api.iconify.design'
 
-async function fetchIcon(id) {
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    try {
-      const response = await fetch(`${base}/${id}.svg?height=24&color=currentColor`)
-      if (!response.ok) continue
-      const text = await response.text()
-      if (text.trim().startsWith('<svg')) return text
-    } catch {
-      // 网络抖动时重试。
-    }
-  }
-  return null
+function fetchIcon(id) {
+  const parts = id.split("/")
+  const prefix = parts[0]
+  const name = parts.slice(1).join("/")
+  const source = prefix === "ph" ? phSource : prefix === "material-symbols" ? msSource : null
+  const entry = source && source.icons ? source.icons[name] : null
+  if (!entry || !entry.body) return null
+  return "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 " + source.width + " " + source.height + "\" fill=\"currentColor\">" + entry.body + "</svg>"
 }
-
 function parseSvg(svg) {
   const viewBox = /viewBox="([^"]+)"/.exec(svg)?.[1]
   const paths = [...svg.matchAll(/<path[^>]*d="([^"]+)"/g)].map((match) => match[1])
@@ -102,6 +100,10 @@ const target = resolve('D:/DesktopPetProject/.worktrees/dsh-p0/src/renderer/icon
 writeFileSync(target, file, 'utf8')
 console.log(`wrote ${target} (${resolved.length} icons)`)
 console.log(missing.length ? `missing: ${missing.join(', ')}` : 'all icons resolved')
+
+
+
+
 
 
 

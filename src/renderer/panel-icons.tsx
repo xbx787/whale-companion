@@ -1,5 +1,5 @@
 import type { ApprovalMode, ContextUsageSnapshot } from '../shared/contracts'
-import { IconArchive, IconCheckBox, IconChecklist, IconClose, IconDownload, IconDragIndicator, IconEdit, IconHexagon, IconKeyboardReturn, IconLanguage, IconPanTool, IconPin, IconPinFill, IconPlus, IconRefresh, IconTarget, IconTrash, IconTune, IconUpload, IconVerifiedUser } from './icons'
+import { IconArchive, IconCheckBox, IconChecklist, IconClose, IconDownload, IconDragIndicator, IconEdit, IconKeyboardReturn, IconLanguage, IconPanTool, IconPlus, IconRefresh, IconSparkle, IconTarget, IconTrash, IconTune, IconUpload, IconVerifiedUser } from './icons'
 
 /** One icon per permission mode: a hand (manual approval), a pencil (workspace
  *  writes), a warning shield (everything runs), a hexagon (self restart). */
@@ -7,7 +7,7 @@ export function ApprovalIcon({ mode }: { mode: ApprovalMode }) {
   if (mode === 'read-only') return <IconPanTool size={18} />;
   if (mode === 'workspace-write') return <IconEdit size={18} />;
   if (mode === 'danger-full-access') return <IconVerifiedUser size={18} />;
-  return <IconHexagon size={18} />;
+  return <IconSparkle size={18} />;
 }
 
 /** Goal mode: a target with an arrow; plan mode: a checklist. */
@@ -77,8 +77,14 @@ export function ImportIcon() {
 }
 
 export function PinIcon({ pinned }: { pinned: boolean }) {
-  // 竖直图钉；已置顶用满亮度，未置顶压淡，避免再用斜杠。
-  return <span className={`panel-pin${pinned ? ' is-pinned' : ''}`}><IconPin size={18} /></span>;
+  // 竖直图钉；已置顶满亮度，未置顶压淡。
+  return (
+    <span className={`panel-pin${pinned ? ' is-pinned' : ''}`}>
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+        <path d="M15 3H9v2l1 1v4.6L7 13.6V16h4.2v5h1.6v-5H17v-2.4l-3-3V6l1-1V3Z" />
+      </svg>
+    </span>
+  );
 }
 
 export function ContextMeter({ usage, compacting, open, onToggle }: {
