@@ -1237,7 +1237,7 @@ body.panel-theme-light .panel-live-label::before, body.panel-theme-light .panel-
 body.panel-theme-light .panel-event-sender{ display: inline-flex; align-items: center; margin: 0 0 3px; padding: 1px 6px; border-radius: 5px; color: #73490f; background: rgba(132, 88, 15, 0.12); font-size: var(--text-2xs); line-height: 1.4; }
 
 /* 跨端/内部转发：来源框 → 目标框，两个圆角矩形各用一种色。 */
-body.panel-theme-light .panel-event-route{ position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0 0 42px; padding-left: 16px; max-width: 100%; }
+body.panel-theme-light .panel-event-route{ position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0 2px; padding-left: 16px; max-width: 100%; }
 /* 从正文左下角弯到色块的四分之一圆弧，实色、不透明、无渐变。 */
 body.panel-theme-light .panel-event-route::before{ content: ""; position: absolute; left: 0; top: -9px; width: 13px; height: 13px; border-left: 2px solid #082556; border-bottom: 2px solid #082556; border-bottom-left-radius: 13px; }
 body.panel-theme-light .route-box{ display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 9px; font-size: var(--text-md); line-height: 1.45; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
