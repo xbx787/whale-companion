@@ -1241,9 +1241,9 @@ body.panel-theme-light .panel-live-label::before, body.panel-theme-light .panel-
 body.panel-theme-light .panel-event-sender{ display: inline-flex; align-items: center; margin: 0 0 3px; padding: 1px 6px; border-radius: 5px; color: #73490f; background: rgba(132, 88, 15, 0.12); font-size: var(--text-2xs); line-height: 1.4; }
 
 /* 跨端/内部转发：来源框 → 目标框，两个圆角矩形各用一种色。 */
-body.panel-theme-light .panel-event-route{ position: absolute; left: 0; top: calc(100% + 8px); display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-left: 22px; max-width: 100%; }
+body.panel-theme-light .panel-event-route{ position: absolute; left: 0; top: calc(100% + 8px); display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-left: 40px; max-width: 100%; }
 /* 从气泡底边弯到色块横向中线的四分之一圆，SVG 画，两端各一个实心圆点。 */
-body.panel-theme-light .route-arc{ position: absolute; left: 0; bottom: 50%; width: 16px; height: 24px; color: #082556; fill: #082556; stroke: #082556; stroke-width: 1.6; stroke-linecap: round; }
+body.panel-theme-light .route-arc{ position: absolute; left: 0; bottom: 50%; width: 34px; height: 46px; color: #082556; fill: #082556; stroke: #082556; stroke-width: 1.6; stroke-linecap: round; }
 body.panel-theme-light .route-arc path{ fill: none; }
 /* 用户消息靠右：色块右对齐气泡右边界；弧线仍在色块左端，跟着色块走。 */
 body.panel-theme-light .panel-event-user .panel-event-route{ left: auto; right: 0; justify-content: flex-end; padding-left: 0; padding-right: 16px; }.route-box { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 9px; font-size: var(--text-md); line-height: 1.45; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
@@ -1341,3 +1341,4 @@ body.panel-theme-light .panel-right-goal-edit span{ color: #2b426c; font-size: v
 body.panel-theme-light .panel-right-goal-edit textarea{ width: 100%; min-height: 62px; padding: 6px 8px; border: 1px solid rgba(0, 22, 65, 0.24); border-radius: 6px; background: rgba(207, 219, 245, 0.6); color: #000817; font-family: inherit; font-size: var(--text-xs); line-height: 1.5; resize: vertical; }
 body.panel-theme-light .panel-right-goal-edit button{ align-self: flex-start; }
 body.panel-theme-light .panel-library-market svg{ width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+
