@@ -201,9 +201,8 @@ export function TimelineNav({ marks, onJump, windowSize = NAV_WINDOW_WIDE, baseW
       onMouseEnter={() => setExpanded(true)}
       onMouseLeave={() => { setExpanded(false); setActive(null); }}
       onClick={(event) => {
-        if (!expanded) return
-        // 横杠只有 3.2px 高，点击很容易落在行与行之间的缝里；按纵坐标
-        // 落在第几行来跳，而不是要求先悬停出 active。
+        // 不要求先展开：点击本身会把导航条收起（滚动导致 mouseleave），
+        // 再点一次就永远进不来。按纵坐标算落在第几行即可。
         const rect = trackRef.current?.getBoundingClientRect()
         if (!rect) return
         const index = Math.floor((event.clientY - rect.top - NAV_PAD) / NAV_STEP)

@@ -1738,6 +1738,8 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
   const [earlierGroups, setEarlierGroups] = useState(0);
   const earlierAnchorRef = useRef<{ height: number } | null>(null);
   const pendingJumpRef = useRef<string | null>(null);
+  // 同一时刻只允许一条跳转流程，连点时不会叠出好几条循环互相打架。
+  const jumpingRef = useRef(false);
   const visibleGroups = useMemo(
     () => tailWindow(timelineGroups, EARLIER_MIN_ENTRIES, earlierGroups),
     [timelineGroups, earlierGroups]
@@ -1777,21 +1779,37 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
       target.scrollIntoView({ block: 'start' });
       return;
     }
-    // 目标还没渲染：可能是被折叠了，也可能是更早的一页还没拉回来。
-    // 不再赌某一条路径，边展开渲染窗口边按页往回收，直到目标出现，
-    // 再由 pendingJump 的 effect 把它滚进视野。
+    // 目标还没渲染：先看它在已加载的分组里是否只是被折叠了，能算准就一次
+    // 展开到位；确实还压在更早的分页里，才一页页往回加载。同一条流程没
+    // 跑完之前，连点不会再起第二条。
     pendingJumpRef.current = id;
     followFeedRef.current = false;
-    let tries = 0;
-    const step = (): void => {
-      if (feedRef.current?.querySelector(`[data-entry-id="${id}"]`)) return;
-      if (tries >= 40) return;
-      tries += 1;
-      setEarlierGroups((count) => count + 20);
-      void loadOlderPage();
-      window.setTimeout(step, 150);
-    };
-    step();
+    const loadedIndex = timelineGroups.findIndex((group) => group.kind === 'turn'
+      ? group.user.id === id || group.items.some((item) => item.id === id)
+      : group.entry.id === id);
+    if (loadedIndex >= 0) {
+      const visibleStart = timelineGroups.length - visibleGroups.length;
+      if (loadedIndex < visibleStart) {
+        const needed = visibleStart - loadedIndex;
+        setEarlierGroups((count) => Math.max(count, needed));
+      }
+      return;
+    }
+    if (jumpingRef.current) return;
+    jumpingRef.current = true;
+    void (async () => {
+      try {
+        for (let round = 0; round < 40; round += 1) {
+          await loadOlderPage();
+          await new Promise((resolve) => setTimeout(resolve, 150));
+          if (feedRef.current?.querySelector(`[data-entry-id="${id}"]`)) return;
+          // 刚拉回来的那一页同样排在被折叠的前段，展开一段让它渲染出来。
+          setEarlierGroups((count) => count + 30);
+        }
+      } finally {
+        jumpingRef.current = false;
+      }
+    })();
   }
   let latestTurnIndex = -1;
   for (let index = visibleGroups.length - 1; index >= 0; index--) {
