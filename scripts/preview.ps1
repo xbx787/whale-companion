@@ -22,7 +22,8 @@ param(
   [switch]$Build,
   [switch]$Close,
   [switch]$NoBuild,
-  [string]$DataDir = ''
+  [string]$DataDir = '',
+  [string]$ConversationId = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -79,6 +80,39 @@ foreach ($dir in 'avatars', 'persona') {
 }
 foreach ($file in 'features.json', 'onboarding.json') {
   Copy-Item (Join-Path $realData $file) (Join-Path $dataDir $file) -Force -ErrorAction SilentlyContinue
+}
+
+# 指定会话时，把它也带进预览并设为当前会话，方便看特定对话的渲染。
+if ($ConversationId) {
+  $srcRecord = Join-Path $realData "conversations\records\$ConversationId.json"
+  if (-not (Test-Path $srcRecord)) { throw "找不到会话记录：$srcRecord" }
+  $recordsDir = Join-Path $conversationsDir 'records'
+  New-Item -ItemType Directory -Force -Path $recordsDir | Out-Null
+  $dstRecord = Join-Path $recordsDir "$ConversationId.json"
+  Copy-Item $srcRecord $dstRecord -Force
+  $libPath = Join-Path $conversationsDir 'library.json'
+  $lib = Get-Content $libPath -Raw | ConvertFrom-Json
+  $rec = Get-Content $dstRecord -Raw | ConvertFrom-Json
+  if (-not (@($lib.conversations) | Where-Object { $_.id -eq $ConversationId })) {
+    $lib.conversations = @($lib.conversations) + [pscustomobject]@{
+      id            = $rec.id
+      title         = $rec.title
+      createdAt     = $rec.createdAt
+      updatedAt     = $rec.updatedAt
+      lastActivityAt = $rec.lastActivityAt
+      archivedAt    = $null
+      pinnedAt      = $null
+      mode          = $rec.mode
+      taskStatus    = $rec.taskStatus
+      messageCount  = @($rec.timeline).Count
+      preview       = ''
+    }
+  }
+  $lib.activeConversationId = $ConversationId
+  # Windows PowerShell 5.1 不支持 -Encoding utf8NoBOM，直接写无 BOM UTF-8。
+  $json = $lib | ConvertTo-Json -Depth 30
+  [System.IO.File]::WriteAllText($libPath, $json, (New-Object System.Text.UTF8Encoding($false)))
+  Write-Output "已导入会话：$($rec.title)（$ConversationId）"
 }
 
 # 2. 构建
