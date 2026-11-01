@@ -1673,7 +1673,9 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
   // With no conversation left the bubble keeps its full shape: the ball form
   // has no tab strip and no room for the "+", and starting fresh is exactly
   // what the owner wants to do next.
-  const compactEmpty = empty && !sideSessionId && !expanded && !modelPickerOpen && !suggestionOpen && recentSessions.length > 0;
+  // 不再等 recentSessions 到位才判定紧凑：启动时它先是空的，面板会先按
+  // full 的大窗口显示，等列表回来再缩成小窗，看起来就是缓慢坍缩。
+  const compactEmpty = empty && !sideSessionId && !expanded && !modelPickerOpen && !suggestionOpen;
   const layout: BubbleLayout = !compactEmpty ? 'full' : !composerOpen ? 'empty' : attachments.length ? 'composer_attachments' : 'composer';
   // 首帧测量常常偏小（字体还没落位），底部那排按钮会被窗口裁掉一截；
   // 留几像素余量，宁可窗口略高也不要切到控件。
