@@ -782,7 +782,7 @@ export class ConversationController {
         return visiblePending(message)
       }
       if (strategy === 'steer') {
-        if (await runtime.steerMessage(message.text, message.attachments, message.sessionContext)) {
+        if (await runtime.steerMessage(message.text, message.attachments, message.sessionContext, message.sender)) {
           await this.persistConversation(id)
           return visiblePending(message)
         }

@@ -123,7 +123,7 @@ export class AgentRuntime {
   /** 插队发送用：DSH 没有原生 steer，只能打断当前回合，队列里的消息随后接上。 */
   private steerInterruptPending = false
   /** 插队消息先压着，等下一次思考开始时再贴到时间线。 */
-  private deferredSteer?: { text: string; attachments: UserAttachment[] }
+  private deferredSteer?: { text: string; attachments: UserAttachment[]; sender?: TimelineEntry['sender'] }
   /** 正在等回显的插话：同一会话同时只允许一条，避免覆盖上一条。 */
   private pendingSteer?: { text: string; messageId?: string; startedAt: string }
   /** The controller's own goal-clear path (interrupt + /goal clear turn). */
@@ -651,7 +651,8 @@ export class AgentRuntime {
   }
 
   /** Adds guidance to the active SDK turn at its next native execution boundary. */
-  async steerMessage(rawText: string, attachments: UserAttachment[] = [], sessionContext = ''): Promise<boolean> {
+  async steerMessage(rawText: string, attachments: UserAttachment[] = [], sessionContext = '',
+    sender?: TimelineEntry['sender']): Promise<boolean> {
     if (!this.isBusy() || this.state.mode !== 'dsh') return false
     // 一次只允许一条待确认的插话。但回显可能一直不来（或 id 对不上），
     // 不能让一次插话把整轮锁死：消息已经贴回时间线，或等满 20 秒，就放行。
@@ -691,7 +692,7 @@ export class AgentRuntime {
     this.history.push({ role: 'user', content: prompt, ...(sessionContext ? { sessionContext } : {}) })
     // 插队消息先压着：等模型下一次思考开始时再贴到时间线，视觉上就是
     // “用户说完，第二条思考马上接上”。投递本身仍然是即时的。
-    this.deferredSteer = { text, attachments }
+    this.deferredSteer = { text, attachments, ...(sender ? { sender } : {}) }
     // 消息已投递给模型、还没轮到显示：队列区先挂一条“正在插话”。
     const startedAt = new Date().toISOString()
     this.pendingSteer = {
@@ -721,8 +722,8 @@ export class AgentRuntime {
     // 已经贴回时间线，说明这一句真的进了回合：可以接受下一次插话了。
     this.pendingSteer = undefined
     this.state.steering = undefined
-    const { text, attachments } = pending
-    const steered = this.add('user', attachments.length ? `${text || '请阅读附件并帮助我。'}\n附件：${attachments.map(({ name }) => name).join('、')}` : text, messageImages(attachments))
+    const { text, attachments, sender } = pending
+    const steered = this.add('user', attachments.length ? `${text || '请阅读附件并帮助我。'}\n附件：${attachments.map(({ name }) => name).join('、')}` : text, messageImages(attachments), sender)
     steered.interrupted = true
     this.markTimelineDirty(steered)
   }

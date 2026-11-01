@@ -93,10 +93,16 @@ export function registerConversationControlIpc(deps: ConversationControlIpcDeps)
     if (conversationId !== undefined && typeof conversationId !== 'string') throw new Error('会话编号无效。')
     return deps.activeController().stop(conversationId as string | undefined)
   })
-  ipcMain.handle('pet:interrupt-turn', (event, conversationId: unknown) => {
+  ipcMain.handle('pet:interrupt-turn', async (event, conversationId: unknown) => {
     if (!deps.trusted(event)) throw new Error('无效的界面请求。')
     if (conversationId !== undefined && typeof conversationId !== 'string') throw new Error('会话编号无效。')
-    return deps.activeController().interruptTurn(conversationId as string | undefined)
+    const controller = deps.activeController()
+    await controller.interruptTurn(conversationId as string | undefined)
+    // ESC 打断后队列里还有待发消息时，隔 3 秒自动接着发下一条；没有就保持停止。
+    const pending = controller.getSnapshot().pendingMessages?.length ?? 0
+    if (pending > 0) {
+      setTimeout(() => { void controller.resumeQueue(conversationId as string | undefined) }, 3000)
+    }
   })
   ipcMain.handle('pet:stop-command', (event, conversationId: unknown) => {
     if (!deps.trusted(event)) throw new Error('无效的界面请求。')

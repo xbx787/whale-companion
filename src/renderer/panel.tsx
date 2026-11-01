@@ -359,6 +359,13 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
   const pendingNewConversationRef = useRef(false);
   const library = mainSnapshot?.conversationLibrary;
   const activeConversationIdRef = useRef<string | null>(library?.activeConversationId ?? null);
+  // 切到另一个对话时，恢复它自己保存的聊天框收起/展开状态。
+  useEffect(() => {
+    const id = library?.activeConversationId
+    activeConversationIdRef.current = id ?? null
+    if (!id) return
+    setComposerOpenRaw(composerOpenByConversation.current.get(id) ?? false)
+  }, [library?.activeConversationId])
   const sideSessionExists = (sessionId: string): boolean => sideSessionExistsUtil(sessionId, sideSnapshots);
   const rememberVisibleSide = (): void => rememberVisibleSideUtil({ destinationRef, sideChatRef, sideSnapshots, composerStateRef, sideComposerStash, sideComposerOpenRef, composerOpen });
   useLayoutEffect(() => {
