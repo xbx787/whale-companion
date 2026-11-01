@@ -206,7 +206,7 @@ export const TimelineItem = memo(function TimelineItem({ entry, running = false,
         {sender?.target && (
           <span className="panel-event-route">
             <svg className="route-arc" viewBox="0 -8 28 24" aria-hidden="true">
-              <path d="M0 -8 V5.5 A8 8 0 0 0 8 13.5 H26" />
+              <path d="M0 -8 A26 21.5 0 0 0 26 13.5" />
               <circle cx="0" cy="-8" r="3.4" />
               <circle cx="26" cy="13.5" r="3.4" />
             </svg>
@@ -240,6 +240,7 @@ export function EntryItem({ entry, running, onOpenImage, onKill, display }: { en
     ? <ThinkingItem entry={entry} running={running} />
     : <TimelineItem entry={entry} running={running} onOpenImage={onOpenImage} onKill={onKill} display={display} />;
 }
+
 
 
 
