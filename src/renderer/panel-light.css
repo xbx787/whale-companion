@@ -393,8 +393,9 @@ body.panel-theme-light .panel-session:hover, body.panel-theme-light .panel-sessi
 body.panel-theme-light .panel-session.is-selected{ border-color: rgba(0, 34, 86, 0.42); background: rgba(0, 34, 86, 0.14); }
 body.panel-theme-light .panel-session-main{ display: flex; flex: 1; flex-direction: column; align-items: flex-start; justify-content: center; min-width: 0; min-height: 39px; padding: 2px 5px; border: 0; color: #000713; background: transparent; text-align: left; }
 body.panel-theme-light .panel-session-main.is-selecting{ position: relative; padding-left: 29px; }
-body.panel-theme-light .panel-session-check{ position: absolute; top: 50%; left: 4px; display: grid; place-items: center; width: 17px; height: 17px; border: 1px solid rgba(5, 29, 71, 0.62); border-radius: 5px; color: #a4bae7; background: rgba(10, 37, 84, 0.1); font-size: var(--text-md); font-style: normal; font-weight: 700; transform: translateY(-50%); }
-body.panel-theme-light .panel-session-check.is-checked{ border-color: #001d4b; background: #001d4b; }
+body.panel-theme-light .panel-session-check{ position: absolute; top: 50%; left: 4px; display: grid; place-items: center; width: 16px; height: 16px; border: 1px solid rgba(5, 29, 71, 0.42); border-radius: 5px; color: #b0c3e9; background: transparent; transform: translateY(-50%); }
+body.panel-theme-light .panel-session-check.is-checked{ border-color: #072757; background: #072757; }
+body.panel-theme-light .panel-session-check svg{ display: block; }
 body.panel-theme-light .panel-session-main strong, body.panel-theme-light .panel-session-main span{ width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 body.panel-theme-light .panel-session-main strong{ font-size: var(--text-md); line-height: 22px; font-weight: 600; }
 body.panel-theme-light .panel-session-main span{ margin-top: 3px; color: #1e3053; font-size: var(--text-xs); }
@@ -406,7 +407,7 @@ body.panel-theme-light .panel-session-actions{ position: absolute; z-index: 1; t
 body.panel-theme-light .panel-session:hover .panel-session-actions, body.panel-theme-light .panel-session:focus-within .panel-session-actions{ opacity: 1; pointer-events: auto; }
 body.panel-theme-light .panel-session-actions button, body.panel-theme-light .panel-session-edit button, body.panel-theme-light .panel-session-confirm button{ min-height: 24px; padding: 0 6px; border: 0; border-radius: 6px; color: #000d23; background: rgba(0, 29, 86, 0.1); font-size: var(--text-xs) !important; }
 body.panel-theme-light .panel-session-actions button{ display: grid; place-items: center; width: 22px; height: 22px; min-height: 22px; padding: 0; background: transparent; }
-body.panel-theme-light .panel-session-actions button svg{ width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+body.panel-theme-light .panel-session-actions button svg:not(.panel-pin-svg){ width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 body.panel-theme-light .panel-session-edit, body.panel-theme-light .panel-session-confirm{ flex: 1 0 100%; padding: 1px 3px 4px; }
 /* The row's own second line, shown on hover or focus: mode, birth, last
    activity and size — the facts you otherwise had to open the session for.

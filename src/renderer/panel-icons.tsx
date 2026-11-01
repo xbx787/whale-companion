@@ -77,13 +77,13 @@ export function ImportIcon() {
 }
 
 export function PinIcon({ pinned }: { pinned: boolean }) {
-  // 竖直图钉；已置顶满亮度，未置顶压淡。
+  // 沿用原来的竖直图钉形状；已置顶实心，未置顶空心。
   return (
-    <span className={`panel-pin${pinned ? ' is-pinned' : ''}`}>
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
-        <path d="M15 3H9v2l1 1v4.6L7 13.6V16h4.2v5h1.6v-5H17v-2.4l-3-3V6l1-1V3Z" />
-      </svg>
-    </span>
+    <svg className="panel-pin-svg" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+      <path d="M7 3.5h6l-.7 4 2.7 2.7v1.3H5v-1.3l2.7-2.7-.7-4Z"
+        fill={pinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+      <path d="M10 11.5v5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
   );
 }
 

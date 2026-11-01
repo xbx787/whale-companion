@@ -43,7 +43,15 @@ export function SessionRow({ item, active, selected, multiSelect, busy, renaming
   }
   return <div className={`panel-session${active ? ' is-current' : ''}${selected ? ' is-selected' : ''}`}>
     <button type="button" className={`panel-session-main${multiSelect ? ' is-selecting' : ''}`} disabled={busy} aria-pressed={multiSelect ? selected : undefined} aria-label={multiSelect ? `${selected ? '取消选择' : '选择'} ${item.title}` : undefined} onKeyDown={(event) => { if (event.altKey && event.key === 'Enter') { event.preventDefault(); onToggleSelected(); } }} onClick={(event) => { if (multiSelect || event.altKey) onToggleSelected(); else onSelect(); }}>
-      {multiSelect && <i className={`panel-session-check${selected ? ' is-checked' : ''}`} aria-hidden="true">{selected ? '✓' : ''}</i>}
+      {multiSelect && (
+        <i className={`panel-session-check${selected ? ' is-checked' : ''}`} aria-hidden="true">
+          {selected && (
+            <svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true">
+              <path d="M2.4 6.15 4.85 8.6 9.6 3.7" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )}
+        </i>
+      )}
       <strong>{item.title}</strong><span>{item.preview || (item.archivedAt ? '点击恢复' : '暂无消息')}</span>
     </button>
     {!multiSelect && <div className="panel-session-actions">
