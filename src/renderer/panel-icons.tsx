@@ -1,4 +1,5 @@
 import type { ApprovalMode, ContextUsageSnapshot } from '../shared/contracts'
+import { IconArchive, IconClose, IconEdit, IconPlus, IconRefresh, IconTrash } from './icons'
 
 /** One icon per permission mode: a hand (manual approval), a pencil (workspace
  *  writes), a warning shield (everything runs), a hexagon (self restart). */
@@ -32,7 +33,7 @@ export function WebSearchIcon() {
 }
 
 export function PlusIcon() {
-  return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12" /></svg>;
+  return <IconPlus size={18} />;
 }
 
 export function GripIcon() {
@@ -40,7 +41,7 @@ export function GripIcon() {
 }
 
 export function CloseIcon() {
-  return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 6 8 8M14 6l-8 8" /></svg>;
+  return <IconClose size={18} />;
 }
 
 export function ReturnIcon() {  // The enter/return arrow: the guide-a-queued-message action says it with a
@@ -65,17 +66,15 @@ export function BackIcon() {
 }
 
 export function EditIcon() {
-  return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m4 14.6 8.9-8.9 2.4 2.4-8.9 8.9-3.2.7.8-3.1ZM11.8 6.8l2.4 2.4" /></svg>;
+  return <IconEdit size={18} />;
 }
 
 export function ArchiveIcon({ restore = false }: { restore?: boolean }) {
-  return restore
-    ? <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 7h12v9H4zM3 4h14v3H3zM7 12h6m-5-2-2 2 2 2" /></svg>
-    : <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 7h12v9H4zM3 4h14v3H3zM8 11h4m-2-2v4" /></svg>;
+  return restore ? <IconRefresh size={18} /> : <IconArchive size={18} />;
 }
 
 export function DeleteIcon() {
-  return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 5.5h11m-9 0 .6 11h5.8l.6-11M8 5.5V3.7h4v1.8M8.5 8.5v5m3-5v5" /></svg>;
+  return <IconTrash size={18} />;
 }
 
 export function ExportIcon() {
