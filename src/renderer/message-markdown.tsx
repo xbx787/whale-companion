@@ -18,7 +18,7 @@ function safeMarkdownUrl(value: string): string {
 }
 
 /** 只放行本地图片：绝对路径、file:// 或项目内的相对路径；远程地址一律不加载。 */
-function localImageUrl(value: string): string {
+export function localImageUrl(value: string): string {
   if (!value) return '';
   if (value.startsWith('file://')) return value;
   if (/^[a-zA-Z]:[\\/]/.test(value)) return `file:///${value.replace(/\\/g, '/')}`;

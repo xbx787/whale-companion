@@ -1,8 +1,11 @@
 import type { MouseEvent } from 'react'
 import type { DroppedAttachment } from './panel-utils'
 import { fileBadge } from './attachment-note'
+import { localImageUrl } from './message-markdown'
 
-/** 编辑器上方的附件列表，每个附件可预览、可移除。 */
+const IMAGE_EXTENSIONS = /\.(png|jpe?g|webp|gif|bmp|avif)$/i
+
+/** 编辑器上方的附件列表，每个附件可预览、可移除；图片直接给缩略图。 */
 export function AttachmentChips({ attachments, onHover, onLeave, onOpen, onRemove }: {
   attachments: DroppedAttachment[]
   onHover: (attachment: DroppedAttachment, element: HTMLElement) => void
@@ -14,11 +17,14 @@ export function AttachmentChips({ attachments, onHover, onLeave, onOpen, onRemov
   return <div className="panel-attachments" aria-label="已添加附件" onMouseLeave={onLeave} onBlur={onLeave}>
     {attachments.map((attachment) => {
       const badge = fileBadge(attachment.name)
+      const thumb = IMAGE_EXTENSIONS.test(attachment.name) ? localImageUrl(attachment.path ?? '') : ''
       return <span key={attachment.id} className="panel-attachment-chip" title={attachment.name}
         onMouseEnter={(event: MouseEvent<HTMLElement>) => onHover(attachment, event.currentTarget)}
         onFocus={(event: React.FocusEvent<HTMLElement>) => onHover(attachment, event.currentTarget)}
         onClick={(event) => { if (!(event.target as HTMLElement).closest('button')) onOpen(attachment) }}>
-        <i aria-hidden="true">{badge.kind}</i>
+        {thumb
+          ? <img className="panel-attachment-thumb" src={thumb} alt={attachment.name} />
+          : <i aria-hidden="true">{badge.kind}</i>}
         <span>{badge.stem}</span>
         <button type="button" aria-label={`移除 ${attachment.name}`} onClick={() => onRemove(attachment.id)}>×</button>
       </span>
