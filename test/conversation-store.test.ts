@@ -286,7 +286,8 @@ describe('persistent conversation library', () => {
     expect((await migrated.getState()).settings).toEqual({
       visibleConversationTabs: 5, autoArchiveAfterDays: 0, effort: 'max',
       modelProfiles: [], activeModelProfileId: null, enableAutoTitleGeneration: true,
-      showMessageTimestamps: true, userName: '主人', assistantName: '小鲸',
+      showMessageTimestamps: true, showSenderBadges: true, compactTimeline: false,
+      userName: '主人', assistantName: '小鲸',
       userAvatar: null, assistantAvatar: null, tabOrder: [],
       goalMaxIterations: 30, goalMaxMinutes: 0, memoryEnabled: true, uiSize: 'small', avatarSize: 'small', avatarRenderer: 'sprite', panelPlacement: 'top', panelTheme: 'dark',
       webSearchEnabled: true, personaId: 'xiaojing', agentKernel: 'dsh', autoCompactPercent: 80,

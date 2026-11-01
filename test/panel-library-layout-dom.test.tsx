@@ -118,11 +118,12 @@ describe('conversation library layout', () => {
     expect(expanded()).toBe('false')
   })
 
-  it("keeps a row's mode and dates in the row, shown on hover", async () => {
+  it("keeps a row's dates in the row, shown on hover, without the model name", async () => {
     await renderAtWidth(554)
     const meta = host.querySelector('.panel-session-meta')
     expect(meta).not.toBeNull()
-    expect(meta?.textContent).toContain('小鲸引擎 + DeepSeek')
+    // 模型名不在列表里显示，只保留时间与条数。
+    expect(meta?.textContent).not.toContain('小鲸引擎 + DeepSeek')
     expect(meta?.textContent).toContain('创建')
     expect(meta?.textContent).toContain('活动')
     expect(meta?.textContent).toContain('条消息')

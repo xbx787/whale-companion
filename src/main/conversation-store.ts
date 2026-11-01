@@ -298,6 +298,7 @@ function readExtendedSettings(settings: Record<string, unknown>): Pick<Conversat
   const activeModelProfileId = typeof settings.activeModelProfileId === 'string' &&
     profiles.some((profile) => profile.id === settings.activeModelProfileId)
     ? settings.activeModelProfileId : null
+  const panelSize = readPanelSize(settings.panelSize)
   return {
     modelProfiles: profiles,
     activeModelProfileId,
@@ -313,7 +314,7 @@ function readExtendedSettings(settings: Record<string, unknown>): Pick<Conversat
     goalMaxIterations: Number.isInteger(settings.goalMaxIterations) && Number(settings.goalMaxIterations) >= 1 && Number(settings.goalMaxIterations) <= 300 ? Number(settings.goalMaxIterations) : 30,
     goalMaxMinutes: Number.isInteger(settings.goalMaxMinutes) && Number(settings.goalMaxMinutes) >= 0 && Number(settings.goalMaxMinutes) <= 1440 ? Number(settings.goalMaxMinutes) : 0,
     memoryEnabled: settings.memoryEnabled !== false,
-    panelSize: readPanelSize(settings.panelSize),
+    ...(panelSize ? { panelSize } : {}),
     panelPlacement: isPanelPlacement(settings.panelPlacement) ? settings.panelPlacement : 'top',
     panelTheme: isPanelTheme(settings.panelTheme) ? settings.panelTheme : 'dark',
     uiSize: isUiSize(settings.uiSize) ? settings.uiSize : 'small',
