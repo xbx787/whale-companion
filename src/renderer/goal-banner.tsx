@@ -1,24 +1,25 @@
 import { useEffect, useState } from 'react'
 import type { AgentGoal } from '../shared/contracts'
+import { IconClose, IconEdit, IconPlay, IconStop, IconTarget } from './icons'
 
 function GoalIcon() {
-  return <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="6.4" /><circle cx="10" cy="10" r="2.6" /><path d="M10 10 16.4 3.6" /><path d="M13.2 3.6h3.2v3.2" /></svg>
+  return <IconTarget size={18} />
 }
 
 function PauseIcon() {
-  return <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="6" y="5" width="3.2" height="10" rx="1.2" /><rect x="10.8" y="5" width="3.2" height="10" rx="1.2" /></svg>
+  return <IconStop size={18} />
 }
 
 function PlayIcon() {
-  return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 4.6v10.8L16 10 7 4.6Z" /></svg>
+  return <IconPlay size={18} />
 }
 
 function EditIcon() {
-  return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m4 16 1-4 8.4-8.4 3 3L8 15l-4 1Z" /><path d="m12.4 4.6 3 3" /></svg>
+  return <IconEdit size={18} />
 }
 
 function CloseIcon() {
-  return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" /></svg>
+  return <IconClose size={18} />
 }
 
 /** 目标条：运行时间、目标文本、修改/暂停/删除三个键。
