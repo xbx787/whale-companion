@@ -807,7 +807,7 @@ describe('conversation controller', () => {
 })
 
 describe('stopped queue', () => {
-  it('keeps pending messages on disk and resumes only after a new explicit send', async () => {
+  it('keeps pending messages on disk and resumes them on its own after a stop', async () => {
     const calls: Array<{ text: string; resolve: (reply: ModelReply) => void }> = []
     const model: ModelClient = {
       respond: (history) => new Promise((resolve) => {
@@ -825,23 +825,11 @@ describe('stopped queue', () => {
     expect(controller.getSnapshot().pendingMessages.map((item) => item.text)).toEqual(['保留在队列'])
     expect((await store.getConversation(id))?.pendingMessages.map((item) => item.text)).toEqual(['保留在队列'])
     calls[0].resolve({ text: '迟到回复' })
-    await new Promise((resolve) => setTimeout(resolve, 20))
-    expect(calls).toHaveLength(1)
-    await controller.sendMessage('/goal clear')
-    await until(() => calls.length === 2, 'clear command while paused')
-    expect(calls[1].text).toBe('/goal clear')
-    calls[1].resolve({ text: '目标已清除' })
-    await new Promise((resolve) => setTimeout(resolve, 20))
-    expect(calls).toHaveLength(2)
-    expect(controller.getSnapshot().pendingMessages.map((item) => item.text)).toEqual(['保留在队列'])
-    await controller.sendMessage('现在继续')
-    await until(() => calls.length === 3, 'explicit resume')
-    expect(calls[2].text).toBe('现在继续')
-    calls[2].resolve({ text: '继续完成' })
-    await until(() => calls.length === 4, 'old pending after resume')
-    expect(calls[3].text).toBe('保留在队列')
-    calls[3].resolve({ text: '排队完成' })
-    await until(() => controller.getSnapshot().pendingMessages.length === 0, 'drained after resume')
+    // 停下之后仍检查待发送队列：下一条自己接上，不需要再发消息催。
+    await until(() => calls.length === 2, 'resumed after stop')
+    expect(calls[1].text).toBe('保留在队列')
+    calls[1].resolve({ text: '排队完成' })
+    await until(() => controller.getSnapshot().pendingMessages.length === 0, 'drained after stop')
   })
 })
 

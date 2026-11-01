@@ -96,13 +96,8 @@ export function registerConversationControlIpc(deps: ConversationControlIpcDeps)
   ipcMain.handle('pet:interrupt-turn', async (event, conversationId: unknown) => {
     if (!deps.trusted(event)) throw new Error('无效的界面请求。')
     if (conversationId !== undefined && typeof conversationId !== 'string') throw new Error('会话编号无效。')
-    const controller = deps.activeController()
-    await controller.interruptTurn(conversationId as string | undefined)
-    // ESC 打断后队列里还有待发消息时，隔 3 秒自动接着发下一条；没有就保持停止。
-    const pending = controller.getSnapshot().pendingMessages?.length ?? 0
-    if (pending > 0) {
-      setTimeout(() => { void controller.resumeQueue(conversationId as string | undefined) }, 3000)
-    }
+    // 打断只管当前回合；队列是否继续由 controller 统一判断。
+    await deps.activeController().interruptTurn(conversationId as string | undefined)
   })
   ipcMain.handle('pet:stop-command', (event, conversationId: unknown) => {
     if (!deps.trusted(event)) throw new Error('无效的界面请求。')

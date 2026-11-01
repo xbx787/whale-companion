@@ -896,8 +896,13 @@ export class ConversationController {
    *  stays queued. */
   async interruptTurn(conversationId?: string): Promise<void> {
     await this.initialize()
-    const runtime = this.runtimeIfAny(conversationId ?? this.activeId)
+    const id = conversationId ?? this.activeId
+    if (!id) return
+    const generation = this.generationOf(id)
+    const runtime = this.runtimes.get(id)
     if (runtime) await runtime.interruptTurn()
+    // ESC 只打断当前回合，不等于放弃队列：还有待发送就接着发。
+    this.scheduleResumeAfterHalt(id, generation)
   }
 
   /** Ends a running goal. The CLI only clears one through its own /goal clear
@@ -942,13 +947,37 @@ export class ConversationController {
     await this.initialize()
     const id = conversationId ?? this.activeId
     if (!id) return
-    return this.serialize(async () => {
-      this.drainGenerations.set(id, this.generationOf(id) + 1)
+    const generation = this.generationOf(id) + 1
+    await this.serialize(async () => {
+      this.drainGenerations.set(id, generation)
       this.drains.delete(id)
-      this.pausedQueues.set(id, '任务已停止；待发送消息仍保留，发送新消息可继续。')
       this.runtimes.get(id)?.stop()
       await this.persistConversation(id)
     })
+    // 停下不等于把队列丢掉：还有待发送内容就接着发，不让任务停在半路。
+    this.scheduleResumeAfterHalt(id, generation)
+  }
+
+  /** 一轮结束或被打断后统一走这里：队列非空、且没有新回合抢跑时，
+   *  解掉暂停状态并把下一条发出去。回合收尾有先后，所以等它真正停稳。 */
+  private scheduleResumeAfterHalt(id: string, generation: number): void {
+    if (!this.queueOf(id).length) return
+    const deadline = Date.now() + 8000
+    const tick = (): void => {
+      if (this.generationOf(id) !== generation) return
+      if (!this.queueOf(id).length) return
+      const runtime = this.runtimes.get(id)
+      if (!runtime) return
+      if (runtime.isRunning()) {
+        if (Date.now() < deadline) setTimeout(tick, 200)
+        return
+      }
+      this.pausedQueues.delete(id)
+      runtime.resumeQueue()
+      this.scheduleDrain(id)
+      this.emit()
+    }
+    setTimeout(tick, 1200)
   }
 
   async removeQueued(id: string): Promise<void> {
