@@ -200,7 +200,16 @@ export function TimelineNav({ marks, onJump, windowSize = NAV_WINDOW_WIDE, baseW
       aria-label="消息导航：悬停展开，滚轮翻动，点击跳转"
       onMouseEnter={() => setExpanded(true)}
       onMouseLeave={() => { setExpanded(false); setActive(null); }}
-      onClick={() => { if (expanded && active !== null && frame.from + active < marks.length) onJump(marks[frame.from + active].id); }}
+      onClick={(event) => {
+        if (!expanded) return
+        // 横杠只有 3.2px 高，点击很容易落在行与行之间的缝里；按纵坐标
+        // 落在第几行来跳，而不是要求先悬停出 active。
+        const rect = trackRef.current?.getBoundingClientRect()
+        if (!rect) return
+        const index = Math.floor((event.clientY - rect.top - NAV_PAD) / NAV_STEP)
+        const mark = shown[index]
+        if (mark) onJump(mark.id)
+      }}
     >
       {shown.map((mark, index) => {
         const boost = expanded && active !== null ? navBoost(Math.abs(index - active)) : 0;
