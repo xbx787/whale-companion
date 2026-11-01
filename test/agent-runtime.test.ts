@@ -1222,3 +1222,18 @@ describe('subagents, interactions and goal truth in the snapshot', () => {
     expect(runtime.getSnapshot().question).toBeNull()
   })
 })
+
+describe('error notices on restore', () => {
+  it('keeps only the last five when entering a conversation', () => {
+    const runtime = new AgentRuntime(new NoteStore(testRoot), undefined, undefined, { respond: async () => ({ text: 'ok' }) })
+    const timeline = Array.from({ length: 8 }, (_, index) => ({
+      id: 'e' + index, time: '2026-01-01T00:00:00.000Z', kind: 'system' as const, tone: 'error' as const, text: '错误 ' + index
+    }))
+    runtime.restoreConversation({
+      id: 'x', title: 'x', createdAt: '', updatedAt: '', archivedAt: null, pinnedAt: null,
+      taskStatus: 'done', pendingMessages: [], history: [], timeline, approvalMode: 'read-only'
+    } as never)
+    const kept = runtime.getSnapshot().timeline.filter((entry) => entry.tone === 'error')
+    expect(kept.map((entry) => entry.id)).toEqual(['e3', 'e4', 'e5', 'e6', 'e7'])
+  })
+})

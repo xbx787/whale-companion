@@ -763,6 +763,7 @@ export class AgentRuntime {
     this.history.splice(0, this.history.length, ...record.history)
     // A restore replaces the whole history; the next publish sends it in full.
     this.state.timeline = record.timeline
+    this.trimStaleErrors()
     this.state.timelineRevision += 1
     this.timelineDirty.clear()
     this.timelineSentRevision = -1
@@ -1701,6 +1702,14 @@ export class AgentRuntime {
       this.armErrorNotice(entry.id)
     }
     return entry
+  }
+
+  /** 每次进入对话都清一遍：历史里积压的错误提示只留最后 5 条。 */
+  private trimStaleErrors(): void {
+    const errors = this.state.timeline.filter((entry) => entry.kind === 'system' && entry.tone === 'error')
+    if (errors.length <= ERROR_NOTICE_LIMIT) return
+    const drop = new Set(errors.slice(0, errors.length - ERROR_NOTICE_LIMIT).map((entry) => entry.id))
+    this.state.timeline = this.state.timeline.filter((entry) => !drop.has(entry.id))
   }
 
   /** 错误提示最多在面板上叠 5 条；再多了从最旧的开始丢，避免一次连发刷屏。 */
