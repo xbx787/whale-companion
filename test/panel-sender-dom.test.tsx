@@ -58,7 +58,8 @@ describe('conversation sender row', () => {
     expect(html).toContain('route-box is-pc')
     expect(html).toContain('手机端·AI助手自检与功能介绍')
     expect(html).toContain('电脑端·ADB调试')
-    expect(html).toContain('→')
+    expect(html).toContain('route-arrow')
+    expect(html).toContain('route-tip')
     // 正文不重复显示那一行头，只留双框。
     expect(html).not.toContain('[手机端·AI助手自检与功能介绍 → 电脑端·ADB调试]')
     expect(html).toContain('收到，链路正常。')

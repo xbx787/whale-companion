@@ -205,7 +205,7 @@ export const TimelineItem = memo(function TimelineItem({ entry, running = false,
           <span className="panel-event-tag-slot">
             <span className="route-link" aria-hidden="true">
               <svg className="route-arc" viewBox="0 0 10 25.5" preserveAspectRatio="none">
-                <path d="M0 0 C0 8 10 17.5 10 25.5" vectorEffect="non-scaling-stroke" />
+                <path d="M0 0 A10 10 0 0 1 10 10 V18.5" vectorEffect="non-scaling-stroke" />
               </svg>
               <i className="route-dot is-top" />
               <i className="route-tip" />
@@ -218,7 +218,7 @@ export const TimelineItem = memo(function TimelineItem({ entry, running = false,
           <span className="panel-event-route">
             <span className="route-link" aria-hidden="true">
               <svg className="route-arc" viewBox="0 0 10 25.5" preserveAspectRatio="none">
-                <path d="M0 0 C0 8 10 17.5 10 25.5" vectorEffect="non-scaling-stroke" />
+                <path d="M0 0 A10 10 0 0 1 10 10 V18.5" vectorEffect="non-scaling-stroke" />
               </svg>
               <i className="route-dot is-top" />
               <i className="route-tip" />

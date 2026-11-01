@@ -1284,13 +1284,15 @@ body.panel-theme-light .route-link{
   height: calc(var(--route-chip-h) / 2 + var(--route-gap));
   pointer-events: none;
 }
-/* 归一化 viewBox + 非等比拉伸：单位圆弧被拉成两端切线一竖一横的四分之一椭圆，
-   端点永远落在框的两个角上；non-scaling-stroke 保证线宽不被拉伸。 */
-body.panel-theme-light .route-arc{ position: absolute; inset: 0; width: 100%; height: 100%; fill: none; stroke: #082556; stroke-width: 1.6; stroke-linecap: round; }
+/* 四分之一圆：半径 10px，圆心在左下，起手水平、收尾竖直，再接竖直线到箭头。
+   框宽高与 viewBox 同比例，圆弧不会被拉成椭圆；overflow 必须放开，否则
+   描边在视口边缘会被裁平，看起来像折角。 */
+body.panel-theme-light .route-arc{ position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; fill: none; stroke: #082556; stroke-width: 1.6; stroke-linecap: round; }
 body.panel-theme-light .route-dot{ position: absolute; width: 6.8px; height: 6.8px; border-radius: 50%; background: #082556; transform: translate(-50%, -50%); }
 body.panel-theme-light .route-dot.is-top{ left: 0; top: 0; }
-/* 连到气泡那一端不用圆点，用朝下的实心三角指向对话框。 */
-body.panel-theme-light .route-tip{ position: absolute; left: 100%; top: 100%; width: 0; height: 0; border-left: 4.5px solid transparent; border-right: 4.5px solid transparent; border-top: 7px solid #082556; transform: translate(-50%, -60%); }
+/* 连到气泡那一端不用圆点，用朝下的实心三角指向对话框。
+   三角自身高 7px，整体上移自身高度，尖端才正好压气泡上边线。 */
+body.panel-theme-light .route-tip{ position: absolute; left: 100%; top: 100%; width: 0; height: 0; border-left: 4.5px solid transparent; border-right: 4.5px solid transparent; border-top: 7px solid #082556; transform: translate(-50%, -100%); }
 /* 用户消息的色块和弧线从左边缘开始，圆点才能落在色块左边中点。
    border-box 让 --route-chip-h 就是渲染出来的总高，弧线中线才不会算错。 */
 body.panel-theme-light .route-box{ box-sizing: border-box; display: inline-flex; align-items: center; height: var(--route-chip-h); padding: 4px 10px; border-radius: 9px; font-size: var(--text-md); line-height: 1.45; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
