@@ -56,11 +56,17 @@ export function usePetState() {
       // Pulls the full history and adopts it; also the recovery path when a
       // partial snapshot arrives without a base to apply it to (fresh window,
       // or a delta that was somehow missed).
-      const resync = () => {
+      const resync = (attempt = 0) => {
         if (resyncingRef.current) return;
         resyncingRef.current = true;
         void bridge.getSnapshot().then((full) => {
           if (!active) return;
+          // 启动或长时间隐藏后，主进程可能还没把历史灌进快照；空历史就短
+          // 暂重试，而不是把空时间线当成最终状态。
+          if (!full.timeline.length && attempt < 30) {
+            window.setTimeout(() => { if (active) resync(attempt + 1) }, 200)
+            return
+          }
           const switched = full.conversationId !== conversationRef.current;
           if (!switched && full.timelineRevision < revisionRef.current) return;
           conversationRef.current = full.conversationId ?? null;
@@ -72,8 +78,9 @@ export function usePetState() {
           resyncingRef.current = false;
         });
       };
-      unsubscribe = bridge.onSnapshot((incoming) => {
-        if (!active) return;
+      // 挂载时主动拉一次完整历史：面板刚打开时只等推送会停在空时间线。
+      resync()
+      unsubscribe = bridge.onSnapshot((incoming) => {        if (!active) return;
         setError(null);
         // A different conversation: adopt it whole and restart the revision
         // bookkeeping — the controller always sends these in full.

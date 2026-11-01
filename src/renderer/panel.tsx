@@ -2260,7 +2260,7 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
                   maxLength={8000}
                   rows={1}
                   style={{ height: composerHeight }}
-                  placeholder={sideExpanded ? '在临时会话中提问…' : goalPrompting ? '写清目标，回车设定；按 Tab 补上“在把我交代的任务全部完成之前不要停下”' : '输入消息…（Enter 发送 · Ctrl+Enter 插话 · Esc 打断）'}
+                  placeholder={sideExpanded ? '在临时会话中提问…' : goalPrompting ? (expanded ? '写清目标，回车设定；按 Tab 补上“在把我交代的任务全部完成之前不要停下”' : '写清目标，回车设定') : (expanded ? '输入消息…（Enter 发送 · Ctrl+Enter 插话 · Esc 打断）' : '输入消息…')}
                   aria-controls={suggestionOpen ? 'panel-composer-suggestions' : undefined}
                   aria-expanded={suggestionOpen && (suggestionLoading || suggestionItems.length > 0)}
                   aria-activedescendant={suggestionOpen && suggestionItems.length > 0 ? `panel-suggestion-${suggestionSelected}` : undefined}
