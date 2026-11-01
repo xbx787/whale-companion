@@ -203,14 +203,14 @@ export const TimelineItem = memo(function TimelineItem({ entry, running = false,
       <div className="panel-event-body">
         {sender && !sender.target && <span className="panel-event-sender">{sender.name}</span>}
         <MessageBody entry={bodyEntry} running={running} onOpenImage={onOpenImage} />
-        {sender?.target && (
-          <span className="panel-event-route">
-            <span className={`route-box ${routeTone(sender.side, 'from')}`}>{sender.name}</span>
-            <span className="route-arrow" aria-hidden="true">→</span>
-            <span className={`route-box ${routeTone(sender.side, 'to')}`}>{sender.target}</span>
-          </span>
-        )}
       </div>
+      {sender?.target && (
+        <span className="panel-event-route">
+          <span className={`route-box ${routeTone(sender.side, 'from')}`}>{sender.name}</span>
+          <span className="route-arrow" aria-hidden="true">→</span>
+          <span className={`route-box ${routeTone(sender.side, 'to')}`}>{sender.target}</span>
+        </span>
+      )}
     </article>
   );
 }, (prev, next) => prev.running === next.running && sameTimelineEntry(prev.entry, next.entry) &&
