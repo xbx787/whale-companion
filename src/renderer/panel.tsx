@@ -1774,7 +1774,9 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
     }
     // 刻度按全量对话生成，目标可能还没渲染：先用全量分组定位，再折算
     // 需要多展开多少组，交给 pendingJump 的 effect 滚过去。
-    const allGroups = groupTimeline(timeline, liveTurnStartMs);
+    // 刻度是按合并后的完整时间线画的，这里也必须用同一份去找位置，
+    // 否则落在更早分页里的那条永远算不出索引，点击等于没反应。
+    const allGroups = groupTimeline(mergedTimeline, liveTurnStartMs);
     const fullIndex = allGroups.findIndex((group) => group.kind === 'turn'
       ? group.user.id === id || group.items.some((item) => item.id === id)
       : group.entry.id === id);
