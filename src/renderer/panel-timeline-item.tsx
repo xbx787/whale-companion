@@ -201,21 +201,32 @@ export const TimelineItem = memo(function TimelineItem({ entry, running = false,
         <span className="panel-event-line" />
       </div>
       <div className="panel-event-body">
-        {sender && !sender.target && <span className="panel-event-sender">{sender.name}</span>}
+        {sender && !sender.target && (
+          <span className="panel-event-tag-slot">
+            <span className="route-link" aria-hidden="true">
+              <svg className="route-arc" viewBox="0 0 10 25.5" preserveAspectRatio="none">
+                <path d="M0 0 C0 8 10 17.5 10 25.5" vectorEffect="non-scaling-stroke" />
+              </svg>
+              <i className="route-dot is-top" />
+              <i className="route-tip" />
+            </span>
+            <span className="panel-event-sender">{sender.name}</span>
+          </span>
+        )}
         <MessageBody entry={bodyEntry} running={running} onOpenImage={onOpenImage} />
         {sender?.target && (
           <span className="panel-event-route">
-            <span className="route-lead" aria-hidden="true">
-              <span className="route-link">
-                <svg className="route-arc" viewBox="0 0 1 1" preserveAspectRatio="none">
-                  <path d="M0 0 A1 1 0 0 0 1 1" vectorEffect="non-scaling-stroke" />
-                </svg>
-                <i className="route-dot is-top" />
-                <i className="route-dot is-bottom" />
-              </span>
+            <span className="route-link" aria-hidden="true">
+              <svg className="route-arc" viewBox="0 0 10 25.5" preserveAspectRatio="none">
+                <path d="M0 0 C0 8 10 17.5 10 25.5" vectorEffect="non-scaling-stroke" />
+              </svg>
+              <i className="route-dot is-top" />
+              <i className="route-tip" />
             </span>
             <span className={`route-box ${routeTone(sender.side, 'from')}`}>{sender.name}</span>
-            <span className="route-arrow" aria-hidden="true">→</span>
+            <span className="route-arrow" aria-hidden="true">
+              <svg viewBox="0 0 16 16" width="15" height="15"><path d="M2 6.2h7.4V2.9L15.2 8l-5.8 5.1V9.8H2z" /></svg>
+            </span>
             <span className={`route-box ${routeTone(sender.side, 'to')}`}>{sender.target}</span>
           </span>
         )}

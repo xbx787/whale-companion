@@ -43,7 +43,8 @@ const icons = {
   panTool: 'ph/hand',
   verifiedUser: 'ph/shield-check',
   hexagon: 'ph/hexagon',
-  sparkle: 'ph/sparkle'
+  sparkle: 'ph/sparkle',
+  arrowRight: 'ph/arrow-fat-right'
 }
 
 const phSource = JSON.parse(readFileSync('D:/DesktopPetProject/.worktrees/dsh-p0/node_modules/@iconify-json/ph/icons.json', 'utf8'))
