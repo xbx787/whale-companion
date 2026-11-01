@@ -205,11 +205,15 @@ export const TimelineItem = memo(function TimelineItem({ entry, running = false,
         <MessageBody entry={bodyEntry} running={running} onOpenImage={onOpenImage} />
         {sender?.target && (
           <span className="panel-event-route">
-            <svg className="route-arc" viewBox="0 -8 28 24" aria-hidden="true">
-              <path d="M0 -8 A26 21.5 0 0 0 26 13.5" />
-              <circle cx="0" cy="-8" r="3.4" />
-              <circle cx="26" cy="13.5" r="3.4" />
-            </svg>
+            <span className="route-lead" aria-hidden="true">
+              <span className="route-link">
+                <svg className="route-arc" viewBox="0 0 1 1" preserveAspectRatio="none">
+                  <path d="M0 0 A1 1 0 0 0 1 1" vectorEffect="non-scaling-stroke" />
+                </svg>
+                <i className="route-dot is-top" />
+                <i className="route-dot is-bottom" />
+              </span>
+            </span>
             <span className={`route-box ${routeTone(sender.side, 'from')}`}>{sender.name}</span>
             <span className="route-arrow" aria-hidden="true">→</span>
             <span className={`route-box ${routeTone(sender.side, 'to')}`}>{sender.target}</span>

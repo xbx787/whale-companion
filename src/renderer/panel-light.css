@@ -515,8 +515,9 @@ body.panel-theme-light .panel-event-user .panel-event-glyph{ color: #f4d8c2; bac
 body.panel-theme-light .panel-event-tool .panel-event-glyph{ font-size: var(--glyph-md); font-weight: 400; }
 body.panel-theme-light .panel-event-time{ color: #2d4571; font-family: var(--font-ui); font-size: var(--text-xs); font-variant-numeric: tabular-nums; line-height: 1; }
 body.panel-theme-light .panel-event-body{ position: relative; min-width: 0; padding-top: 1px; }
-/* 色块挂在气泡外面下方：绝对定位，不占正文高度，用 :has 给气泡留出空间。 */
-body.panel-theme-light .panel-event-body:has(.panel-event-route){ margin-bottom: 40px; }
+/* 色块挂在气泡外面下方：绝对定位，不占正文高度，用 :has 给气泡留出空间。
+   留白要盖住按 --route-gap 下移的整块色块，否则色块底部会被下一行压掉几像素。 */
+body.panel-theme-light .panel-event-body:has(.panel-event-route){ margin-bottom: 48px; }
 body.panel-theme-light .panel-event-body p{ margin: 4px 0 0; color: #000612; font-size: var(--text-md); line-height: 1.58; white-space: pre-wrap; overflow-wrap: anywhere; }
 /* A system notice has no speaker: it reads as a quiet centered aside between
    messages — no avatar, no timestamp; hairline rules mark it instead. */
@@ -1240,13 +1241,49 @@ body.panel-theme-light .panel-live-label::before, body.panel-theme-light .panel-
 /* 另一个对话/代理注入的消息：头像位显示来源徽章，正文前标出名字。 */
 body.panel-theme-light .panel-event-sender{ display: inline-flex; align-items: center; margin: 0 0 3px; padding: 1px 6px; border-radius: 5px; color: #73490f; background: rgba(132, 88, 15, 0.12); font-size: var(--text-2xs); line-height: 1.4; }
 
-/* 跨端/内部转发：来源框 → 目标框，两个圆角矩形各用一种色。 */
-body.panel-theme-light .panel-event-route{ position: absolute; left: 0; top: calc(100% + 8px); display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-left: 26px; max-width: 100%; }
-/* 从气泡底边弯到色块横向中线的四分之一圆，SVG 画，两端各一个实心圆点。 */
-body.panel-theme-light .route-arc{ position: absolute; left: 0; top: 0; left: 0; width: 28px; height: 24px; overflow: visible; color: #082556; fill: #082556; stroke: #082556; stroke-width: 1.6; stroke-linecap: round; }
-body.panel-theme-light .route-arc path{ fill: none; }
-/* 用户消息的色块和弧线从左边缘开始，圆点才能落在色块左边中点。 */
-body.panel-theme-light .route-box{ display: inline-flex; align-items: center; height: 27px; padding: 4px 10px; border-radius: 9px; font-size: var(--text-md); line-height: 1.45; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+/* 跨端/内部转发：来源框 → 目标框，两个圆角矩形各用一种色。
+   弧线的两个端点不靠手写坐标，而是由这组变量和布局本身决定：
+   上端点在气泡下边线（route 容器上移 --route-gap），
+   下端点在第一个色块左边缘的横向中线（高度 --route-chip-h 的一半）。 */
+body.panel-theme-light .panel-event-route{
+  --route-chip-h: 35px;
+  --route-gap: 8px;
+  --route-gap-x: 6px;
+  --route-indent: 26px;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + var(--route-gap));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--route-gap-x);
+}
+/* 弧线的横向跨度由这块弹性空白决定：助手消息固定缩进 --route-indent，
+   用户消息吃掉剩余宽度，于是右边的色块贴着气泡右边界。 */
+body.panel-theme-light .route-lead{ position: relative; flex: 0 0 auto; width: var(--route-indent); align-self: stretch; }
+body.panel-theme-light .panel-event-user .panel-event-route{ justify-content: flex-end; right: -1px; top: calc(100% + var(--route-gap) + 1px); }
+body.panel-theme-light .panel-event-user .route-lead{ flex: 1 1 auto; width: auto; min-width: var(--route-indent); }
+/* 连接件只负责弧线和圆点，本身不占流。它的框就是两端点围出的矩形：
+   左上角是气泡下边线上的上端点，右下角是色块左边中点。右缘多跨一个色块
+   间距，圆点才落在色块左边线上而不是空白里。 */
+body.panel-theme-light .route-link{
+  position: absolute;
+  left: 0;
+  top: calc(var(--route-gap) * -1);
+  width: calc(100% + var(--route-gap-x));
+  height: calc(var(--route-chip-h) / 2 + var(--route-gap));
+  pointer-events: none;
+}
+/* 归一化 viewBox + 非等比拉伸：单位圆弧被拉成两端切线一竖一横的四分之一椭圆，
+   端点永远落在框的两个角上；non-scaling-stroke 保证线宽不被拉伸。 */
+body.panel-theme-light .route-arc{ position: absolute; inset: 0; width: 100%; height: 100%; fill: none; stroke: #082556; stroke-width: 1.6; stroke-linecap: round; }
+body.panel-theme-light .route-dot{ position: absolute; width: 6.8px; height: 6.8px; border-radius: 50%; background: #082556; transform: translate(-50%, -50%); }
+body.panel-theme-light .route-dot.is-top{ left: 0; top: 0; }
+body.panel-theme-light .route-dot.is-bottom{ left: 100%; top: 100%; }
+/* 用户消息的色块和弧线从左边缘开始，圆点才能落在色块左边中点。
+   border-box 让 --route-chip-h 就是渲染出来的总高，弧线中线才不会算错。 */
+body.panel-theme-light .route-box{ box-sizing: border-box; display: inline-flex; align-items: center; height: var(--route-chip-h); padding: 4px 10px; border-radius: 9px; font-size: var(--text-md); line-height: 1.45; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 body.panel-theme-light .route-box.is-pc{ color: #9f520d; background: rgba(159, 82, 13, 0.2); }
 body.panel-theme-light .route-box.is-pc-target{ color: #851a3f; background: rgba(133, 26, 63, 0.2); }
 body.panel-theme-light .route-box.is-phone{ color: #2c905c; background: rgba(44, 144, 92, 0.2); }
