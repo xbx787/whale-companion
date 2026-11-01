@@ -1261,8 +1261,8 @@ img.panel-markdown-image { display: block; max-width: 100%; margin: 6px 0; borde
 /* 从气泡底边弯到色块横向中线的四分之一圆，SVG 画，两端各一个实心圆点。 */
 .route-arc { position: absolute; left: 0; top: 0; left: 0; width: 28px; height: 24px; overflow: visible; color: #a9c6f7; fill: #a9c6f7; stroke: #a9c6f7; stroke-width: 1.6; stroke-linecap: round; }
 .route-arc path { fill: none; }
-/* 用户消息靠右：色块右对齐气泡右边界；弧线仍在色块左端，跟着色块走。 */
-.panel-event-user .panel-event-route { left: auto; right: 0; justify-content: flex-end; padding-left: 0; padding-right: 16px; }.route-box { display: inline-flex; align-items: center; height: 27px; padding: 4px 10px; border-radius: 9px; font-size: var(--text-md); line-height: 1.45; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+/* 用户消息的色块和弧线从左边缘开始，圆点才能落在色块左边中点。 */
+.route-box { display: inline-flex; align-items: center; height: 27px; padding: 4px 10px; border-radius: 9px; font-size: var(--text-md); line-height: 1.45; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .route-box.is-pc { color: #f2a560; background: rgba(242, 165, 96, .2); }
 .route-box.is-pc-target { color: #e57a9f; background: rgba(229, 122, 159, .2); }
 .route-box.is-phone { color: #6fd39f; background: rgba(111, 211, 159, .2); }
