@@ -24,6 +24,7 @@ Whale Companion lives in the corner of your Windows desktop and in the notificat
 - **A real conversation workbench**: messages, thinking and tool activity share one timeline. Long replies fold into segments; tool rows expand to show the full arguments and output.
 - **She gets work done**: read and write files, run commands, search a workspace, reference files and past conversations with `@`, and drop in images or attachments.
 - **Side chats**: open an independent conversation inside the current bubble, collapse it, and return to the main thread. Side chats stay out of the library and do not interrupt running work.
+- **Phone link**: connect DSH Go on the same Wi-Fi and reference phone conversations right from the desktop. The two conversation libraries stay separate.
 - **Message ruler**: a column of marks on the bubble's edge. Scroll to move, click to jump — useful in long conversations.
 - **Long-term memory**: a few stable facts are extracted after successful turns and can be edited or deleted in Settings.
 - **Persona presets**: the default whale girl plus tsundere, gentle, energetic and sharp-tongued presets. Switching changes the persona text, chat avatar and desktop character together.
@@ -31,9 +32,9 @@ Whale Companion lives in the corner of your Windows desktop and in the notificat
 
 ## Quick start
 
-1. Download the latest `whale-companion-v*-win-x64.zip` from [Releases](https://github.com/xbx787/whale-companion/releases/latest).
-2. Unzip it to a writable folder, for example `D:\Apps\WhaleCompanion`. Do not use `C:\Program Files`.
-3. Open `win-unpacked` and run `Whale Companion Preview.exe`.
+1. Download the latest `whale-companion-v*-win-x64.zip`, or the installer `小鲸 Setup *.exe`, from [Releases](https://github.com/xbx787/whale-companion/releases/latest).
+2. For the portable build, unzip to a writable folder such as `D:\Apps\WhaleCompanion`. Do not use `C:\Program Files`. The installer installs per user into any writable folder.
+3. Portable: open `win-unpacked` and run `Whale Companion Preview.exe`. The installer launches the app when it finishes.
 4. Follow the first-run wizard: paste a DeepSeek API key and choose a workspace. Then click the character to chat.
 
 Keys are encrypted on this machine and sent only to the model endpoint you select. Whale Companion does not send them back to its repository or unrelated services.
@@ -52,7 +53,7 @@ Keys are encrypted on this machine and sent only to the model endpoint you selec
 
 ## Data and moving
 
-Everything lives under `win-unpacked\data`: conversations, attachments, memory, personas, model profiles and the workspace choice.
+Everything lives under `win-unpacked\data` in the portable build, or `data` in the install folder for the installer build: conversations, attachments, memory, personas, model profiles and the workspace choice.
 
 - **Update**: quit the app, copy the old `data` folder into the new `win-unpacked`, then start the new version.
 - **Move to another PC**: quit the app and copy the whole `win-unpacked` folder. Copy `data` too if you want to keep your history.
@@ -72,7 +73,7 @@ Build a release with `npm.cmd run pack:release`. See [CHANGELOG.md](./CHANGELOG.
 
 ## Notes
 
-- Only a portable Windows x64 build is provided; there is no installer or auto-updater yet.
+- A portable zip and a per-user installer are provided; there is no auto-updater yet.
 - DeepSeek Harness is still a developer preview. Runtime upgrades require renewed compatibility checks for the ACP patches and saved sessions.
 - Character artwork comes from public character pages and is intended for personal desktop use. Confirm the rights or replace it with original art before redistributing.
 - Voice quality depends on the installed Chinese speech pack and the network.
