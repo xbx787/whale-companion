@@ -76,7 +76,6 @@ Build a release with `npm.cmd run pack:release`. See [CHANGELOG.md](./CHANGELOG.
 - A portable zip and a per-user installer are provided; there is no auto-updater yet, so upgrading means downloading and replacing manually.
 - Manual compaction of very large conversations (around 16k messages) can fail: the summary model sometimes returns empty text, and the app refuses to overwrite context with an empty summary. That round needs a retry; the deterministic fallback is not finished.
 - The phone link needs the PC and phone on the same Wi-Fi and LAN access enabled in DSH Go on the phone. Switching networks drops the connection and requires reconnecting.
-- The conversation panel's "back to bottom" button still sits toward the lower-right corner instead of being horizontally centered.
 - DeepSeek Harness is still a developer preview. Runtime upgrades require renewed compatibility checks for the ACP patches and saved sessions.
 - Character artwork comes from public character pages and is intended for personal desktop use. Confirm the rights or replace it with original art before redistributing.
 - Voice quality depends on the installed Chinese speech pack and the network.
