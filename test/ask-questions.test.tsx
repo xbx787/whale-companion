@@ -60,36 +60,35 @@ describe('composeAnswers', () => {
 describe('AskQuestionPanel', () => {
   const noop = async (): Promise<boolean> => true
 
-  it('renders a tabbed panel: labelled tabs, option marks, the own-answer line and the review tab', () => {
+  it('renders the DSH-style card: heading, progress, option marks and the own-answer line', () => {
     const html = renderToStaticMarkup(<AskQuestionPanel request={{ id: 'r1', questions }} onSubmit={noop} onSkip={noop} />)
-    expect(html).toContain('panel-ask-tab')
+    expect(html).toContain('panel-ask-card')
     expect(html).toContain('方案')
-    expect(html).toContain('Q2')
-    expect(html).toContain('提交')
+    expect(html).toContain('1 / 2')
     expect(html).toContain('用哪种方案？')
     expect(html).toContain('甲')
     expect(html).toContain('panel-ask-mark-radio')
     expect(html).toContain('其他…')
     expect(html).toContain('aria-checked="false"')
+    expect(html).toContain('下一题')
   })
 
-  it('shows one question at a time and keeps the actions off the question tab', () => {
+  it('shows one question at a time and keeps skip/next in the footer', () => {
     const html = renderToStaticMarkup(<AskQuestionPanel request={{ id: 'r1', questions }} onSubmit={noop} onSkip={noop} />)
     expect(html).toContain('用哪种方案？')
     expect(html).not.toContain('>还要什么？<')
     expect(html).not.toContain('确认回答')
-    expect(html).not.toContain('跳过')
-    expect(html).not.toContain('下一步')
-    expect(html).not.toContain('上一步')
-    expect(html).not.toContain('1 / 2')
+    expect(html).toContain('跳过')
+    expect(html).toContain('下一题')
+    expect(html).toContain('1 / 2')
   })
 
-  it('answers a single question straight from its options, without tabs or review', () => {
+  it('answers a single question straight from its options, without progress or review', () => {
     const html = renderToStaticMarkup(<AskQuestionPanel request={{ id: 'r1', questions: [questions[0]] }} onSubmit={noop} onSkip={noop} />)
-    expect(html).not.toContain('panel-ask-tab')
+    expect(html).not.toContain('panel-ask-progress')
     expect(html).not.toContain('确认回答')
     expect(html).toContain('跳过')
-    expect(html).toMatch(/panel-ask-submit[^>]*disabled/)
+    expect(html).toContain('提交')
     expect(html).toContain('panel-ask-mark-radio')
   })
 })

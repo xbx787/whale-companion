@@ -73,7 +73,7 @@ New-Item -ItemType Directory -Force -Path $conversationsDir | Out-Null
 foreach ($file in 'library.json') {
   Copy-Item (Join-Path $realData "conversations\$file") (Join-Path $conversationsDir $file) -Force -ErrorAction SilentlyContinue
 }
-foreach ($dir in 'avatars', 'persona') {
+foreach ($dir in 'avatars', 'persona', 'libraries') {
   if (Test-Path (Join-Path $realData $dir)) {
     Copy-Item (Join-Path $realData $dir) (Join-Path $dataDir $dir) -Recurse -Force
   }

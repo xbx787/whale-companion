@@ -28,6 +28,8 @@ import { DshAcpRuntime, toAcpMcpServer, type DshAcpMcpServer } from './dsh-acp-r
 import { DshAcpAgentClient } from './dsh-acp-agent'
 import { PetMcpBridge } from './pet-mcp-server'
 import { startPhoneApi } from './phone-api'
+import { PhoneLink } from './phone-link'
+import { registerPhoneIpc } from './ipc-phone'
 import { WinMcpClient } from './win-mcp-client'
 import { registerSettingsIpc } from './ipc-settings'
 import { registerLibrariesIpc } from './ipc-libraries'
@@ -899,6 +901,13 @@ const createRuntime = (conversationId: string, onChange: () => void, persistSess
     enableEvolve ? evolveHooksFor(conversationId) : undefined
   )
 }
+/** 电脑 → 手机 DSH Go。手机连 USB 时优先用 adb 拿地址，否则扫局域网。 */
+const phoneLink = new PhoneLink({
+  dataRoot,
+  adbPath: path.join(projectRoot, 'tools', 'platform-tools', 'adb.exe')
+})
+void phoneLink.autoConnect()
+
 controller = new ConversationController(
   new ConversationStore(dataRoot, electronSecretCodec()),
   createRuntime,
@@ -912,7 +921,8 @@ controller = new ConversationController(
     ? { id: 'default', name: 'DeepSeek', baseUrl: DEEPSEEK_ANTHROPIC_BASE_URL, apiKey: deepseekKey,
         model: DEEPSEEK_DEFAULT_MODEL, smallModel: 'deepseek-flash' }
     : undefined,
-  resolveLibraries
+  resolveLibraries,
+  (sessionId) => phoneLink.read(sessionId, 60)
 )
 /** Post-turn reflection — fact extraction — is side
  *  work: it reads the finished turn and writes memory, and nothing in the
@@ -934,6 +944,9 @@ void startPhoneApi({
 }).catch((error: unknown) => {
   console.error('Phone API failed to start:', error)
 })
+
+/** 电脑 → 手机 DSH Go。手机连 USB 时优先用 adb 拿地址，否则扫局域网。 */
+// phoneLink 定义在 ConversationController 之前，@手机会话 的引用读取要用它。
 
 controller.setTurnHooks({
   memoryContext: () => memory.contextBlock(),
@@ -1750,7 +1763,7 @@ function isScreenPoint(value: unknown): value is Electron.Point {
 function conversationSettingsPatch(value: unknown): Partial<ConversationSettings> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('会话设置无效。')
   const input = value as Record<string, unknown>
-  const editable = ['visibleConversationTabs', 'autoArchiveAfterDays', 'effort', 'goalMaxIterations', 'goalMaxMinutes', 'memoryEnabled', 'uiSize', 'avatarSize', 'avatarRenderer', 'toolRowDetail', 'webSearchEnabled', 'personaId', 'agentKernel', 'autoCompactPercent', 'assistantAvatar', 'enableAutoTitleGeneration', 'showMessageTimestamps', 'showSenderBadges', 'compactTimeline', 'userName', 'assistantName', 'panelPlacement', 'panelTheme',
+  const editable = ['visibleConversationTabs', 'autoArchiveAfterDays', 'effort', 'goalMaxIterations', 'goalMaxMinutes', 'memoryEnabled', 'uiSize', 'avatarSize', 'avatarRenderer', 'toolRowDetail', 'webSearchEnabled', 'personaId', 'agentKernel', 'autoCompactPercent', 'assistantAvatar', 'enableAutoTitleGeneration', 'showMessageTimestamps', 'showSenderBadges', 'senderRouteStyle', 'compactTimeline', 'userName', 'assistantName', 'panelPlacement', 'panelTheme',
     'outputStyle', 'appendSystemPrompt', 'autoScroll', 'expandFileEditsByDefault', 'sessionSort', 'titleLocale', 'titleModel', 'loadUserSettings']
   if (Object.keys(input).some((key) => !editable.includes(key))) throw new Error('会话设置无效。')
   const patch: Partial<ConversationSettings> = {}
@@ -2252,6 +2265,7 @@ function registerIpc(): void {
   registerMiscIpc(buildMiscIpcDeps())
   registerSideIpc({ trusted, sideChat, activeController, validAttachmentList, resolveAttachments, get avatarWindow() { return avatarWindow } })
   registerConversationsIpc({ trusted, activeController, sideChat, get panelWindow() { return panelWindow } })
+  registerPhoneIpc({ trusted, settingsTrusted, phoneLink })
   registerConversationControlIpc({ trusted, activeController, sideChat, get agentWorkspace() { return agentWorkspace } })
   registerModelsIpc(buildModelsIpcDeps())
   registerShellIpc(buildShellIpcDeps())

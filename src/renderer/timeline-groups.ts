@@ -139,6 +139,26 @@ export function tailWindow(groups: TimelineGroup[], minEntries: number, extraGro
   return index === 0 ? groups : groups.slice(index)
 }
 
+/**
+ * 渲染窗口不能把一轮从中间切开，并且至少覆盖最后 `minTurns` 轮：这样窗口
+ * 起点永远在收起态那三条刻度之上，进度线在收起时自然看不到。按固定条数
+ * 从尾部截会把几百步的一轮切掉开头，剩下半轮看起来就像凭空消失。
+ */
+export function tailFromTurn(entries: TimelineEntry[], size: number, minTurns = 4): TimelineEntry[] {
+  if (entries.length <= size) return entries
+  const fallback = Math.max(0, entries.length - Math.max(1, size))
+  let start = entries.length
+  let users = 0
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    if (entries[index].kind !== 'user') continue
+    users += 1
+    start = index
+    if (users >= Math.max(1, minTurns)) break
+  }
+  start = Math.min(start, fallback)
+  return entries.slice(start)
+}
+
 export type TurnSegment =
   | { kind: 'work'; id: string; items: TimelineEntry[] }
   | { kind: 'note'; entry: TimelineEntry }

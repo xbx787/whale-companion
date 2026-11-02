@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type { AgentCapabilities, AppSnapshot, ApprovalMode, AskAnswers, ContextUsageSnapshot, ConversationBatchAction, ConversationBatchResult, ModelMode, ModelProfile, TimelineEntry, UserAttachment } from '../shared/contracts'
+import type { AgentCapabilities, AppSnapshot, ApprovalMode, AskAnswers, ContextUsageSnapshot, ConversationBatchAction, ConversationBatchResult, ModelMode, ModelProfile, PhoneMessageRecord, TimelineEntry, UserAttachment } from '../shared/contracts'
 import { AUTO_COMPACT_DEFAULT_PERCENT, normalizeApprovalMode, normalizeModelMode } from '../shared/contracts'
 import { DEEPSEEK_ANTHROPIC_BASE_URL, DEEPSEEK_DEFAULT_MODEL } from './deepseek-endpoint'
 import { deleteTurnEntries, type AgentRuntime } from './agent-runtime'
@@ -7,6 +7,7 @@ import type { DialogueLine } from './deepseek'
 import { containsSensitiveData } from './memory-service'
 import { attachmentContext, validAttachmentList } from './local-context'
 import { snapshotSessionMentions } from './session-context'
+import { snapshotPhoneMentions } from './phone-context'
 import { parseLibraryMentions, stripLibraryMentions } from '../shared/libraries'
 import type { ConversationTarget } from './conversation-tools'
 import {
@@ -136,7 +137,9 @@ export class ConversationController {
      *  environment's own setup, so the model menu never starts empty. */
     private readonly seedProfile?: ModelProfile,
     /** Installed-library lookups for @ references. */
-    private readonly resolveLibraries?: LibraryLaunchResolver
+    private readonly resolveLibraries?: LibraryLaunchResolver,
+    /** 手机 DSH Go 的会话读取：@手机会话 引用时用。 */
+    private readonly loadPhoneSession?: (sessionId: string) => Promise<PhoneMessageRecord[]>
   ) {}
 
   setTurnHooks(hooks: ConversationTurnHooks): void {
@@ -727,14 +730,17 @@ export class ConversationController {
     // 文件引用去找，报“找不到引用文件”。正文里剔除，空正文给一句兜底。
     const libraryRefs = parseLibraryMentions(clean)
     const messageText = libraryRefs.length ? (stripLibraryMentions(clean) || '使用已选技能。') : clean
-    const sessionContext = await snapshotSessionMentions(clean, id, async (sourceId) => {
-      const record = await this.store.getConversation(sourceId)
-      if (!record) return null
-      const sourceRuntime = this.runtimes.get(sourceId)
-      if (!sourceRuntime) return record
-      if (sourceRuntime.isRunning()) throw new ConversationStoreError('INVALID_INPUT', '引用会话仍在运行，请等它回复完成后再发送。')
-      return { ...record, ...sourceRuntime.exportConversationState() }
-    })
+    const sessionContext = (await Promise.all([
+      snapshotSessionMentions(clean, id, async (sourceId) => {
+        const record = await this.store.getConversation(sourceId)
+        if (!record) return null
+        const sourceRuntime = this.runtimes.get(sourceId)
+        if (!sourceRuntime) return record
+        if (sourceRuntime.isRunning()) throw new ConversationStoreError('INVALID_INPUT', '引用会话仍在运行，请等它回复完成后再发送。')
+        return { ...record, ...sourceRuntime.exportConversationState() }
+      }),
+      this.loadPhoneSession ? snapshotPhoneMentions(clean, this.loadPhoneSession) : Promise.resolve('')
+    ])).filter(Boolean).join('\n\n')
     const message: PendingMessage = {
       id: randomUUID(), text: messageText, attachments: structuredClone(attachments), createdAt: new Date().toISOString(),
       ...(divider ? { divider: true } : {}),
@@ -1469,8 +1475,8 @@ export class ConversationController {
     if (!id) return
     await this.serialize(async () => {
       this.assertIdle(id)
-      const runtime = this.runtimeIfAny(id)
-      if (!runtime) throw new Error('这个会话还没有可以压缩的上下文。')
+      // 冷会话还没有 runtime：先按记录恢复出来，再压缩，不能直接说“没有上下文”。
+      const runtime = await this.ensureRuntime(id)
       await runtime.compactConversation()
       await this.persistConversation(id)
     })

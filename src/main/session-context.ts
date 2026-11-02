@@ -13,7 +13,9 @@ type LoadConversation = (id: string) => Promise<ConversationRecord | null>
  * tokens are checked for cycles but are never expanded into another snapshot. */
 export async function snapshotSessionMentions(text: string, currentId: string,
   load: LoadConversation): Promise<string> {
-  const mentions = [...new Map(parseSessionMentions(text).map((mention) => [mention.id, mention])).values()]
+  const mentions = [...new Map(parseSessionMentions(text)
+    .filter((mention) => mention.kind !== 'phone')
+    .map((mention) => [mention.id, mention])).values()]
   if (!mentions.length) return ''
   if (mentions.length > MAX_SESSIONS) throw new Error(`一次最多引用 ${MAX_SESSIONS} 个会话。`)
   const cache = new Map<string, ConversationRecord | null>()
@@ -34,7 +36,10 @@ export async function snapshotSessionMentions(text: string, currentId: string,
       if (entry.kind !== 'user') continue
       let nested: ReturnType<typeof parseSessionMentions>
       try { nested = parseSessionMentions(entry.text) } catch { continue }
-      for (const mention of nested) await checkGraph(mention.id, stack)
+      for (const mention of nested) {
+        if (mention.kind === 'phone') continue
+        await checkGraph(mention.id, stack)
+      }
     }
     stack.delete(id)
     checked.add(id)

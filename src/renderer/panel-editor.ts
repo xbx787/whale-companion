@@ -32,7 +32,7 @@ export function clampEditorHeight(measured: number, bounds: EditorHeightBounds =
 /** The editor's content height, or null when the measurement means nothing —
  *  a hidden panel or a zero-width pass reports 0, and writing that back froze
  *  the composer at a sliver until something else happened to re-measure it. */
-export function fitEditorHeight(editor: HTMLTextAreaElement): number | null {
+export function fitEditorHeight(editor: HTMLElement): number | null {
   if (editor.clientWidth === 0) return null;
   const bounds = editorHeightBounds(getComputedStyle(editor));
   editor.style.height = 'auto';

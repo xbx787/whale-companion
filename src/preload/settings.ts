@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { AgentCapabilities, ConversationSettings, ModelProfile, VoiceJobProgress, VoiceSettingsPatch, VoiceSettingsPublic } from '../shared/contracts'
+import type { AgentCapabilities, ConversationSettings, ModelProfile, PhoneCandidate, PhoneLinkStatus, PhoneSession, VoiceJobProgress, VoiceSettingsPatch, VoiceSettingsPublic } from '../shared/contracts'
 import type { LibraryItem, LibraryKind, LibrarySnapshot } from '../shared/libraries'
 import type { MemoryItem } from '../main/memory-service'
 
@@ -65,6 +65,13 @@ export interface SettingsAPI {
   memorySetEnabled(enabled: boolean): Promise<boolean>
   memoryUpdate(id: string, text: string): Promise<MemoryItem>
   memoryDelete(id: string): Promise<void>
+  /** 手机 DSH Go：状态、扫描、连接、断开、会话列表、自动重连。 */
+  phoneStatus?(): Promise<PhoneLinkStatus>
+  phoneScan?(): Promise<PhoneCandidate[]>
+  phoneConnect?(host: string, password?: string): Promise<PhoneSession[]>
+  phoneDisconnect?(): Promise<void>
+  phoneSessions?(): Promise<PhoneSession[]>
+  phoneSetAutoConnect?(on: boolean): Promise<void>
 }
 
 const api: SettingsAPI = {
@@ -115,7 +122,13 @@ const api: SettingsAPI = {
   memoryDelete: (id) => ipcRenderer.invoke('pet:memory:delete', id),
   close: () => ipcRenderer.invoke('pet:settings:close'),
   quit: () => ipcRenderer.invoke('pet:settings:quit'),
-  restart: () => ipcRenderer.invoke('pet:settings:restart')
+  restart: () => ipcRenderer.invoke('pet:settings:restart'),
+  phoneStatus: () => ipcRenderer.invoke('pet:phone:status'),
+  phoneScan: () => ipcRenderer.invoke('pet:phone:scan'),
+  phoneConnect: (host, password) => ipcRenderer.invoke('pet:phone:connect', host, password),
+  phoneDisconnect: () => ipcRenderer.invoke('pet:phone:disconnect'),
+  phoneSessions: () => ipcRenderer.invoke('pet:phone:sessions'),
+  phoneSetAutoConnect: (on) => ipcRenderer.invoke('pet:phone:auto-connect', on)
 }
 
 // 与 pet preload 相同：字号档只写 <html data-ui-size>，CSS 自己派生。

@@ -10,6 +10,7 @@ import { publicErrorText } from '../shared/error-copy'
 import type { SettingsAPI } from '../preload/settings'
 import type { MemoryItem } from '../main/memory-service'
 import { SettingsVoiceSection } from './settings-voice'
+import { SettingsPhoneSection } from './settings-phone'
 import { AVATAR_SIZE_OPTIONS, dateLabel, errorMessage, initialSettingsTab, marketLink, SETTINGS_TABS, UI_SIZE_OPTIONS, type ModelFormState, type SettingsTab } from './settings-constants'
 import './settings.css'
 import './voice.css'
@@ -648,6 +649,17 @@ export function SettingsPage() {
             onClick={() => { void update({ showSenderBadges: !(settings?.showSenderBadges !== false) }) }} />
         </div>
         <div className="settings-row">
+          <div className="settings-copy"><label id="sender-route-style-label">来源标签样式</label><p>胶囊和输入框里的 @ 引用同款；双框是旧的卡片样式。</p></div>
+          <div className="settings-segmented" role="radiogroup" aria-labelledby="sender-route-style-label">
+            <button type="button" role="radio" aria-checked={settings?.senderRouteStyle !== 'card'}
+              className={settings?.senderRouteStyle !== 'card' ? 'is-active' : ''} disabled={!settings || busy}
+              onClick={() => { void update({ senderRouteStyle: 'chip' }) }}>胶囊</button>
+            <button type="button" role="radio" aria-checked={settings?.senderRouteStyle === 'card'}
+              className={settings?.senderRouteStyle === 'card' ? 'is-active' : ''} disabled={!settings || busy}
+              onClick={() => { void update({ senderRouteStyle: 'card' }) }}>双框</button>
+          </div>
+        </div>
+        <div className="settings-row">
           <div className="settings-copy"><label id="compact-timeline-label">紧凑间距</label><p>缩小对话行之间的间距，一屏显示更多内容。</p></div>
           <button type="button" role="switch" aria-labelledby="compact-timeline-label" aria-checked={settings?.compactTimeline === true}
             className={`settings-switch${settings?.compactTimeline === true ? ' is-on' : ''}`} disabled={!settings || busy}
@@ -717,6 +729,9 @@ export function SettingsPage() {
             <option value="deepseek-chat">对话（Chat）</option>
           </select>
         </div>
+      </section>}
+      {tab === 'phone' && <section className="settings-section" role="tabpanel" id="settings-panel-phone" aria-labelledby="settings-tab-phone">
+        <SettingsPhoneSection api={window.whaleSettings} />
       </section>}
       {tab === 'appearance' && <section className="settings-section" role="tabpanel" id="settings-panel-appearance" aria-labelledby="settings-tab-appearance">
         <div className="settings-row">

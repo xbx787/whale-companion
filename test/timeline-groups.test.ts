@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { TimelineEntry } from '../src/shared/contracts'
-import { groupTimeline, liftAsides, segmentTurn, splitTurnTail, tailWindow, type TimelineGroup } from '../src/renderer/timeline-groups'
+import { groupTimeline, liftAsides, segmentTurn, splitTurnTail, tailFromTurn, tailWindow, type TimelineGroup } from '../src/renderer/timeline-groups'
 
 const BASE = Date.parse('2026-10-09T00:00:00.000Z')
 let sequence = 0
@@ -212,5 +212,27 @@ describe('tailWindow', () => {
     const groups = Array.from({ length: 40 }, (_, index) => turn(`t${index}`, 9))
     expect(tailWindow(groups, 240, 6)).toHaveLength(30)
     expect(tailWindow(groups, 240, 100)).toBe(groups)
+  })
+})
+
+describe('tailFromTurn', () => {
+  it('starts at the fourth-last turn so the window never cuts the current one', () => {
+    const entries = [
+      entry('user', 'q1'), entry('assistant', 'a1'),
+      entry('user', 'q2'), entry('assistant', 'a2'),
+      entry('user', 'q3'), entry('assistant', 'a3'),
+      entry('user', 'q4'),
+      ...Array.from({ length: 20 }, () => entry('tool', 'Bash')),
+      entry('assistant', 'a4')
+    ]
+    const window = tailFromTurn(entries, 3)
+    expect(window[0].kind).toBe('user')
+    expect(window[0].text).toBe('q1')
+    expect(window.filter((item) => item.kind === 'user')).toHaveLength(4)
+  })
+
+  it('returns the same array when the whole history already fits', () => {
+    const entries = [entry('user', 'q1'), entry('assistant', 'a1')]
+    expect(tailFromTurn(entries, 10)).toBe(entries)
   })
 })

@@ -1,10 +1,10 @@
 import type { RefObject } from 'react'
-import type { EffortLevel, ModelProfile } from '../shared/contracts'
+import type { EffortLevel, ModelProfile, PhoneLinkStatus } from '../shared/contracts'
 import { EffortSlider } from './effort-slider'
 import { GoalIcon, ModelIcon, PlanIcon, WebSearchIcon } from './panel-icons'
 
-/** 输入区左下角的模型与上下文菜单：目标、计划、联网三个开关，模型列表和思考强度。 */
-export function ModelPicker({ wrapperRef, open, dsh, sideExpanded, goalOn, planOn, webOn, goalTitle, profiles, activeId, effort, onToggle, onClose, onToggleGoal, onChoosePlan, onToggleWeb, onPickProfile, onManage, onOpenOnboarding, onEffort }: {
+/** 输入区左下角的模型与上下文菜单：目标、计划、联网三个开关，手机端入口，模型列表和思考强度。 */
+export function ModelPicker({ wrapperRef, open, dsh, sideExpanded, goalOn, planOn, webOn, goalTitle, profiles, activeId, effort, phoneState, onOpenPhone, onToggle, onClose, onToggleGoal, onChoosePlan, onToggleWeb, onPickProfile, onManage, onOpenOnboarding, onEffort }: {
   wrapperRef: RefObject<HTMLDivElement | null>
   open: boolean
   dsh: boolean
@@ -16,6 +16,8 @@ export function ModelPicker({ wrapperRef, open, dsh, sideExpanded, goalOn, planO
   profiles: ModelProfile[]
   activeId?: string | null
   effort: EffortLevel
+  phoneState?: PhoneLinkStatus | null
+  onOpenPhone?: () => void
   onToggle: () => void
   onClose: () => void
   onToggleGoal: () => void
@@ -27,12 +29,18 @@ export function ModelPicker({ wrapperRef, open, dsh, sideExpanded, goalOn, planO
   onEffort: (level: EffortLevel) => void
 }) {
   const enabled = profiles.filter((profile) => profile.enabled !== false)
+  const phoneConnected = phoneState?.state === 'connected'
   return <div className="panel-model-picker-wrap" ref={wrapperRef}>
     <button type="button" className="panel-model-button" aria-label="模型与上下文" title="模型与上下文" aria-haspopup="dialog" aria-expanded={open} onClick={onToggle}>
       <ModelIcon />
     </button>
     <div className={`panel-model-menu${open ? ' is-open' : ''}`} role="dialog" aria-label="模型与上下文" aria-hidden={!open} inert={!open}
       onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); onClose(); } }}>
+      {onOpenPhone && <button type="button" className="panel-phone-entry" onClick={onOpenPhone}>
+        <span className={`panel-phone-dot is-${phoneState?.state ?? 'idle'}`} aria-hidden="true" />
+        <span className="panel-phone-entry-label">连接 DSH Go 手机端</span>
+        <span className="panel-phone-entry-state">{phoneConnected ? '已连接' : '未连接'}</span>
+      </button>}
       <div className="panel-popover-modes">
         <div className="panel-popover-heading">模式</div>
         <button type="button" role="switch" aria-checked={goalOn} className={`panel-mode-toggle is-goal${goalOn ? ' is-on' : ''}`} disabled={sideExpanded || !dsh}
@@ -65,7 +73,7 @@ export function ModelPicker({ wrapperRef, open, dsh, sideExpanded, goalOn, planO
             className={`panel-model-pick${profile.id === activeId ? ' is-active' : ''}`}
             disabled={sideExpanded}
             onClick={() => onPickProfile(profile.id)}>
-            {profile.id === activeId && <span className="panel-model-check">✓</span>}
+            <span className="panel-model-name">{profile.name}</span>{profile.id === activeId && <span className="panel-model-check">✓</span>}
           </button>))}
         <button type="button" className="panel-model-manage" onClick={onManage}>在设置中管理…</button>
       </div>

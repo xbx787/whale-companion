@@ -23,14 +23,18 @@ export function composeAnswers(questions: AskQuestion[], picked: Record<string, 
   return answers
 }
 
+/** DSH 的推荐后缀不改变答案值，只在界面上补一个小标签。 */
+export function parseRecommendedLabel(label: string): { label: string; recommended: boolean } {
+  const match = /^(.+?)\s*(?:（推荐）|\(Recommended\))$/u.exec(label.trim())
+  return match ? { label: match[1], recommended: true } : { label, recommended: false }
+}
+
 /**
- * The parked AskUserQuestion, shown where the composer usually sits — laid out
- * like Claudian's panel: one question per tab ("Q1"/header), a green tick once
- * a question is answered, single-choice picks advance on their own, and a final
- * review tab lists every question with its answer (click one to jump back and
- * edit) before 回答 submits. A single question skips the tabs and answers
- * straight from its options. Options are borderless rows with a radio/checkbox
- * mark, every question keeps an "其他…" line, and 跳过 declines the whole call.
+ * 停住的 AskUserQuestion，占用输入框的位置。
+ *
+ * 结构照 DSH 的 QuestionComposer：卡片 → 头部（eyebrow + 标题 + 进度）→
+ * 题目与选项 → 底部（反馈 + 跳过/上一题/下一题/提交）。多题逐题前进，最后一题
+ * 才出现「提交」；提交时缺哪题就跳回哪题，不另做汇总页。
  */
 export function AskQuestionPanel({ request, onSubmit, onSkip }: {
   request: AskQuestionRequest
@@ -41,18 +45,20 @@ export function AskQuestionPanel({ request, onSubmit, onSkip }: {
   const [custom, setCustom] = useState<Record<string, string>>({})
   const [tab, setTab] = useState(0)
   const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const total = request.questions.length
   const multi = total > 1
-  const review = multi && tab >= total
-  const question = request.questions[Math.min(tab, total - 1)]
+  const index = Math.min(tab, total - 1)
+  const question = request.questions[index]
 
   const answers = composeAnswers(request.questions, picked, custom)
-  const ready = request.questions.every((item) => item.key in answers)
   const free = (custom[question.key] ?? '').trim()
   const chosen = picked[question.key] ?? []
+  const last = index === total - 1
 
   function pick(label: string): void {
+    setError(null)
     setPicked((current) => {
       const choices = current[question.key] ?? []
       const next = question.multiSelect
@@ -60,84 +66,103 @@ export function AskQuestionPanel({ request, onSubmit, onSkip }: {
         : [label]
       return { ...current, [question.key]: next }
     })
-    // A single choice is a decision: it replaces any own answer, and with more
-    // than one question it also moves on — next question, or the review tab.
+    // 单选就是决定：清掉自写答案；多题时自动进入下一题，最后一题停在原地等提交。
     if (!question.multiSelect) {
       setCustom((current) => ({ ...current, [question.key]: '' }))
-      if (multi) setTab(tab + 1)
+      if (!last) setTab(index + 1)
     }
   }
 
   function typeFree(value: string): void {
+    setError(null)
     setCustom((current) => ({ ...current, [question.key]: value }))
-    // An own answer replaces a single choice; multi-select folds it in.
+    // 自写答案覆盖单选；多选里它和已选项并存。
     if (!question.multiSelect && value.trim()) {
       setPicked((current) => ({ ...current, [question.key]: [] }))
     }
   }
 
+  function goNext(): void {
+    if (!last) setTab(index + 1)
+  }
+
   async function submit(): Promise<void> {
-    if (busy || !ready) return
+    if (busy) return
+    const missing = request.questions.findIndex((item) => !(item.key in answers))
+    if (missing >= 0) {
+      setTab(missing)
+      setError('还有问题没有回答。')
+      return
+    }
     setBusy(true)
-    if (!await onSubmit(answers)) setBusy(false)
+    setError(null)
+    if (!await onSubmit(answers)) {
+      setBusy(false)
+      setError('回答没有送达，请重试。')
+    }
   }
 
   async function skip(): Promise<void> {
     if (busy) return
     setBusy(true)
-    if (!await onSkip()) setBusy(false)
+    setError(null)
+    if (!await onSkip()) {
+      setBusy(false)
+      setError('跳过没有送达，请重试。')
+    }
   }
 
-  return <div className="panel-ask" aria-label="等待回答的问题">
-    {multi && <nav className="panel-ask-tabs" role="tablist" aria-label="问题导航">
-      {request.questions.map((item, index) => {
-        const done = item.key in answers
-        return <button key={item.key} type="button" role="tab" aria-selected={!review && index === tab}
-          className={`panel-ask-tab${!review && index === tab ? ' is-active' : ''}${done ? ' is-answered' : ''}`}
-          title={item.question} onClick={() => setTab(index)}>
-          <span className="panel-ask-tick" aria-hidden="true">{done ? '✓' : ''}</span>
-          <span className="panel-ask-tab-label">{item.header ? item.header.slice(0, 12) : `Q${index + 1}`}</span>
-        </button>
-      })}
-      <button type="button" role="tab" aria-selected={review}
-        className={`panel-ask-tab panel-ask-tab-submit${review ? ' is-active' : ''}${ready ? ' is-ready' : ''}`}
-        onClick={() => setTab(total)}>提交</button>
-    </nav>}
-    {review ? <section className="panel-ask-review" aria-label="确认回答">
-      <span className="panel-ask-review-title">确认回答</span>
-      <div className="panel-ask-review-list">
-        {request.questions.map((item, index) => {
-          const value = answers[item.key]
-          const text = value === undefined ? null : Array.isArray(value) ? value.join('、') : value
-          return <button key={item.key} type="button" className="panel-ask-review-pair" aria-label={`修改此题的答案：${item.question}`} onClick={() => setTab(index)}>
-            <span className="panel-ask-review-q">{item.question}</span>
-            <span className={text === null ? 'panel-ask-review-empty' : 'panel-ask-review-a'}>{text ?? '未回答'}</span>
-          </button>
-        })}
-      </div>
-    </section> : <section className="panel-ask-block">
-      {question.header && <span className="panel-ask-header">{question.header}</span>}
-      <div className="panel-ask-text"><MessageMarkdown text={question.question} /></div>
-      <div className="panel-ask-options" role={question.multiSelect ? 'group' : 'radiogroup'} aria-label={question.question}>
-        {question.options.map((option) => {
-          const active = chosen.includes(option.label)
-          return <button key={option.label} type="button" role={question.multiSelect ? 'checkbox' : 'radio'} aria-checked={active}
-            className={`panel-ask-option${active ? ' is-picked' : ''}`} onClick={() => pick(option.label)}>
+  return <div className="panel-ask-frame" aria-label="等待回答的问题">
+    <section className="panel-ask-card" aria-busy={busy}>
+      <header className="panel-ask-header">
+        <div className="panel-ask-heading">
+          <div className="panel-ask-eyebrow">需要你的回答</div>
+          <h3 className="panel-ask-title" title={question.question}>
+            {question.header || (multi ? `问题 ${index + 1}` : '回答一下')}
+          </h3>
+        </div>
+        {multi && <div className="panel-ask-header-actions">
+          <span className="panel-ask-progress">{index + 1} / {total}</span>
+        </div>}
+      </header>
+      <div className="panel-ask-body">
+        <div className="panel-ask-question"><MessageMarkdown text={question.question} /></div>
+        <div className="panel-ask-options" role={question.multiSelect ? 'group' : 'radiogroup'} aria-label={question.question}>
+          {question.options.map((option) => {
+            const active = chosen.includes(option.label)
+            const shown = parseRecommendedLabel(option.label)
+            return <button key={option.label} type="button" role={question.multiSelect ? 'checkbox' : 'radio'} aria-checked={active}
+              className={`panel-ask-option${active ? ' is-picked' : ''}`} onClick={() => pick(option.label)}>
+              <span className={`panel-ask-mark panel-ask-mark-${question.multiSelect ? 'check' : 'radio'}`} aria-hidden="true" />
+              <span className="panel-ask-option-text">
+                <span className="panel-ask-option-label">{shown.label}</span>
+                {shown.recommended && <span className="panel-ask-recommended">推荐</span>}
+                {option.description && <small>{option.description}</small>}
+              </span>
+            </button>
+          })}
+          <label className={`panel-ask-option panel-ask-custom${free ? ' is-picked' : ''}`}>
             <span className={`panel-ask-mark panel-ask-mark-${question.multiSelect ? 'check' : 'radio'}`} aria-hidden="true" />
-            <span className="panel-ask-option-text"><span className="panel-ask-option-label">{option.label}</span>{option.description && <small>{option.description}</small>}</span>
-          </button>
-        })}
-        <label className={`panel-ask-option panel-ask-custom${free ? ' is-picked' : ''}`}>
-          <span className={`panel-ask-mark panel-ask-mark-${question.multiSelect ? 'check' : 'radio'}`} aria-hidden="true" />
-          <input className="panel-ask-other" value={custom[question.key] ?? ''} aria-label={`${question.question} 的其他答案`} placeholder="其他…"
-            onChange={(event) => typeFree(event.target.value)}
-            onKeyDown={(event) => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) { event.preventDefault(); if (multi) setTab(tab + 1); else void submit() } }} />
-        </label>
+            <input className="panel-ask-other" value={custom[question.key] ?? ''} aria-label={`${question.question} 的其他答案`} placeholder="其他…"
+              onChange={(event) => typeFree(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key !== 'Enter' || event.nativeEvent.isComposing) return
+                event.preventDefault()
+                if (last) void submit()
+                else goNext()
+              }} />
+          </label>
+        </div>
       </div>
-    </section>}
-    {(review || !multi) && <div className="panel-ask-actions">
-      <button type="button" className="panel-ask-skip" disabled={busy} onClick={() => { void skip() }}>跳过</button>
-      <button type="button" className="panel-ask-submit" disabled={busy || !ready} onClick={() => { void submit() }}>{busy ? '发送中…' : '回答'}</button>
-    </div>}
+      <footer className="panel-ask-footer">
+        <div className="panel-ask-feedback" role="status">{error}</div>
+        <div className="panel-ask-actions">
+          <button type="button" className="panel-ask-skip" disabled={busy} onClick={() => { void skip() }}>跳过</button>
+          {multi && index > 0 && <button type="button" className="panel-ask-nav" disabled={busy} onClick={() => setTab(index - 1)}>上一题</button>}
+          {!last && <button type="button" className="panel-ask-nav" disabled={busy} onClick={goNext}>下一题</button>}
+          {last && <button type="button" className="panel-ask-submit" disabled={busy} onClick={() => { void submit() }}>{busy ? '发送中…' : '提交'}</button>}
+        </div>
+      </footer>
+    </section>
   </div>
 }

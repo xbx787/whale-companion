@@ -121,11 +121,11 @@ describe('navRowAt', () => {
 })
 
 describe('navBoost', () => {
-  it('shapes the dock arc: longest under the pointer, shrinking with distance', () => {
+  it('spreads the wave over five rows with one peak', () => {
     expect(navBoost(0)).toBe(10)
-    expect(navBoost(1)).toBe(8)
-    expect(navBoost(3)).toBe(4)
-    expect(navBoost(5)).toBe(0)
+    expect(navBoost(1)).toBe(7)
+    expect(navBoost(2)).toBe(3)
+    expect(navBoost(3)).toBe(0)
     expect(navBoost(9)).toBe(0)
   })
 })
@@ -142,8 +142,11 @@ describe('navMarkClass', () => {
 describe('TimelineNav', () => {
   const marks = (count: number) => Array.from({ length: count }, (_, index) => ({ id: `m${index}`, role: 'user' as const, text: `第 ${index} 条` }))
 
-  it('stays hidden below five messages', () => {
-    expect(renderToStaticMarkup(<TimelineNav marks={marks(4)} onJump={() => {}} />)).toBe('')
+  it('needs at least four marks and shows the newest three at rest', () => {
+    expect(renderToStaticMarkup(<TimelineNav marks={marks(3)} onJump={() => {}} />)).toBe('')
+    const html = renderToStaticMarkup(<TimelineNav marks={marks(4)} onJump={() => {}} />)
+    expect(html).toContain('panel-nav')
+    expect((html.match(/panel-nav-row/g) ?? [])).toHaveLength(3)
   })
 
   it('renders the resting handle with no speaker tone on its marks', () => {
@@ -161,9 +164,9 @@ describe('TimelineNav', () => {
 
   it('rests as a short handle of the newest marks, with no card until hovered', () => {
     const html = renderToStaticMarkup(<TimelineNav marks={marks(40)} onJump={() => {}} />)
-    // At rest only the newest few marks render; the wheel window and the card
-    // belong to the expanded state.
+    // 收起态严格三条：第四条不在 DOM 里，避免遮罩边缘隐约多出一根。
     expect((html.match(/panel-nav-mark/g) ?? []).length).toBe(NAV_RESTING)
+    expect(html).toContain('translateY(0px)')
     expect(html).not.toContain('is-expanded')
     expect(html).not.toContain('panel-nav-card')
     expect(html).not.toContain('is-active')

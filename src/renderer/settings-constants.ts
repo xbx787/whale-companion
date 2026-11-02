@@ -26,6 +26,7 @@ export interface ModelFormState {
 
 const BASE_SETTINGS_TABS = [
   { id: 'conversation', label: '对话' },
+  { id: 'phone', label: '手机' },
   { id: 'appearance', label: '外观' },
   { id: 'libraries', label: '库' },
   { id: 'models', label: '模型' },

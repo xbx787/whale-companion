@@ -243,6 +243,8 @@ export interface ConversationSettings {
   showMessageTimestamps: boolean
   /** 是否在消息头部显示来源/目标标签；默认显示。 */
   showSenderBadges?: boolean
+  /** 跨对话传话的来源/目标样式：chip 是与输入框同款的圆角胶囊，card 是旧的双框卡片。 */
+  senderRouteStyle?: 'chip' | 'card'
   /** 时间线使用紧凑行距；默认关闭。 */
   compactTimeline?: boolean
   /** What the assistant calls the user, and what the user calls it. */
@@ -501,6 +503,33 @@ export interface PlanApprovalRequest {
   plan: string
 }
 
+/** 手机 DSH Go 的一个会话；只存在于手机，不并进本机库。 */
+export interface PhoneSession {
+  sessionId: string
+  title: string
+  running: boolean
+  updatedAt?: string
+}
+
+/** 局域网扫描到的一台手机。 */
+export interface PhoneCandidate {
+  host: string
+  address: string
+  source: 'adb' | 'scan'
+}
+
+export interface PhoneLinkStatus {
+  state: 'idle' | 'scanning' | 'connecting' | 'connected' | 'error'
+  host?: string
+  error?: string
+  autoConnect: boolean
+}
+
+export interface PhoneMessageRecord {
+  role: 'user' | 'assistant'
+  text: string
+}
+
 /** Question key → chosen label (labels array for multiSelect); free text allowed. */
 export type AskAnswers = Record<string, string | string[]>
 
@@ -692,6 +721,15 @@ export interface PetAPI {
   /** 取 `before` 之前的 `limit` 条历史；分页窗口之外的旧消息靠它补齐。 */
   timelinePage(conversationId: string, before: number, limit: number): Promise<TimelineEntry[]>
   compactConversation(conversationId?: string): Promise<void>
+  /** 手机 DSH Go：状态、局域网扫描、连接、断开、会话列表、读记录、发消息。 */
+  phoneStatus(): Promise<PhoneLinkStatus>
+  phoneScan(): Promise<PhoneCandidate[]>
+  phoneConnect(host: string, password?: string): Promise<PhoneSession[]>
+  phoneDisconnect(): Promise<void>
+  phoneSessions(): Promise<PhoneSession[]>
+  phoneRead(sessionId: string, limit?: number): Promise<PhoneMessageRecord[]>
+  phoneSend(sessionId: string, text: string, mode?: 'queue' | 'steer'): Promise<void>
+  phoneSetAutoConnect(on: boolean): Promise<void>
   listAppCommands(): Promise<AppCommandOption[]>
   onSlashUiAction(callback: (action: SlashUiAction) => void): () => void
   searchWorkspaceFiles(query: string): Promise<WorkspaceFileOption[]>

@@ -1,6 +1,6 @@
 {
   "name": "desktop-resident-agent",
-  "version": "0.0.147",
+  "version": "0.0.149",
   "private": true,
   "license": "UNLICENSED",
   "author": "DesktopPetProject",
@@ -36,6 +36,7 @@
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
     "uiohook-napi": "^1.5.5",
+    "ws": "^8.22.1",
     "zod": "^4.6.5"
   },
   "devDependencies": {
@@ -46,6 +47,7 @@
     "@types/node": "^24.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@types/ws": "^8.18.2",
     "electron": "^44.6.0",
     "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",

@@ -1,17 +1,34 @@
 /** Stable conversation references keep the visible title readable while the
- * UUID, rather than a renameable title, identifies the source at submission. */
+ * UUID, rather than a renameable title, identifies the source at submission.
+ * 手机 DSH Go 的会话用同一套语法，scheme 换成 `xiaojing-phone:`；本机结果不带
+ * `kind`，保持旧调用方的形状不变。 */
 export interface SessionMention {
   id: string
   title: string
+  /** 只有手机引用才带；缺省就是本机会话。 */
+  kind?: 'phone'
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu
-const SCHEME = '](xiaojing-session:'
+/** 手机会话 id 由 DSH Go 生成，不保证是 UUID；只做保守的字符与长度校验。 */
+const PHONE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u
+const LOCAL_SCHEME = '](xiaojing-session:'
+const PHONE_SCHEME = '](xiaojing-phone:'
+
+function escapeLabel(title: string): string {
+  const label = title.replace(/\s+/gu, ' ').trim().slice(0, 60) || '会话'
+  return label.replace(/[\\\]]/gu, '\\$&')
+}
 
 export function sessionMentionToken(title: string, id: string): string {
   if (!UUID.test(id)) throw new Error('会话编号无效。')
-  const label = title.replace(/\s+/gu, ' ').trim().slice(0, 60) || '会话'
-  return `@[${label.replace(/[\\\]]/gu, '\\$&')}](${SCHEME.slice(2)}${id})`
+  return `@[${escapeLabel(title)}](${LOCAL_SCHEME.slice(2)}${id})`
+}
+
+/** 手机对话的引用 token。id 是手机侧的 sessionId，不并进本机库。 */
+export function phoneMentionToken(title: string, id: string): string {
+  if (!PHONE_ID.test(id)) throw new Error('手机会话编号无效。')
+  return `@[${escapeLabel(title)}](${PHONE_SCHEME.slice(2)}${id})`
 }
 
 /** Tokens in Markdown code stay literal. A malformed Xiaojing token in prose
@@ -52,14 +69,18 @@ export function parseSessionMentions(input: string): SessionMention[] {
         if (line[labelEnd] === ']') break
         labelEnd += 1
       }
-      if (!line.startsWith(SCHEME, labelEnd)) { i += 2; continue }
-      const idStart = labelEnd + SCHEME.length
+      const phone = line.startsWith(PHONE_SCHEME, labelEnd)
+      if (!phone && !line.startsWith(LOCAL_SCHEME, labelEnd)) { i += 2; continue }
+      const scheme = phone ? PHONE_SCHEME : LOCAL_SCHEME
+      const idStart = labelEnd + scheme.length
       const close = line.indexOf(')', idStart)
-      if (close < 0) throw new Error('会话引用格式无效，请重新从 @ 候选中选择。')
+      if (close < 0) throw new Error(phone ? '手机会话引用格式无效，请重新从手机对话列表选择。' : '会话引用格式无效，请重新从 @ 候选中选择。')
       const id = line.slice(idStart, close)
-      if (!UUID.test(id)) throw new Error('会话引用编号无效，请重新从 @ 候选中选择。')
+      if (phone ? !PHONE_ID.test(id) : !UUID.test(id)) {
+        throw new Error(phone ? '手机会话引用编号无效，请重新从手机对话列表选择。' : '会话引用编号无效，请重新从 @ 候选中选择。')
+      }
       const title = line.slice(i + 2, labelEnd).replace(/\\([\\\]])/gu, '$1')
-      mentions.push({ id, title })
+      mentions.push(phone ? { id, title, kind: 'phone' } : { id, title })
       i = close + 1
     }
   }

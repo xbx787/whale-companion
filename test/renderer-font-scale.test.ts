@@ -32,7 +32,7 @@ const ROOTS: Array<{ css: string; root: RegExp }> = [
  *  rendered 16px for months without it. scripts/font-cascade-probe.cjs
  *  re-checks this against the real cascade when run under Electron. */
 const BUTTON_CLASSES = [
-  'panel-ask-tab', 'panel-ask-option', 'panel-ask-skip', 'panel-ask-submit',
+  'panel-ask-option', 'panel-ask-skip', 'panel-ask-submit', 'panel-ask-nav',
   'panel-plan-revise', 'panel-plan-approve', 'panel-tasks-summary',
   'panel-compact-button'
 ]

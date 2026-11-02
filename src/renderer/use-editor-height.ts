@@ -1,9 +1,10 @@
 import { useEffect, useLayoutEffect, type RefObject } from 'react'
 import { fitEditorHeight } from './panel-editor'
+import type { ComposerEditorHandle } from './composer-editor'
 
 /** 编辑器高度：内容变化时量一次，窗口宽度或界面字号变化时重量。 */
 export function useEditorHeight({ editorRef, composerOpen, draft, expanded, compactEmpty, visible, setComposerHeight }: {
-  editorRef: RefObject<HTMLTextAreaElement | null>
+  editorRef: RefObject<ComposerEditorHandle | null>
   composerOpen: boolean
   draft: string
   expanded: boolean
@@ -12,7 +13,7 @@ export function useEditorHeight({ editorRef, composerOpen, draft, expanded, comp
   setComposerHeight: (updater: (current: number) => number) => void
 }) {
   useLayoutEffect(() => {
-    const editor = editorRef.current
+    const editor = editorRef.current?.element()
     if (!composerOpen || !editor) return
     const nextHeight = fitEditorHeight(editor)
     if (nextHeight === null) return
@@ -20,7 +21,7 @@ export function useEditorHeight({ editorRef, composerOpen, draft, expanded, comp
   }, [draft, composerOpen, expanded, compactEmpty, visible, editorRef, setComposerHeight])
 
   useEffect(() => {
-    const editor = editorRef.current
+    const editor = editorRef.current?.element()
     if (!composerOpen || !editor) return
     let width = editor.clientWidth
     const remeasure = (): void => {

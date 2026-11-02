@@ -40,12 +40,12 @@ function click(element: Element): void {
   element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
 }
 
-function type(editor: HTMLTextAreaElement, value: string): void {
-  Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(editor, value)
+function type(editor: HTMLElement, value: string): void {
+  editor.textContent = value
   editor.dispatchEvent(new Event('input', { bubbles: true }))
 }
 
-function enter(editor: HTMLTextAreaElement): void {
+function enter(editor: HTMLElement): void {
   editor.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
 }
 
@@ -100,11 +100,11 @@ describe('composer submissions stay with their conversation', () => {
       run={async (action) => { try { await action(bridge); return true } catch { return false } }} />))
   }
 
-  async function openComposer(): Promise<HTMLTextAreaElement> {
-    if (!host.querySelector('textarea[aria-label="输入消息"]')) {
+  async function openComposer(): Promise<HTMLElement> {
+    if (!host.querySelector('.composer-editor')) {
       await act(async () => click(host.querySelector('.panel-compose-trigger')!))
     }
-    return host.querySelector('textarea[aria-label="输入消息"]')!
+    return host.querySelector('.composer-editor')!
   }
 
   async function switchTo(id: string): Promise<void> {
@@ -124,11 +124,11 @@ describe('composer submissions stay with their conversation', () => {
     const otherEditor = await openComposer()
     await act(async () => type(otherEditor, '另一会话'))
     await act(async () => pending.reject(new Error('发送失败')))
-    expect(host.querySelector<HTMLTextAreaElement>('textarea[aria-label="输入消息"]')!.value).toBe('另一会话')
+    expect(host.querySelector('[aria-label="输入消息"]')!.textContent).toBe('另一会话')
     expect(host.querySelectorAll('.panel-attachment-chip')).toHaveLength(0)
 
     await switchTo('a')
-    expect(host.querySelector<HTMLTextAreaElement>('textarea[aria-label="输入消息"]')!.value).toBe('原消息\n\n之后输入')
+    expect(host.querySelector('[aria-label="输入消息"]')!.textContent).toBe('原消息\n\n之后输入')
     expect([...host.querySelectorAll('.panel-attachment-chip')].map((chip) => chip.textContent)).toEqual(['TXToriginal×', 'TXTlater×'])
   })
 
@@ -145,13 +145,13 @@ describe('composer submissions stay with their conversation', () => {
     const otherEditor = await openComposer()
     await act(async () => type(otherEditor, 'B 的草稿'))
     await act(async () => pending.reject(new Error('目标发送失败')))
-    expect(host.querySelector<HTMLTextAreaElement>('textarea[aria-label="输入消息"]')!.value).toBe('B 的草稿')
+    expect(host.querySelector('[aria-label="输入消息"]')!.textContent).toBe('B 的草稿')
 
     await switchTo('a')
-    const restored = host.querySelector<HTMLTextAreaElement>('textarea[aria-label="输入消息"]')!
-    expect(restored.value).toBe('整理项目')
+    const restored = host.querySelector<HTMLElement>('[aria-label="输入消息"]')!
+    expect(restored.textContent).toBe('整理项目')
     // 收起态只留一句短提示，展开后才会带上 Tab 说明。
-    expect(restored.placeholder).toBe('写清目标，回车设定')
+    expect(restored.getAttribute('data-placeholder')).toBe('写清目标，回车设定')
   })
 
   it('allows B to send while A is pending and keeps each conversation locked independently', async () => {
@@ -176,7 +176,7 @@ describe('composer submissions stay with their conversation', () => {
     await act(async () => type(otherEditor, 'B 的下一条'))
     await act(async () => enter(otherEditor))
     expect(sendMessage).toHaveBeenCalledTimes(2)
-    expect(otherEditor.value).toBe('B 的下一条')
+    expect(otherEditor.textContent).toBe('B 的下一条')
     expect(host.querySelector<HTMLButtonElement>('.panel-send')?.disabled).toBe(true)
 
     await act(async () => first.resolve())
@@ -184,7 +184,7 @@ describe('composer submissions stay with their conversation', () => {
     expect(host.querySelector('.panel-send')?.getAttribute('aria-label')).toBe('发送中…')
     await act(async () => second.resolve())
     expect(host.querySelector<HTMLButtonElement>('.panel-send')?.disabled).toBe(false)
-    expect(otherEditor.value).toBe('B 的下一条')
+    expect(otherEditor.textContent).toBe('B 的下一条')
   })
 
   it('never closes the composer on Escape; the key only interrupts', async () => {
@@ -198,3 +198,4 @@ describe('composer submissions stay with their conversation', () => {
     expect(host.querySelector('.panel-composer')?.className).not.toContain('is-closing')
   })
 })
+

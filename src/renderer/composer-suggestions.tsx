@@ -54,7 +54,7 @@ export function workflowSuggestionItems(options: readonly AppCommandOption[], tr
       const name = option.name.replace(/^[/\$]+/u, '');
       return {
         id: `${option.kind}:${option.source}:${name}`,
-        label: `${prefix}${name}`,
+        label: name,
         detail: `${kind === 'skill' ? '技能' : '命令'}，${option.source === 'project' ? '项目' : option.source === 'builtin' ? '内置' : '用户'}${option.description ? `，${option.description}` : ''}`,
         insertText: `${prefix}${name}`,
       };
@@ -71,7 +71,7 @@ export function librarySuggestionItems(items: readonly LibraryItem[], query: str
     .slice(0, Math.max(0, limit))
     .map((item) => ({
       id: `library:${item.kind}:${item.id}`,
-      label: `@${item.kind}:${item.name}`,
+      label: item.name,
       detail: item.description,
       insertText: `@${item.kind}:${item.name}`,
     }));
@@ -114,6 +114,23 @@ export function fileMention(relativePath: string): string {
   return /[\s{}]/.test(normalized) ? `@"${normalized}"` : `@{${normalized}}`;
 }
 
+export type SuggestionKind = 'mcp' | 'skill' | 'plugin' | 'file' | 'session' | 'command'
+
+const SUGGESTION_LABELS: Record<SuggestionKind, string> = {
+  mcp: 'MCP', skill: '技能', plugin: '插件', file: '文件', session: '对话', command: '命令'
+}
+const SUGGESTION_ORDER: SuggestionKind[] = ['mcp', 'skill', 'plugin', 'file', 'session', 'command']
+
+/** Which type chip a row shows — inferred from the id the picker built. */
+export function suggestionKind(item: ComposerSuggestion): SuggestionKind {
+  if (item.id.startsWith('library:mcp:')) return 'mcp'
+  if (item.id.startsWith('library:plugin:')) return 'plugin'
+  if (item.id.startsWith('library:skill:') || item.id.startsWith('skill:')) return 'skill'
+  if (item.id.startsWith('session:')) return 'session'
+  if (item.id.startsWith('command:')) return 'command'
+  return 'file'
+}
+
 export function ComposerSuggestions({ kind, query, items, selectedIndex, loading, failed = false, onSelect }: {
   kind: ComposerTrigger['kind'];
   query: string;
@@ -134,19 +151,32 @@ export function ComposerSuggestions({ kind, query, items, selectedIndex, loading
     ? kind === 'file' ? '输入文件名查找' : kind === 'skill' ? '没有可用技能' : '没有可用命令'
     : '没有匹配内容';
   const keepEditorFocus = (event: MouseEvent<HTMLButtonElement>) => event.preventDefault();
+  const groups = SUGGESTION_ORDER
+    .map((groupKind) => ({ kind: groupKind, rows: items.filter((item) => suggestionKind(item) === groupKind) }))
+    .filter((group) => group.rows.length > 0);
   return <div id="panel-composer-suggestions" ref={listRef} className="panel-composer-suggestions" role="listbox" aria-label={kind === 'file' ? '引用文件' : kind === 'skill' ? '选择技能' : '选择命令'}>
     {loading && !items.length && <div className="panel-suggestion-loading" role="status">正在查找…</div>}
     {!loading && failed && <div className="panel-suggestion-note" role="status">查找失败，继续输入可重试</div>}
     {empty && <div className="panel-suggestion-note" role="status">{emptyHint}</div>}
-    {items.map((item, index) => <button
-      key={item.id}
-      id={`panel-suggestion-${index}`}
-      type="button"
-      role="option"
-      aria-selected={selectedIndex === index}
-      className="panel-suggestion-item"
-      onMouseDown={keepEditorFocus}
-      onClick={() => onSelect(item)}
-    ><span>{item.label}</span>{item.detail && <small>{item.detail}</small>}</button>)}
+    {groups.map((group) => <section key={group.kind} className="panel-suggestion-group" aria-label={SUGGESTION_LABELS[group.kind]}>
+      <div className="panel-suggestion-group-title">{SUGGESTION_LABELS[group.kind]}</div>
+      {group.rows.map((item) => {
+        const index = items.indexOf(item);
+        return <button
+          key={item.id}
+          id={`panel-suggestion-${index}`}
+          type="button"
+          role="option"
+          aria-selected={selectedIndex === index}
+          className="panel-suggestion-item"
+          onMouseDown={keepEditorFocus}
+          onClick={() => onSelect(item)}
+        >
+          <span className={`panel-suggestion-tag is-${group.kind}`}>{SUGGESTION_LABELS[group.kind]}</span>
+          <span className="panel-suggestion-label">{item.label}</span>
+          {item.detail && <small>{item.detail}</small>}
+        </button>;
+      })}
+    </section>)}
   </div>;
 }

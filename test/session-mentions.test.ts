@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseSessionMentions, sessionMentionToken } from '../src/shared/session-mentions'
+import { parseSessionMentions, phoneMentionToken, sessionMentionToken } from '../src/shared/session-mentions'
 
 const id = '6e2dfe3c-f0ec-4b73-92aa-5ffec9b87780'
 
@@ -32,5 +32,15 @@ describe('session mention tokens', () => {
   it('does not open a backtick fence with a backtick in its info string', () => {
     const token = sessionMentionToken('旧会话', id)
     expect(parseSessionMentions(['```js`invalid', token].join('\n'))).toEqual([{ id, title: '旧会话' }])
+  })
+
+  it('parses a phone mention with its own kind and id charset', () => {
+    const token = phoneMentionToken('手机上的会话', 'sess-123_abc')
+    expect(parseSessionMentions(`参考 ${token}`)).toEqual([{ id: 'sess-123_abc', title: '手机上的会话', kind: 'phone' }])
+  })
+
+  it('rejects malformed phone ids without treating them as local sessions', () => {
+    expect(() => parseSessionMentions('@[手机](xiaojing-phone:)')).toThrow('手机会话引用编号无效')
+    expect(() => parseSessionMentions('@[手机](xiaojing-phone:has space)')).toThrow('手机会话引用编号无效')
   })
 })

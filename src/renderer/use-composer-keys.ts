@@ -1,13 +1,12 @@
 import { useCallback } from 'react'
-import type { ChangeEvent, KeyboardEvent, MouseEvent, ClipboardEvent } from 'react'
+import type { KeyboardEvent, ClipboardEvent } from 'react'
 import { pastedFiles } from './composer-drafts'
 import type { ComposerSuggestion } from './composer-suggestions'
+import type { ComposerEditorHandle } from './composer-editor'
 
-/** 编辑器的事件处理：输入、光标、粘贴文件、补全键盘导航、Tab 补目标、回车发送。
- *  抽成 hook 只是把这段判断从 JSX 里挪出来，行为与原来一致。 */
-export function useComposerKeys({ setDraft, setCaretIndex, setDismissedSuggestion, suggestionOpen, suggestionItems, suggestionSelected, setSuggestionSelected, suggestionKey, acceptSuggestion, goalPrompting, editorRef, addFiles, send }: {
-  setDraft: (value: string) => void
-  setCaretIndex: (value: number) => void
+/** 编辑器的事件处理：补全键盘导航、Tab 补目标、回车发送、粘贴文件。
+ *  输入与光标同步在 ComposerEditor 内部完成，这里只管键位。 */
+export function useComposerKeys({ setDismissedSuggestion, suggestionOpen, suggestionItems, suggestionSelected, setSuggestionSelected, suggestionKey, acceptSuggestion, goalPrompting, editorRef, addFiles, send }: {
   setDismissedSuggestion: (value: string | null) => void
   suggestionOpen: boolean
   suggestionItems: ComposerSuggestion[]
@@ -16,34 +15,18 @@ export function useComposerKeys({ setDraft, setCaretIndex, setDismissedSuggestio
   suggestionKey: string | null
   acceptSuggestion: (item: ComposerSuggestion) => void
   goalPrompting: boolean
-  editorRef: React.RefObject<HTMLTextAreaElement | null>
+  editorRef: React.RefObject<ComposerEditorHandle | null>
   addFiles: (files: File[]) => Promise<void> | void
   send: (strategy: 'queue' | 'steer') => Promise<void> | void
 }) {
-  const onChange = useCallback((event: ChangeEvent<HTMLTextAreaElement>) => {
-    setDraft(event.target.value)
-    setCaretIndex(event.target.selectionStart)
-    setDismissedSuggestion(null)
-  }, [setDraft, setCaretIndex, setDismissedSuggestion])
-
-  const onClick = useCallback((event: MouseEvent<HTMLTextAreaElement>) => {
-    setCaretIndex(event.currentTarget.selectionStart)
-  }, [setCaretIndex])
-
-  const onKeyUp = useCallback((event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (['ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key)) {
-      setCaretIndex(event.currentTarget.selectionStart)
-    }
-  }, [setCaretIndex])
-
-  const onPaste = useCallback((event: ClipboardEvent<HTMLTextAreaElement>) => {
+  const onPaste = useCallback((event: ClipboardEvent<HTMLElement>) => {
     const files = pastedFiles(event.clipboardData)
     if (!files.length) return
     event.preventDefault()
     void addFiles(files)
   }, [addFiles])
 
-  const onKeyDown = useCallback((event: KeyboardEvent<HTMLTextAreaElement>) => {
+  const onKeyDown = useCallback((event: KeyboardEvent<HTMLElement>) => {
     if (suggestionOpen && !event.nativeEvent.isComposing) {
       if (event.key === 'Escape') {
         event.preventDefault()
@@ -73,12 +56,12 @@ export function useComposerKeys({ setDraft, setCaretIndex, setDismissedSuggestio
     if (goalPrompting && event.key === 'Tab' && !event.nativeEvent.isComposing) {
       event.preventDefault()
       const editor = editorRef.current
-      if (!editor || editor.value.trim()) return
+      if (!editor || editor.getValue().trim()) return
       const defaultGoal = '在把我交代的任务全部完成之前不要停下'
-      setDraft(defaultGoal)
+      editor.replaceRange(0, editor.getValue().length, defaultGoal)
       requestAnimationFrame(() => {
         editor.focus()
-        editor.setSelectionRange(defaultGoal.length, defaultGoal.length)
+        editor.setCaret(defaultGoal.length)
       })
       return
     }
@@ -86,7 +69,7 @@ export function useComposerKeys({ setDraft, setCaretIndex, setDismissedSuggestio
       event.preventDefault()
       void send(event.ctrlKey || event.metaKey ? 'steer' : 'queue')
     }
-  }, [suggestionOpen, suggestionItems, suggestionSelected, suggestionKey, acceptSuggestion, goalPrompting, editorRef, setDraft, setDismissedSuggestion, setSuggestionSelected, send])
+  }, [suggestionOpen, suggestionItems, suggestionSelected, suggestionKey, acceptSuggestion, goalPrompting, editorRef, setDismissedSuggestion, setSuggestionSelected, send])
 
-  return { onChange, onClick, onKeyUp, onPaste, onKeyDown }
+  return { onPaste, onKeyDown }
 }

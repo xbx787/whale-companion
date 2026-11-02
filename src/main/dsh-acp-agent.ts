@@ -78,6 +78,21 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
+/** 计划正文可能落在 tool_call 的 rawInput 对象里，也可能只剩 JSON 字符串。
+ *  ACP 的 session/request_permission 本身不带 rawInput，所以两条都要试。 */
+function cachedPlan(input: { input: string; rawInput?: unknown } | undefined): string {
+  const direct = objectValue(input?.rawInput)
+  const fromObject = textValue(direct.plan) || textValue(direct.planText) || textValue(direct.content)
+  if (fromObject) return fromObject
+  if (!input?.input) return ''
+  try {
+    const parsed = objectValue(JSON.parse(input.input) as unknown)
+    return textValue(parsed.plan) || textValue(parsed.planText) || textValue(parsed.content)
+  } catch {
+    return ''
+  }
+}
+
 function chunkText(content: unknown): string {
   const block = objectValue(content)
   return block.type === 'text' ? textValue(block.text) : ''
@@ -182,6 +197,8 @@ export class DshAcpAgentClient implements ModelClient {
   private permissionListener: ((request: ToolPermissionRequest | null) => void) | undefined
   private planListener: ((request: PlanApprovalRequest | null) => void) | undefined
   private readonly pendingPlans = new Map<string, { resolve: (optionId: string | null) => void; allowOptionId: string; rejectOptionId: string }>()
+  /** 用户主动退回的计划：工具行按「已退回」收尾，不能标成失败。 */
+  private readonly rejectedPlans = new Set<string>()
   private readonly pendingPermissions = new Map<string, PendingPermission>()
   private readonly alwaysAllowedKinds = new Set<string>()
   /** 插话回显：DSH 把 steer 的用户消息写进会话后，用它确认投递。 */
@@ -221,7 +238,7 @@ export class DshAcpAgentClient implements ModelClient {
   private usageLogSize = -1
   /** ACP permission requests carry only the tool-call id; keep the earlier
    *  tool_call payload so the panel can name the action and show its input. */
-  private readonly toolCallInfo = new Map<string, { title: string; input: string; kind: string }>()
+  private readonly toolCallInfo = new Map<string, { title: string; input: string; kind: string; rawInput?: unknown }>()
 
   constructor(private readonly options: DshAcpAgentOptions) {
     this.provider = options.provider ?? 'deepseek-official'
@@ -406,7 +423,7 @@ export class DshAcpAgentClient implements ModelClient {
         const input = update.rawInput === undefined ? '' : JSON.stringify(update.rawInput)
         if (toolCallId) {
           toolNames.set(toolCallId, title)
-          this.toolCallInfo.set(toolCallId, { title, input, kind: textValue(update.kind) })
+          this.toolCallInfo.set(toolCallId, { title, input, kind: textValue(update.kind), rawInput: update.rawInput })
           if (isSubagentTool(title)) this.startSubagentTask(toolCallId, title, update.rawInput)
           this.maybeStartQuestion(toolCallId, title, update.rawInput)
         }
@@ -421,8 +438,13 @@ export class DshAcpAgentClient implements ModelClient {
         const toolCallId = textValue(update.toolCallId)
         const status = textValue(update.status)
         if (status !== 'completed' && status !== 'failed') return
-        const output = toolOutput(update.content) ||
-          (update.rawOutput === undefined ? '' : JSON.stringify(update.rawOutput))
+        // 用户退回计划是一次正常决定，不是工具失败：DSH 会把 exit_plan_mode
+        // 标成 failed，这里按“已退回”收尾，避免时间线出现红叉和错误提示。
+        const rejectedPlan = status === 'failed' && Boolean(toolCallId) && this.rejectedPlans.delete(toolCallId)
+        const output = rejectedPlan
+          ? '你退回了这份计划，模型会按修改意见继续调整。'
+          : toolOutput(update.content) ||
+            (update.rawOutput === undefined ? '' : JSON.stringify(update.rawOutput))
         if (toolCallId && this.subagentTasks.has(toolCallId)) {
           this.finishSubagentTask(toolCallId, status === 'failed', output)
         }
@@ -436,7 +458,7 @@ export class DshAcpAgentClient implements ModelClient {
           kind: toolCallId ? this.toolCallInfo.get(toolCallId)?.kind : undefined,
           phase: 'result',
           output,
-          isError: status === 'failed'
+          isError: status === 'failed' && !rejectedPlan
         })
         toolNames.delete(toolCallId)
         this.toolCallInfo.delete(toolCallId)
@@ -653,10 +675,11 @@ export class DshAcpAgentClient implements ModelClient {
     if (planTool && this.planListener) {
       const planId = toolCallId || randomUUID()
       const rawPlan = objectValue(toolCall.rawInput)
-      const planText = textValue(rawPlan.plan) || textValue(rawPlan.planText) || textValue(toolCall.content)
+      const planText = textValue(rawPlan.plan) || textValue(rawPlan.planText) || textValue(rawPlan.content) ||
+        cachedPlan(cached)
       const optionId = await new Promise<string | null>((resolve) => {
         this.pendingPlans.set(planId, { resolve, allowOptionId, rejectOptionId })
-        this.planListener?.({ id: planId, plan: planText || cached?.input || '' })
+        this.planListener?.({ id: planId, plan: planText })
       })
       this.planListener?.(null)
       if (!optionId) return { outcome: { outcome: 'cancelled' } }
@@ -730,6 +753,7 @@ export class DshAcpAgentClient implements ModelClient {
     const pending = this.pendingPlans.get(id)
     if (!pending) return false
     this.pendingPlans.delete(id)
+    if (!approved) this.rejectedPlans.add(id)
     pending.resolve(approved ? pending.allowOptionId : pending.rejectOptionId)
     return true
   }
@@ -1152,12 +1176,14 @@ export class DshAcpAgentClient implements ModelClient {
 
   /** 手动压缩：调用我们补的 session/compact；没有可压缩内容时如实返回未压缩。 */
   async compact(_sessionId?: string | null): Promise<ContextUsageSnapshot> {
-    if (!this.sessionId) throw new Error('还没有可压缩的会话。')
+    // 冷会话刚被打开时还没有 ACP sessionId：先按记录恢复，否则一进对话
+    // 点压缩只会得到“还没有可压缩的会话”。
+    const sessionId = await this.ensureSession(_sessionId)
     let result: { shadowed?: number; tokens?: number } | undefined
     let firstError: unknown
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
-        result = await this.runtime.compact(this.sessionId)
+        result = await this.runtime.compact(sessionId)
         firstError = undefined
         break
       } catch (error) {

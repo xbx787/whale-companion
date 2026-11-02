@@ -37,10 +37,10 @@ describe('composer trigger detection', () => {
       { name: 'compact', kind: 'command' as const, source: 'builtin' as const, description: 'Shrink context' },
     ];
     expect(workflowSuggestionItems(options, { kind: 'workflow', query: 'review', start: 0, end: 7 })).toEqual([
-      { id: 'command:project:review', label: '/review', detail: '命令，项目，Run a review', insertText: '/review' },
+      { id: 'command:project:review', label: 'review', detail: '命令，项目，Run a review', insertText: '/review' },
     ]);
     expect(workflowSuggestionItems(options, { kind: 'skill', query: 'REVIEW', start: 0, end: 7 })).toEqual([
-      { id: 'skill:user:review', label: '$review', detail: '技能，用户，Review with a skill', insertText: '$review' },
+      { id: 'skill:user:review', label: 'review', detail: '技能，用户，Review with a skill', insertText: '$review' },
     ]);
     expect(workflowSuggestionItems(options, { kind: 'file', query: 'review', start: 0, end: 7 })).toEqual([]);
   });

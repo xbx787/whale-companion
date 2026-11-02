@@ -77,12 +77,18 @@ function click(element: Element): void {
   element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
 }
 
-function type(editor: HTMLTextAreaElement, value: string): void {
-  Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(editor, value)
+function type(editor: HTMLElement, value: string): void {
+  editor.textContent = value
+  const range = document.createRange()
+  range.selectNodeContents(editor)
+  range.collapse(false)
+  const selection = window.getSelection()
+  selection?.removeAllRanges()
+  selection?.addRange(range)
   editor.dispatchEvent(new Event('input', { bubbles: true }))
 }
 
-function enter(editor: HTMLTextAreaElement): void {
+function enter(editor: HTMLElement): void {
   editor.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
 }
 
@@ -173,11 +179,11 @@ describe('temporary side chat stays in the same panel', () => {
       run={async (action) => { try { await action(bridge); return true } catch { return false } }} />))
   }
 
-  async function editor(): Promise<HTMLTextAreaElement> {
-    let input = host.querySelector<HTMLTextAreaElement>('textarea[aria-label="输入消息"]')
+  async function editor(): Promise<HTMLElement> {
+    let input = host.querySelector<HTMLElement>('.composer-editor')
     if (!input) {
       await act(async () => click(host.querySelector('.panel-compose-trigger')!))
-      input = host.querySelector<HTMLTextAreaElement>('textarea[aria-label="输入消息"]')
+      input = host.querySelector<HTMLElement>('.composer-editor')
     }
     return input!
   }
@@ -204,16 +210,16 @@ describe('temporary side chat stays in the same panel', () => {
     const input = await editor()
     await act(async () => { type(input, '主线草稿') })
     await act(async () => { for (const listener of sideListeners) listener(side()) })
-    expect(input.value).toBe('')
+    expect(input.textContent).toBe('')
     await act(async () => { type(input, '临时会话草稿') })
     await act(async () => click(host.querySelector('button[aria-label="收起临时会话，返回主线"]')!))
     // 输入框在切换对话时会重新挂载，旧引用拿到的是已经摘掉的节点。
-    const backToMain = host.querySelector<HTMLTextAreaElement>('textarea[aria-label="输入消息"]')!
-    expect(backToMain.value).toBe('主线草稿')
+    const backToMain = host.querySelector<HTMLElement>('[aria-label="输入消息"]')!
+    expect(backToMain.textContent).toBe('主线草稿')
     expect(host.textContent).toContain('主线里的内容')
     expect(host.textContent).not.toContain('临时会话里的内容')
     await act(async () => click(host.querySelector('button[aria-label^="展开临时会话"]')!))
-    expect(input.value).toBe('临时会话草稿')
+    expect(input.textContent).toBe('临时会话草稿')
     expect(saveDraft.mock.calls.every(([_, value]) => value !== '临时会话草稿')).toBe(true)
   })
 
@@ -225,7 +231,7 @@ describe('temporary side chat stays in the same panel', () => {
       await act(async () => { type((await editor()), 'A 临时会话未发出的内容'); drop(host, 'A-note.docx') })
       await act(async () => click(host.querySelector('button[aria-label="收起输入框"]')!))
       await act(async () => { await new Promise((resolve) => setTimeout(resolve, 250)) })
-      expect(host.querySelector('textarea[aria-label="输入消息"]')).not.toBeNull()
+      expect(host.querySelector('[aria-label="输入消息"]')).not.toBeNull()
 
       if (order === 'side-first') {
         await publishSide(sideB())
@@ -237,12 +243,12 @@ describe('temporary side chat stays in the same panel', () => {
         await publishSide(sideB())
       }
       expect(host.textContent).toContain('B 临时会话里的内容')
-      expect((await editor()).value).toBe('')
+      expect((await editor()).textContent).toBe('')
       await act(async () => { type((await editor()), 'B 临时会话未发出的内容'); drop(host, 'B-note.pdf') })
 
       if (order === 'side-first') {
         await publishSide(side())
-        expect((await editor()).value).toBe('B 临时会话未发出的内容')
+        expect((await editor()).textContent).toBe('B 临时会话未发出的内容')
         await mount(selectedMain('main-a'))
       } else {
         await mount(selectedMain('main-a'))
@@ -250,14 +256,14 @@ describe('temporary side chat stays in the same panel', () => {
       }
       expect(host.textContent).toContain('临时会话里的内容')
       expect(host.textContent).not.toContain('B 临时会话里的内容')
-      expect(host.querySelector('textarea[aria-label="输入消息"]')).not.toBeNull()
+      expect(host.querySelector('[aria-label="输入消息"]')).not.toBeNull()
       const aInput = await editor()
-      expect(aInput.value).toBe('A 临时会话未发出的内容')
+      expect(aInput.textContent).toBe('A 临时会话未发出的内容')
       expect(host.querySelector('[aria-label="已添加附件"]')?.textContent).toContain('A-note')
       expect(host.querySelector('[aria-label="已添加附件"]')?.textContent).not.toContain('B-note')
 
       await mount(selectedMain('main-b'))
-      expect((await editor()).value).toBe('B 临时会话未发出的内容')
+      expect((await editor()).textContent).toBe('B 临时会话未发出的内容')
       expect(host.querySelector('[aria-label="已添加附件"]')?.textContent).toContain('B-note')
       expect(host.querySelector('[aria-label="已添加附件"]')?.textContent).not.toContain('A-note')
       expect(saveDraft.mock.calls.every(([_, value]) => !value.includes('临时会话未发出的内容'))).toBe(true)
@@ -281,11 +287,11 @@ describe('temporary side chat stays in the same panel', () => {
         await publishSide(emptySide('main-b'))
       }
       expect(host.querySelector('[aria-label="临时会话"]')).toBeNull()
-      expect((await editor()).value).toBe('B 保存的草稿')
+      expect((await editor()).textContent).toBe('B 保存的草稿')
       await mount(selectedMain('main-a'))
       expect(host.querySelector('button[aria-label^="展开临时会话"]')).not.toBeNull()
       await act(async () => click(host.querySelector('button[aria-label^="展开临时会话"]')!))
-      expect((await editor()).value).toBe('折叠的 A 临时会话草稿')
+      expect((await editor()).textContent).toBe('折叠的 A 临时会话草稿')
     }
   )
 
@@ -296,7 +302,7 @@ describe('temporary side chat stays in the same panel', () => {
     await act(async () => type((await editor()), '旧临时会话草稿'))
     await publishSide(emptySide('main-a'))
     await publishSide({ ...side(), sessionId: 'side-new', snapshot: { ...sideRuntime, conversationId: 'side-new' } })
-    expect((await editor()).value).toBe('')
+    expect((await editor()).textContent).toBe('')
   })
 
   it('returns a late A file preparation to A after switching to B side', async () => {
@@ -371,7 +377,7 @@ describe('temporary side chat stays in the same panel', () => {
     await mount()
     const input = await editor()
     await act(async () => { type(input, '/side 失败后保留的问题'); enter(input) })
-    expect(input.value).toBe('/side 失败后保留的问题')
+    expect(input.textContent).toBe('/side 失败后保留的问题')
     expect(host.textContent).toContain('主线里的内容')
     expect(host.querySelector('[aria-label="临时会话"]')).toBeNull()
     expect(sendSide).not.toHaveBeenCalled()
@@ -390,13 +396,13 @@ describe('temporary side chat stays in the same panel', () => {
     await act(async () => click(host.querySelector('button[aria-label^="展开临时会话"]')!))
     await act(async () => { type(input, '/'); })
     const choices = host.querySelector('[aria-label="选择命令"]')?.textContent ?? ''
-    expect(choices).toContain('/review')
+    expect(choices).toContain('review')
     for (const name of ['new', 'side', 'btw', 'sessions', 'model', 'help', 'goal', 'compact']) {
       expect(choices).not.toContain(`/${name}`)
     }
     await act(async () => { type(input, '/new') })
     await act(async () => { enter(input) })
-    expect(input.value).toBe('/new')
+    expect(input.textContent).toBe('/new')
     expect(host.textContent).toContain('/new 仅适用于主线')
     expect(sendSide).not.toHaveBeenCalled()
     expect(sendMain).not.toHaveBeenCalled()
@@ -412,11 +418,11 @@ describe('temporary side chat stays in the same panel', () => {
     await act(async () => click(host.querySelector('button[aria-label="修改待发送消息：待发正文"]')!))
     await act(async () => click(host.querySelector('button[aria-label="收起临时会话，返回主线"]')!))
     await act(async () => releaseRemove())
-    expect((await editor()).value).toBe('')
+    expect((await editor()).textContent).toBe('')
     expect(host.querySelector('[aria-label="已添加附件"]')).toBeNull()
     await act(async () => click(host.querySelector('button[aria-label^="展开临时会话"]')!))
     const sideInput = await editor()
-    expect(sideInput.value).toBe('待发正文')
+    expect(sideInput.textContent).toBe('待发正文')
     expect(host.querySelector('[aria-label="已添加附件"]')?.textContent).toContain('note')
     await act(async () => enter(sideInput))
     expect(removeSideQueuedMessage).toHaveBeenCalledWith('side-1', 'side-queue-1')
@@ -436,14 +442,14 @@ describe('temporary side chat stays in the same panel', () => {
     await act(async () => type(input, 'A 临时会话草稿'))
     if (order === 'side-first') {
       await act(async () => { for (const listener of sideListeners) listener(emptySide('main-b')) })
-      expect(input.value).toBe('A 临时会话草稿')
+      expect(input.textContent).toBe('A 临时会话草稿')
       await mount(switchedMain(action))
     } else {
       await mount(switchedMain(action))
       await act(async () => { for (const listener of sideListeners) listener(emptySide('main-b')) })
     }
     const nextInput = await editor()
-    expect(nextInput.value).toBe('B 保存的草稿')
+    expect(nextInput.textContent).toBe('B 保存的草稿')
     expect(host.textContent).toContain('B 主线里的内容')
     expect(host.querySelector('[data-entry-id="main-entry"]')).toBeNull()
     expect(host.querySelector('[aria-label="临时会话"]')).toBeNull()
@@ -453,8 +459,9 @@ describe('temporary side chat stays in the same panel', () => {
     if (action === 'archive') {
       await act(async () => { for (const listener of sideListeners) listener(side()) })
       await mount(mainSnapshot)
-      expect((await editor()).value).toBe('A 私有草稿')
+      expect((await editor()).textContent).toBe('A 私有草稿')
       expect(host.querySelector('[aria-label="临时会话"]')).toBeNull()
     }
   })
 })
+

@@ -35,6 +35,23 @@ describe('the rail’s ordinal ticks', () => {
     expect(labels).toEqual(['10', '20', '30', '40'])
   })
 
+  it('keeps one latest mark and grows only the hovered mark into a single peak', async () => {
+    await act(async () => {
+      root.render(<TimelineNav marks={marks} onJump={() => {}} />)
+    })
+    const nav = host.querySelector<HTMLElement>('.panel-nav')!
+    await act(async () => { nav.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })) })
+    // 最新一条始终亮着，且只有它。
+    expect(host.querySelectorAll('.panel-nav-mark.is-latest')).toHaveLength(1)
+    const rows = host.querySelectorAll<HTMLElement>('.panel-nav-row')
+    await act(async () => {
+      rows[5].querySelector('.panel-nav-mark')!.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+    })
+    // 鼠标指向的一条高亮；峰本身加一条肩，形成单个波浪。
+    expect(host.querySelectorAll('.panel-nav-mark.is-active')).toHaveLength(1)
+    expect(host.querySelectorAll('.panel-nav-mark[style]')).toHaveLength(5)
+  })
+
   it('jumps from the clicked tick even when no tick was hovered first', async () => {
     const jumps: string[] = []
     await act(async () => {
@@ -46,5 +63,15 @@ describe('the rail’s ordinal ticks', () => {
     // 只点击、不先 hover：横杠本身要能直接响应。
     await act(async () => { row.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
     expect(jumps.length).toBe(1)
+  })
+
+  it('draws the reading progress line only while the rail is open', async () => {
+    await act(async () => {
+      root.render(<TimelineNav marks={marks} onJump={() => {}} progressId="m30" />)
+    })
+    expect(host.querySelector('.panel-nav-progress')).toBeNull()
+    const nav = host.querySelector<HTMLElement>('.panel-nav')!
+    await act(async () => { nav.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })) })
+    expect(host.querySelector('.panel-nav-progress')).not.toBeNull()
   })
 })

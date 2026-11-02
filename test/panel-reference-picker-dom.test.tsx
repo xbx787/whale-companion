@@ -71,12 +71,23 @@ describe('Claudian style composer discovery', () => {
     vi.unstubAllGlobals()
   })
 
-  async function type(value: string): Promise<HTMLTextAreaElement> {
-    const editor = host.querySelector<HTMLTextAreaElement>('textarea[aria-label="输入消息"]')!
+  async function type(value: string): Promise<HTMLElement> {
+    if (!host.querySelector('.composer-editor')) {
+      await act(async () => host.querySelector<HTMLElement>('.panel-compose-trigger')?.click())
+    }
+    const editor = host.querySelector<HTMLElement>('.composer-editor')!
     await act(async () => {
-      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(editor, value)
+      editor.textContent = value
+      // 模拟真实输入后的光标：落在文本末尾，补全才能按 caret 识别 $ / 命令。
+      const range = document.createRange()
+      range.selectNodeContents(editor)
+      range.collapse(false)
+      const selection = window.getSelection()
+      selection?.removeAllRanges()
+      selection?.addRange(range)
       editor.dispatchEvent(new Event('input', { bubbles: true }))
-      await Promise.resolve()
+      // 建议列表来自异步的 listAppCommands，等一拍宏任务再断言。
+      await new Promise((resolve) => setTimeout(resolve, 0))
     })
     return editor
   }
@@ -87,18 +98,19 @@ describe('Claudian style composer discovery', () => {
     await act(async () => host.querySelector<HTMLElement>('.panel-compose-trigger')?.click())
 
     await type('$')
-    expect([...host.querySelectorAll('.panel-suggestion-item')].map((item) => item.textContent)).toEqual(['$review技能，用户，代码审查'])
+    expect([...host.querySelectorAll('.panel-suggestion-item')].map((item) => item.textContent)).toEqual(['技能review技能，用户，代码审查'])
     await type('/')
-    expect([...host.querySelectorAll('.panel-suggestion-item')].map((item) => item.textContent)).toEqual(['/compact命令，内置，压缩对话'])
+    expect([...host.querySelectorAll('.panel-suggestion-item')].map((item) => item.textContent)).toEqual(['命令compact命令，内置，压缩对话'])
 
     const editor = await type('@')
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 150)) })
     const options = [...host.querySelectorAll<HTMLElement>('.panel-suggestion-item')]
     expect(options.map((item) => item.textContent)).toEqual([
-      '项目计划会话，4 条消息', 'docs目录，docs', 'README.md文件，README.md'
+      '文件docs目录，docs', '文件README.md文件，README.md', '对话项目计划会话，4 条消息'
     ])
-    await act(async () => options[0].click())
-    expect(editor.value).toBe(`@[项目计划](xiaojing-session:${sourceId}) `)
+    await act(async () => options[2].click())
+    expect(editor.querySelector('.composer-mention')).not.toBeNull()
+    expect(editor.querySelector('.composer-mention')!.getAttribute('data-token')).toBe(`@[项目计划](xiaojing-session:${sourceId})`)
   })
 
   it('completes the highlighted suggestion with Tab instead of moving focus', async () => {
@@ -107,11 +119,11 @@ describe('Claudian style composer discovery', () => {
     await act(async () => host.querySelector<HTMLElement>('.panel-compose-trigger')?.click())
 
     const editor = await type('/comp')
-    expect([...host.querySelectorAll('.panel-suggestion-item')].map((item) => item.textContent)).toEqual(['/compact命令，内置，压缩对话'])
+    expect([...host.querySelectorAll('.panel-suggestion-item')].map((item) => item.textContent)).toEqual(['命令compact命令，内置，压缩对话'])
     await act(async () => {
       editor.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }))
       await Promise.resolve()
     })
-    expect(editor.value).toBe('/compact ')
+    expect(editor.textContent).toBe('/compact ')
   })
 })

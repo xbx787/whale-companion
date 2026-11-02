@@ -45,90 +45,83 @@ async function mount(onSubmit: (answers: AskAnswers) => Promise<boolean>, onSkip
 }
 
 describe('AskQuestionPanel interactions', () => {
-  it('advances on a single choice, ticks the tab, and submits from the review tab', async () => {
+  it('advances on a single choice, shows progress, and submits from the last question', async () => {
     const submitted: AskAnswers[] = []
     const view = await mount(async (answers) => { submitted.push(answers); return true }, async () => true)
     expect(view.textContent).toContain('用哪种方案？')
+    expect(view.querySelector('.panel-ask-progress')!.textContent).toContain('1 / 2')
     await act(async () => click(view.querySelectorAll('.panel-ask-option')[0]))
-    // A single choice moves on by itself — first to the next question.
+    // 单选自动进入下一题。
     expect(view.textContent).not.toContain('用哪种方案？')
     expect(view.textContent).toContain('还要什么？')
-    const tabs = view.querySelectorAll('.panel-ask-tab')
-    expect(tabs[0].textContent).toContain('✓')
-    expect(tabs[1].getAttribute('aria-selected')).toBe('true')
-    // Multi-select stays put until the pick list is done.
+    expect(view.querySelector('.panel-ask-progress')!.textContent).toContain('2 / 2')
+    // 多选停在原地，直到主人自己提交。
     await act(async () => click(view.querySelectorAll('.panel-ask-option')[0]))
     expect(view.textContent).toContain('还要什么？')
-    expect(tabs[1].textContent).toContain('✓')
-    // The last tab is the review; every answer is on it.
-    await act(async () => click(view.querySelectorAll('.panel-ask-tab')[2]))
-    expect(view.textContent).toContain('确认回答')
-    expect(view.textContent).toContain('甲')
-    expect(view.textContent).toContain('日志')
     await act(async () => click(view.querySelector('.panel-ask-submit')!))
     expect(submitted).toEqual([{ q1: '甲', q2: ['日志'] }])
   })
 
-  it('keeps every answer one click away: tabs jump back and review pairs reopen their question', async () => {
+  it('keeps every answer one click away: 上一题 restores the earlier choice', async () => {
     const view = await mount(async () => true, async () => true)
     await act(async () => click(view.querySelectorAll('.panel-ask-option')[0]))
-    await act(async () => click(view.querySelectorAll('.panel-ask-tab')[0]))
+    await act(async () => click(view.querySelector('.panel-ask-nav')!))
     expect(view.textContent).toContain('用哪种方案？')
     expect(view.querySelectorAll('.panel-ask-option')[0].getAttribute('aria-checked')).toBe('true')
     await act(async () => click(view.querySelectorAll('.panel-ask-option')[1]))
-    await act(async () => click(view.querySelectorAll('.panel-ask-tab')[2]))
-    expect(view.textContent).toContain('乙')
-    await act(async () => click(view.querySelectorAll('.panel-ask-review-pair')[1]))
     expect(view.textContent).toContain('还要什么？')
-    expect(view.textContent).not.toContain('确认回答')
+    expect(view.querySelectorAll('.panel-ask-option')[0].getAttribute('aria-checked')).toBe('false')
   })
 
   it('folds own answers in: typing replaces a single choice and joins multi-select picks', async () => {
     const submitted: AskAnswers[] = []
     const view = await mount(async (answers) => { submitted.push(answers); return true }, async () => true)
     await act(async () => click(view.querySelectorAll('.panel-ask-option')[0]))
-    await act(async () => click(view.querySelectorAll('.panel-ask-tab')[0]))
+    await act(async () => click(view.querySelector('.panel-ask-nav')!))
     await act(async () => type(view.querySelector('.panel-ask-other') as HTMLInputElement, ' 丙 '))
-    // Typing an own answer replaces the picked label.
+    // 自写答案覆盖单选。
     expect(view.querySelectorAll('.panel-ask-option')[0].getAttribute('aria-checked')).toBe('false')
-    await act(async () => click(view.querySelectorAll('.panel-ask-tab')[2]))
-    expect(view.textContent).toContain('丙')
-    await act(async () => click(view.querySelectorAll('.panel-ask-review-pair')[1]))
+    await act(async () => click(view.querySelector('.panel-ask-nav')!))
     await act(async () => click(view.querySelectorAll('.panel-ask-option')[0]))
     await act(async () => type(view.querySelector('.panel-ask-other') as HTMLInputElement, ' 别的 '))
-    await act(async () => click(view.querySelectorAll('.panel-ask-tab')[2]))
     await act(async () => click(view.querySelector('.panel-ask-submit')!))
     expect(submitted).toEqual([{ q1: '丙', q2: ['日志', '别的'] }])
   })
 
-  it('lists unanswered entries in the review and lets 跳过 decline the whole call', async () => {
+  it('jumps back to the first unanswered question instead of submitting a hole', async () => {
+    const submitted: AskAnswers[] = []
+    const view = await mount(async (answers) => { submitted.push(answers); return true }, async () => true)
+    // 直接跳到最后一题再提交：缺的 q1 要跳回去并给出提示。
+    await act(async () => click(view.querySelector('.panel-ask-nav')!))
+    await act(async () => click(view.querySelector('.panel-ask-submit')!))
+    expect(submitted).toEqual([])
+    expect(view.textContent).toContain('用哪种方案？')
+    expect(view.textContent).toContain('还有问题没有回答')
+  })
+
+  it('lets 跳过 decline the whole call', async () => {
     let skipped = 0
     const view = await mount(async () => true, async () => { skipped += 1; return true })
-    await act(async () => click(view.querySelectorAll('.panel-ask-tab')[2]))
-    expect(view.textContent).toContain('未回答')
-    expect((view.querySelector('.panel-ask-submit') as HTMLButtonElement).disabled).toBe(true)
     await act(async () => click(view.querySelector('.panel-ask-skip')!))
     expect(skipped).toBe(1)
   })
 
-  it('re-enables the buttons when a submit fails', async () => {
+  it('re-enables the buttons and explains when a submit fails', async () => {
     const view = await mount(async () => false, async () => true)
     await act(async () => click(view.querySelectorAll('.panel-ask-option')[0]))
     await act(async () => click(view.querySelectorAll('.panel-ask-option')[0]))
-    await act(async () => click(view.querySelectorAll('.panel-ask-tab')[2]))
     await act(async () => click(view.querySelector('.panel-ask-submit')!))
     expect((view.querySelector('.panel-ask-submit') as HTMLButtonElement).disabled).toBe(false)
     expect((view.querySelector('.panel-ask-skip') as HTMLButtonElement).disabled).toBe(false)
+    expect(view.textContent).toContain('回答没有送达')
   })
 
-  it('keeps the single-question flow direct: no tabs, gated 回答, straight submit', async () => {
+  it('keeps the single-question flow direct: no progress, straight submit', async () => {
     const submitted: AskAnswers[] = []
     const view = await mount(async (answers) => { submitted.push(answers); return true }, async () => true,
       { id: 'r2', questions: [request.questions[0]] })
-    expect(view.querySelector('.panel-ask-tabs')).toBeNull()
-    expect((view.querySelector('.panel-ask-submit') as HTMLButtonElement).disabled).toBe(true)
+    expect(view.querySelector('.panel-ask-progress')).toBeNull()
     await act(async () => click(view.querySelectorAll('.panel-ask-option')[0]))
-    expect((view.querySelector('.panel-ask-submit') as HTMLButtonElement).disabled).toBe(false)
     await act(async () => click(view.querySelector('.panel-ask-submit')!))
     expect(submitted).toEqual([{ q1: '甲' }])
   })
@@ -138,9 +131,7 @@ describe('AskQuestionPanel interactions', () => {
     const view = await mount(async (answers) => { submitted.push(answers); return true }, async () => true,
       { id: 'r3', questions: [{ key: 'q1', question: '给这个会话起个名字', options: [], multiSelect: false }] })
     expect(view.querySelectorAll('.panel-ask-option')).toHaveLength(1)
-    expect((view.querySelector('.panel-ask-submit') as HTMLButtonElement).disabled).toBe(true)
     await act(async () => type(view.querySelector('.panel-ask-other') as HTMLInputElement, '开发一'))
-    expect((view.querySelector('.panel-ask-submit') as HTMLButtonElement).disabled).toBe(false)
     await act(async () => click(view.querySelector('.panel-ask-submit')!))
     expect(submitted).toEqual([{ q1: '开发一' }])
   })

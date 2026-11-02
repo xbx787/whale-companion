@@ -64,14 +64,14 @@ describe('the composer draft after a restart', () => {
     host.remove()
   })
 
-  it('pulls the saved draft back into the textarea', async () => {
+  it('pulls the saved draft back into the editor', async () => {
     await act(async () => {
       root.render(<PanelBubble visible snapshot={snapshot} error={null} run={async (action) => { await action(bridge); return true }} />)
     })
     // The restore lands through a promise; let it settle before reading the DOM.
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
-    const textarea = host.querySelector<HTMLTextAreaElement>('textarea[aria-label="输入消息"]')
-    expect(textarea).toBeTruthy()
-    expect(textarea!.value).toBe(saved)
+    const editor = host.querySelector<HTMLElement>('[aria-label="输入消息"]')
+    expect(editor).toBeTruthy()
+    expect(editor!.textContent).toBe(saved)
   })
 })

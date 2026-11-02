@@ -45,6 +45,14 @@ const api: PetAPI = {
   timelinePage: (conversationId, before, limit) => ipcRenderer.invoke('pet:conversation-timeline-page', conversationId, before, limit),
   getContextUsage: (conversationId) => ipcRenderer.invoke('pet:get-context-usage', conversationId),
   compactConversation: (conversationId) => ipcRenderer.invoke('pet:compact-conversation', conversationId),
+  phoneStatus: () => ipcRenderer.invoke('pet:phone:status'),
+  phoneScan: () => ipcRenderer.invoke('pet:phone:scan'),
+  phoneConnect: (host, password) => ipcRenderer.invoke('pet:phone:connect', host, password),
+  phoneDisconnect: () => ipcRenderer.invoke('pet:phone:disconnect'),
+  phoneSessions: () => ipcRenderer.invoke('pet:phone:sessions'),
+  phoneRead: (sessionId, limit) => ipcRenderer.invoke('pet:phone:read', sessionId, limit),
+  phoneSend: (sessionId, text, mode) => ipcRenderer.invoke('pet:phone:send', sessionId, text, mode),
+  phoneSetAutoConnect: (on) => ipcRenderer.invoke('pet:phone:auto-connect', on),
   listAppCommands: () => ipcRenderer.invoke('pet:list-app-commands'),
   onSlashUiAction: (callback) => {
     const listener = (_event: Electron.IpcRendererEvent, action: SlashUiAction): void => callback(action)

@@ -135,7 +135,7 @@ export class LibraryStore {
           id: externalId('mcp', `${source}:${name}`),
           kind: 'mcp',
           name,
-          description: url ? '已在 Claude 配置中：HTTP MCP 服务器' : '已在 Claude 配置中：stdio MCP 服务器',
+          description: '',
           source,
           launch: {
             type: 'mcp',
