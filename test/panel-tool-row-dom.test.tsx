@@ -55,10 +55,10 @@ describe('工具行信息详细程度', () => {
       .toBeLessThan(children.findIndex((node) => node.classList.contains('panel-tool-time')))
   })
 
-  it('keeps milliseconds and decimals for non-command tools', async () => {
+  it('keeps whole seconds for non-command tools too', async () => {
     const entry: TimelineEntry = { ...fileEdit, id: 'tool-edit-time', tool: { ...fileEdit.tool!, durationMs: 12_340 } }
     await mount(entry, 'brief', 'D:/DesktopPetProject')
-    expect(container.querySelector('.panel-tool-time')?.textContent).toBe('12.3s')
+    expect(container.querySelector('.panel-tool-time')?.textContent).toBe('12s')
   })
 
   it('counts whole seconds while a command is still running', async () => {
