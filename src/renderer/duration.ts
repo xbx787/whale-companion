@@ -5,7 +5,7 @@ export function formatDuration(totalSeconds: number): string {
 }
 
 /** 一般工具（编辑、读取等）的耗时：100ms 以下给毫秒，100ms 到 1 秒给零点几秒，
- *  1 分钟内一位小数秒，再长走 mm:ss。 */
+ *  1 秒以上一律整数秒，再长走 mm:ss。 */
 export function formatToolDuration(ms: number): string {
   const value = Math.max(0, ms)
   if (value < 100) return `${Math.round(value)}ms`
@@ -13,7 +13,7 @@ export function formatToolDuration(ms: number): string {
     // 0.85s、0.35s；去掉末尾的 0，但保留 0.1s 这种一位。
     return `${(value / 1_000).toFixed(2).replace(/0+$/u, '').replace(/\.$/u, '')}s`
   }
-  if (value < 60_000) return `${(value / 1_000).toFixed(1)}s`
+  if (value < 60_000) return `${Math.round(value / 1_000)}s`
   return formatDuration(value / 1_000)
 }
 

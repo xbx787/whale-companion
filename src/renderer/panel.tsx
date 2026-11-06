@@ -136,6 +136,9 @@ function writeComposerOpenPrefs(prefs: Map<string, boolean>): void {
   try { localStorage.setItem(COMPOSER_OPEN_KEY, JSON.stringify(Object.fromEntries(prefs))) } catch { /* 存不了就只记在内存。 */ }
 }
 
+/** 附件预览缓存上限：存的是 base64 图片，体积大，只留最近几张。 */
+const ATTACHMENT_PREVIEW_LIMIT = 12
+
 export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direction = 'up', placement = 'top' }: PanelBubbleProps) {
   usePanelWindowChrome(direction, placement);
 
@@ -240,6 +243,7 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
   const batchDeleteConfirmRef = useRef(batchDeleteConfirm);
   batchDeleteConfirmRef.current = batchDeleteConfirm;
   const [compactBusy, setCompactBusy] = useState(false);
+  const [carryBusy, setCarryBusy] = useState(false);
   const [renameId, setRenameId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -287,6 +291,18 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
   // Hover previews of image chips: data URLs land here keyed by file path, so a
   // second hover (or a conversation switch and back) never re-reads the disk.
   const [attachmentPreviews, setAttachmentPreviews] = useState<Record<string, string>>({});
+  // 预览存的是图片的 base64，一张大图几 MB；看过就再也不清会一直涨。
+  // 只留最近用到的若干张，需要时按路径重新读。
+  const rememberAttachmentPreview = useCallback((path: string, url: string) => {
+    setAttachmentPreviews((current) => {
+      const next = { ...current, [path]: url }
+      const keys = Object.keys(next)
+      if (keys.length > ATTACHMENT_PREVIEW_LIMIT) {
+        for (const key of keys.slice(0, keys.length - ATTACHMENT_PREVIEW_LIMIT)) delete next[key]
+      }
+      return next
+    })
+  }, []);
   const [previewCard, setPreviewCard] = useState<{ path: string; name: string; placement: PreviewPlacement } | null>(null);
   const requestedPreviews = useRef(new Set<string>());
   const composerRef = useRef<HTMLFormElement>(null);
@@ -1136,7 +1152,7 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
     requestedPreviews.current.add(target);
     try {
       void petBridge().readImagePreview(target).then((url) => {
-        if (url) setAttachmentPreviews((current) => ({ ...current, [target]: url }));
+        if (url) rememberAttachmentPreview(target, url);
         else requestedPreviews.current.delete(target); // Let a later hover retry a file that was briefly unreadable.
       }).catch(() => requestedPreviews.current.delete(target));
     } catch { requestedPreviews.current.delete(target); }
@@ -1249,6 +1265,18 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
       if (accepted) setModelPickerOpen(false);
     } finally {
       setCompactBusy(false);
+    }
+  }
+
+  /** 把当前对话的摘要和最近几轮带进一个新会话，原对话保留。 */
+  async function carryContext() {
+    if (carryBusy) return;
+    setCarryBusy(true);
+    try {
+      const accepted = await run((bridge) => bridge.carryConversation());
+      if (accepted) setContextMenuOpen(false);
+    } finally {
+      setCarryBusy(false);
     }
   }
 
@@ -1763,7 +1791,7 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
   // 跳转循环里要读到最新的已加载条数，state 在闭包里是旧值。
   const olderCountRef = useRef(0);
   olderCountRef.current = olderEntries.length;
-  useEffect(() => { setOlderEntries([]) }, [snapshot?.conversationId]);
+  useEffect(() => { setOlderEntries([]); setAttachmentPreviews({}) }, [snapshot?.conversationId]);
   const mergedTimeline = useMemo(
     () => olderEntries.length ? [...olderEntries, ...timeline] : timeline,
     [olderEntries, timeline]
@@ -2375,7 +2403,7 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
                   title="添加图片或文件（也可以直接拖入或粘贴）" onClick={() => attachmentInputRef.current?.click()}>
                   <PlusIcon />
                 </button>
-                <ContextMenu wrapperRef={contextMenuRef} usage={contextUsage} compacting={contextCompacting} open={contextMenuOpen} autoCompactPercent={autoCompactPreview ?? library?.settings.autoCompactPercent ?? AUTO_COMPACT_DEFAULT_PERCENT} onToggle={() => setContextMenuOpen((open) => !open)} onClose={() => setContextMenuOpen(false)} onNudge={nudgeAutoCompact} onCompact={() => { void compactContext(); }} />
+                <ContextMenu wrapperRef={contextMenuRef} usage={contextUsage} compacting={contextCompacting} carrying={carryBusy} open={contextMenuOpen} autoCompactPercent={autoCompactPreview ?? library?.settings.autoCompactPercent ?? AUTO_COMPACT_DEFAULT_PERCENT} onToggle={() => setContextMenuOpen((open) => !open)} onClose={() => setContextMenuOpen(false)} onNudge={nudgeAutoCompact} onCompact={() => { void compactContext(); }} onCarry={() => { void carryContext(); }} />
                 <ComposerSendRow phase={voicePhase} canListen={voiceReady && Boolean(voiceManagerRef.current?.available ?? voiceConfig?.siliconFlowAvailable)} busy={Boolean(busy)} sending={sendingCurrent} active={active} empty={!draft.trim() && !attachments.length} snapshotReady={Boolean(snapshot)} compacting={contextCompacting} goalPrompting={goalPrompting} mode={snapshot?.mode} onToggleVoice={toggleVoice} onStop={() => { void stop(); }} />
               </div>
             </form>

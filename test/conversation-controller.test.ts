@@ -53,6 +53,33 @@ describe('conversation controller', () => {
     expect(activeSideChatParentId(controller.displayedConversationId(), library)).toBeNull()
   })
 
+  it('carries a conversation into a new one without touching the source', async () => {
+    const store = new ConversationStore(testRoot)
+    const source = await store.createConversation('旧对话', 'dsh')
+    await store.updateConversation(source.id, {
+      history: [
+        { role: 'user', content: '第一问' },
+        { role: 'assistant', content: '第一答' },
+        { role: 'user', content: '第二问' },
+        { role: 'assistant', content: '第二答' }
+      ]
+    })
+    await store.setActiveConversation(source.id)
+    const summarize = async (): Promise<string | null> => '之前完成了两件事。'
+    const controller = new ConversationController(store,
+      (_conversationId, onChange) => new AgentRuntime(new NoteStore(testRoot), undefined, onChange),
+      () => {}, () => {}, undefined, undefined, undefined, undefined, summarize)
+    await controller.initialize()
+    const next = await controller.carryConversation()
+    expect(next.title).toBe('旧对话（续）')
+    expect(next.compactionSummary).toContain('之前完成了两件事。')
+    expect(next.compactionSummary).toContain('用户：第二问')
+    expect(controller.displayedConversationId()).toBe(next.id)
+    const before = await store.getConversation(source.id)
+    expect(before?.history).toHaveLength(4)
+    expect(before?.compactionSummary).toBeUndefined()
+  })
+
   it('changes the displayed epoch even after switching away and back to the same parent', async () => {
     const store = new ConversationStore(testRoot)
     const first = await store.createConversation('第一条', 'dsh')

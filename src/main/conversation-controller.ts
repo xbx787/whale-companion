@@ -8,6 +8,7 @@ import { containsSensitiveData } from './memory-service'
 import { attachmentContext, validAttachmentList } from './local-context'
 import { snapshotSessionMentions } from './session-context'
 import { snapshotPhoneMentions } from './phone-context'
+import { composeCarriedContext, recentTurnText } from './carry-context'
 import { parseLibraryMentions, stripLibraryMentions } from '../shared/libraries'
 import type { ConversationTarget } from './conversation-tools'
 import {
@@ -139,7 +140,9 @@ export class ConversationController {
     /** Installed-library lookups for @ references. */
     private readonly resolveLibraries?: LibraryLaunchResolver,
     /** 手机 DSH Go 的会话读取：@手机会话 引用时用。 */
-    private readonly loadPhoneSession?: (sessionId: string) => Promise<PhoneMessageRecord[]>
+    private readonly loadPhoneSession?: (sessionId: string) => Promise<PhoneMessageRecord[]>,
+    /** 承接摘要：为“在新对话中继续”生成一段上下文摘要。失败时应返回 null。 */
+    private readonly summarize?: (source: string, model?: string) => Promise<string | null>
   ) {}
 
   setTurnHooks(hooks: ConversationTurnHooks): void {
@@ -730,7 +733,11 @@ export class ConversationController {
     // 文件引用去找，报“找不到引用文件”。正文里剔除，空正文给一句兜底。
     const libraryRefs = parseLibraryMentions(clean)
     const messageText = libraryRefs.length ? (stripLibraryMentions(clean) || '使用已选技能。') : clean
-    const sessionContext = (await Promise.all([
+    // 从上一段对话承接来的会话：第一条消息把承接背景带进内核；之后历史里
+    // 已经有一份，不再重复注入。
+    const ref = await this.store.getConversationRef(id)
+    const carriedContext = ref && ref.history.length === 0 ? ref.compactionSummary?.trim() ?? '' : ''
+    const sessionContext = [carriedContext, ...(await Promise.all([
       snapshotSessionMentions(clean, id, async (sourceId) => {
         const record = await this.store.getConversation(sourceId)
         if (!record) return null
@@ -740,7 +747,7 @@ export class ConversationController {
         return { ...record, ...sourceRuntime.exportConversationState() }
       }),
       this.loadPhoneSession ? snapshotPhoneMentions(clean, this.loadPhoneSession) : Promise.resolve('')
-    ])).filter(Boolean).join('\n\n')
+    ]))].filter(Boolean).join('\n\n')
     const message: PendingMessage = {
       id: randomUUID(), text: messageText, attachments: structuredClone(attachments), createdAt: new Date().toISOString(),
       ...(divider ? { divider: true } : {}),
@@ -1055,8 +1062,38 @@ export class ConversationController {
     })
   }
 
-  async selectConversation(id: string): Promise<ConversationRecord> {
+  /** 从一段对话派生新会话：摘要 + 最近几轮原文作为承接背景，原对话不动。
+   *  摘要失败时只带最近几轮，不让整个功能失败。 */
+  async carryConversation(conversationId?: string): Promise<ConversationRecord> {
     await this.initialize()
+    const sourceId = conversationId ?? this.activeId
+    if (!sourceId) throw new ConversationStoreError('NOT_FOUND', '找不到这个会话。')
+    if (this.runtimes.get(sourceId)?.isRunning()) {
+      throw new ConversationStoreError('INVALID_INPUT', '这段对话还在运行，等它停下来再继续。')
+    }
+    const source = await this.store.getConversationRef(sourceId)
+    if (!source) throw new ConversationStoreError('NOT_FOUND', '找不到这个会话。')
+    const turns = recentTurnText(source.history)
+    if (!turns) throw new ConversationStoreError('INVALID_INPUT', '这段对话还没有内容可以承接。')
+    const summary = this.summarize
+      ? await this.summarize(turns).then((value) => value?.trim() || null, () => null)
+      : null
+    const carried = composeCarriedContext(source.title, summary, turns)
+    return this.serialize(async () => {
+      const activeCount = this.library?.conversations.filter((item) => !item.archivedAt).length ?? 0
+      if (activeCount >= UNARCHIVED_LIMIT) {
+        throw new Error(`未归档最多 ${UNARCHIVED_LIMIT} 个会话，先归档一个再新建。`)
+      }
+      const created = await this.store.createConversation(`${source.title}（续）`, source.mode)
+      await this.store.updateConversation(created.id, {
+        compactionSummary: carried,
+        ...(source.approvalMode ? { approvalMode: source.approvalMode } : {})
+      })
+      return this.setDisplayed(created.id)
+    })
+  }
+
+  async selectConversation(id: string): Promise<ConversationRecord> {    await this.initialize()
     return this.serialize(async () => {
       // 先切显示，active 标记异步落盘：切换的体感不能被写 library.json 拖住。
       const record = await this.setDisplayed(id)

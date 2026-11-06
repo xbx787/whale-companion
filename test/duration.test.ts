@@ -14,10 +14,11 @@ describe('tool duration labels', () => {
     expect(formatToolDuration(850)).toBe('0.85s')
   })
 
-  it('shows one decimal second under a minute', () => {
-    expect(formatToolDuration(1_000)).toBe('1.0s')
-    expect(formatToolDuration(12_340)).toBe('12.3s')
-    expect(formatToolDuration(59_900)).toBe('59.9s')
+  it('shows whole seconds from one second up', () => {
+    expect(formatToolDuration(1_000)).toBe('1s')
+    expect(formatToolDuration(12_340)).toBe('12s')
+    expect(formatToolDuration(17_100)).toBe('17s')
+    expect(formatToolDuration(59_900)).toBe('60s')
   })
 
   it('falls back to mm:ss for long ordinary tools', () => {

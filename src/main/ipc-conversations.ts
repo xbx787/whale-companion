@@ -119,4 +119,9 @@ export function registerConversationsIpc(deps: ConversationsIpcDeps): void {
     if (conversationId !== undefined && typeof conversationId !== 'string') throw new Error('会话编号无效。')
     return deps.activeController().compactConversation(conversationId as string | undefined)
   })
+  ipcMain.handle('pet:carry-conversation', (event, conversationId: unknown) => {
+    if (!deps.trusted(event)) throw new Error('无效的界面请求。')
+    if (conversationId !== undefined && typeof conversationId !== 'string') throw new Error('会话编号无效。')
+    return deps.activeController().carryConversation(conversationId as string | undefined)
+  })
 }

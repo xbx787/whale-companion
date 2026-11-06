@@ -721,6 +721,8 @@ export interface PetAPI {
   /** 取 `before` 之前的 `limit` 条历史；分页窗口之外的旧消息靠它补齐。 */
   timelinePage(conversationId: string, before: number, limit: number): Promise<TimelineEntry[]>
   compactConversation(conversationId?: string): Promise<void>
+  /** 把当前对话的摘要和最近几轮带进一个新会话，原对话保留。 */
+  carryConversation(conversationId?: string): Promise<void>
   /** 手机 DSH Go：状态、局域网扫描、连接、断开、会话列表、读记录、发消息。 */
   phoneStatus(): Promise<PhoneLinkStatus>
   phoneScan(): Promise<PhoneCandidate[]>

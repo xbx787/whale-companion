@@ -1083,7 +1083,10 @@ img.panel-markdown-image { display: block; max-width: 100%; margin: 6px 0; borde
 .panel-composer-inputrow { position: relative; display: flex; flex: none; min-height: 0; padding-right: 23px; }
 .panel-composer textarea, .panel-composer .composer-editor { width: 100%; flex: none; min-width: 0; min-height: 0; max-height: 155px; padding: 2px 2px 2px 0; resize: none; overflow-y: auto; border: 0; outline: none; color: #f3f6ff; background: transparent; font-size: var(--text-md); line-height: 1.45; scrollbar-color: rgba(171, 201, 250, .62) transparent; scrollbar-width: auto; }
 .panel-composer .composer-editor { white-space: pre-wrap; overflow-wrap: anywhere; }
-.panel-composer .composer-editor[data-empty="true"]::before { content: attr(data-placeholder); color: #99acd5; pointer-events: none; }
+/* 空输入框的提示不占正文：绝对定位覆盖，光标留在最左侧起点，而不是被
+   推到提示文字末尾。 */
+.panel-composer .composer-editor[data-empty="true"] { position: relative; }
+.panel-composer .composer-editor[data-empty="true"]::before { content: attr(data-placeholder); position: absolute; top: 2px; left: 0; right: 2px; color: #99acd5; pointer-events: none; }
 .panel-composer .composer-mention { display: inline-flex; align-items: center; height: 1.45em; padding: 0 .45em; margin: 0 1px; border-radius: .45em; color: #f3d7a4; background: rgba(240, 196, 123, .16); font-size: inherit; font-weight: 600; line-height: 1; vertical-align: baseline; white-space: nowrap; }
 .panel-composer .composer-mention.is-phone { color: #6fd39f; background: rgba(111, 211, 159, .18); }
 .panel-composer textarea::-webkit-scrollbar { width: 8px; }

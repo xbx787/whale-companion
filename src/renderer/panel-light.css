@@ -1071,7 +1071,10 @@ body.panel-theme-light .panel-suggestion-item small{ flex: 1; min-width: 0; over
 body.panel-theme-light .panel-composer-inputrow{ position: relative; display: flex; flex: none; min-height: 0; padding-right: 23px; }
 body.panel-theme-light .panel-composer textarea, body.panel-theme-light .panel-composer .composer-editor{ width: 100%; flex: none; min-width: 0; min-height: 0; max-height: 155px; padding: 2px 2px 2px 0; resize: none; overflow-y: auto; border: 0; outline: none; color: #00030c; background: transparent; font-size: var(--text-md); line-height: 1.45; scrollbar-color: rgba(5, 35, 84, 0.62) transparent; scrollbar-width: auto; }
 body.panel-theme-light .panel-composer .composer-editor{ white-space: pre-wrap; overflow-wrap: anywhere; }
-body.panel-theme-light .panel-composer .composer-editor[data-empty="true"]::before{ content: attr(data-placeholder); color: #2a3d66; pointer-events: none; }
+/* 空输入框的提示不占正文：绝对定位覆盖，光标留在最左侧起点，而不是被
+   推到提示文字末尾。 */
+body.panel-theme-light .panel-composer .composer-editor[data-empty="true"]{ position: relative; }
+body.panel-theme-light .panel-composer .composer-editor[data-empty="true"]::before{ content: attr(data-placeholder); position: absolute; top: 2px; left: 0; right: 2px; color: #2a3d66; pointer-events: none; }
 body.panel-theme-light .panel-composer .composer-mention{ display: inline-flex; align-items: center; height: 1.45em; padding: 0 .45em; margin: 0 1px; border-radius: .45em; color: #5b3f0c; background: rgba(132, 88, 15, 0.16); font-size: inherit; font-weight: 600; line-height: 1; vertical-align: baseline; white-space: nowrap; }
 body.panel-theme-light .panel-composer .composer-mention.is-phone{ color: #2c905c; background: rgba(44, 144, 92, 0.18); }
 body.panel-theme-light .panel-composer textarea::-webkit-scrollbar{ width: 8px; }

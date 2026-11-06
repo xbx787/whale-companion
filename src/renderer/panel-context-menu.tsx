@@ -4,16 +4,18 @@ import { AUTO_COMPACT_DEFAULT_PERCENT, AUTO_COMPACT_MAX_PERCENT, AUTO_COMPACT_MI
 import { ContextMeter } from './panel-icons'
 
 /** 输入区的上下文用量与自动压缩阈值菜单。包装 ref 由调用方持有。 */
-export function ContextMenu({ wrapperRef, usage, compacting, open, autoCompactPercent, onToggle, onClose, onNudge, onCompact }: {
+export function ContextMenu({ wrapperRef, usage, compacting, carrying, open, autoCompactPercent, onToggle, onClose, onNudge, onCompact, onCarry }: {
   wrapperRef: RefObject<HTMLDivElement | null>
   usage: ContextUsageSnapshot | undefined
   compacting: boolean
+  carrying: boolean
   open: boolean
   autoCompactPercent: number
   onToggle: () => void
   onClose: () => void
   onNudge: (delta: number) => void
   onCompact: () => void
+  onCarry: () => void
 }) {
   return <div className="panel-context-wrap" ref={wrapperRef}>
     <ContextMeter usage={usage} compacting={compacting} open={open} onToggle={onToggle} />
@@ -36,6 +38,7 @@ export function ContextMenu({ wrapperRef, usage, compacting, open, autoCompactPe
         }}>
         自动压缩阈值 {autoCompactPercent}%
       </div>
+      <button type="button" className="panel-compact-button" disabled={carrying} onClick={onCarry}>{carrying ? '承接中…' : '在新对话中继续'}</button>
       <button type="button" className="panel-compact-button" disabled={compacting} onClick={onCompact}>{compacting ? '压缩中…' : '压缩上下文'}</button>
     </div>
   </div>

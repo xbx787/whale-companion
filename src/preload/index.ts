@@ -45,6 +45,7 @@ const api: PetAPI = {
   timelinePage: (conversationId, before, limit) => ipcRenderer.invoke('pet:conversation-timeline-page', conversationId, before, limit),
   getContextUsage: (conversationId) => ipcRenderer.invoke('pet:get-context-usage', conversationId),
   compactConversation: (conversationId) => ipcRenderer.invoke('pet:compact-conversation', conversationId),
+  carryConversation: (conversationId) => ipcRenderer.invoke('pet:carry-conversation', conversationId),
   phoneStatus: () => ipcRenderer.invoke('pet:phone:status'),
   phoneScan: () => ipcRenderer.invoke('pet:phone:scan'),
   phoneConnect: (host, password) => ipcRenderer.invoke('pet:phone:connect', host, password),

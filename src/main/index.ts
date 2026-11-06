@@ -67,7 +67,7 @@ import { registerVoiceIpc } from './voice-ipc'
 import { InboxWatcher } from './inbox-watcher'
 import { isLibraryItem, isLibraryKind } from '../shared/libraries'
 import { scanPlugins, toLibraryItems } from './plugin-market'
-import { generateConversationTitle } from './title-generation'
+import { generateCarriedSummary, generateConversationTitle } from './title-generation'
 import { attachmentPreviewPath, prepareDroppedFile, readImagePreview, searchWorkspaceFiles, stagePastedAttachment, validAttachmentList, verifyDroppedFilePath } from './local-context'
 import { findSourceProjectRoot, isUsableWorkspace, isWritableWorkspace, readSavedWorkspace, resolveAgentWorkspace, writeSavedWorkspace } from './workspace-root'
 import { isEffortLevel } from '../shared/effort'
@@ -922,7 +922,10 @@ controller = new ConversationController(
         model: DEEPSEEK_DEFAULT_MODEL, smallModel: 'deepseek-flash' }
     : undefined,
   resolveLibraries,
-  (sessionId) => phoneLink.read(sessionId, 60)
+  (sessionId) => phoneLink.read(sessionId, 60),
+  deepseekKey || apiKey
+    ? (source, model) => generateCarriedSummary((deepseekKey || apiKey)!, source, AbortSignal.timeout(90_000), model)
+    : undefined
 )
 /** Post-turn reflection — fact extraction — is side
  *  work: it reads the finished turn and writes memory, and nothing in the
