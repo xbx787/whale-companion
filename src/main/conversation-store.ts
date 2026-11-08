@@ -290,7 +290,7 @@ function readExtendedSettings(settings: Record<string, unknown>): Pick<Conversat
   'userName' | 'assistantName' | 'userAvatar' | 'assistantAvatar' | 'tabOrder' |
   'goalMaxIterations' | 'goalMaxMinutes' | 'memoryEnabled' | 'panelSize' | 'panelPlacement' | 'panelTheme' | 'uiSize' | 'avatarSize' | 'avatarRenderer' | 'webSearchEnabled' | 'personaId' | 'agentKernel' | 'autoCompactPercent' |
   'panelAutoCollapseMinutes' |
-  'roastEnabled' | 'roastIntervalMinutes' | 'roastIdlePauseMinutes' | 'roastBurstLimit' | 'eyeEnabled' | 'eyeIntervalSeconds' |
+  'roastEnabled' | 'roastIntervalMinutes' | 'roastIdlePauseMinutes' | 'roastBurstLimit' | 'roastPrompt' | 'eyeEnabled' | 'eyeIntervalSeconds' |
   'toolRowDetail' |
   'outputStyle' | 'appendSystemPrompt' | 'autoScroll' | 'expandFileEditsByDefault' | 'sessionSort' | 'titleLocale' |
   'titleModel' | 'loadUserSettings' | 'skillMarketSources' | 'hiddenTabIds' | 'windowOpacity' | 'avatarOpacity'> {
@@ -343,6 +343,7 @@ function readExtendedSettings(settings: Record<string, unknown>): Pick<Conversat
     roastIntervalMinutes: isRoastInterval(settings.roastIntervalMinutes) ? settings.roastIntervalMinutes : 8,
     roastIdlePauseMinutes: isRoastIdlePause(settings.roastIdlePauseMinutes) ? settings.roastIdlePauseMinutes : 10,
     roastBurstLimit: isRoastBurstLimit(settings.roastBurstLimit) ? settings.roastBurstLimit : 5,
+    roastPrompt: typeof settings.roastPrompt === 'string' ? settings.roastPrompt.slice(0, 4000) : '',
     eyeEnabled: settings.eyeEnabled === true,
     eyeIntervalSeconds: isPeekInterval(settings.eyeIntervalSeconds) ? settings.eyeIntervalSeconds : 60,
     ...(typeof settings.outputStyle === 'string' && settings.outputStyle.trim()
@@ -722,7 +723,7 @@ export class ConversationStore {
         panelPlacement: 'top', panelTheme: 'dark',
         toolRowDetail: 'brief',
         autoCompactPercent: AUTO_COMPACT_DEFAULT_PERCENT, panelAutoCollapseMinutes: PANEL_AUTO_COLLAPSE_DEFAULT_MINUTES, autoScroll: true, expandFileEditsByDefault: false,
-        roastEnabled: true, roastIntervalMinutes: 8, roastIdlePauseMinutes: 10, roastBurstLimit: 5, eyeEnabled: false, eyeIntervalSeconds: 60,
+        roastEnabled: true, roastIntervalMinutes: 8, roastIdlePauseMinutes: 10, roastBurstLimit: 5, roastPrompt: '', eyeEnabled: false, eyeIntervalSeconds: 60,
         sessionSort: 'updated', titleLocale: 'auto', titleModel: 'deepseek-flash', loadUserSettings: true }
       migrating = true
     }
@@ -1036,7 +1037,7 @@ export class ConversationStore {
     const activeModelProfileId = patch.activeModelProfileId
     const { goalMaxIterations, goalMaxMinutes, memoryEnabled } = patch
     const { enableAutoTitleGeneration, showMessageTimestamps, userName, assistantName, userAvatar, assistantAvatar, panelSize, panelPlacement, panelTheme, uiSize, avatarSize, avatarRenderer, toolRowDetail, personaId, agentKernel, autoCompactPercent,
-      panelAutoCollapseMinutes, roastEnabled, roastIntervalMinutes, roastIdlePauseMinutes, roastBurstLimit, eyeEnabled, eyeIntervalSeconds,
+      panelAutoCollapseMinutes, roastEnabled, roastIntervalMinutes, roastIdlePauseMinutes, roastBurstLimit, roastPrompt, eyeEnabled, eyeIntervalSeconds,
       outputStyle, appendSystemPrompt, autoScroll, expandFileEditsByDefault, sessionSort, titleLocale,
       titleModel, loadUserSettings, hiddenTabIds } = patch
     if (tabs !== undefined && (!Number.isInteger(tabs) || tabs < 1 || tabs > MAX_VISIBLE_TABS)) {
@@ -1110,6 +1111,9 @@ export class ConversationStore {
     }
     if (roastBurstLimit !== undefined && !isRoastBurstLimit(roastBurstLimit)) {
       throw new ConversationStoreError('INVALID_INPUT', '吐槽连续次数无效。')
+    }
+    if (roastPrompt !== undefined && typeof roastPrompt !== 'string') {
+      throw new ConversationStoreError('INVALID_INPUT', '吐槽提示词无效。')
     }
     for (const [value, label] of [[roastEnabled, '吐槽模式'], [eyeEnabled, '偷窥模式']] as const) {
       if (value !== undefined && typeof value !== 'boolean') throw new ConversationStoreError('INVALID_INPUT', `${label}开关无效。`)
@@ -1189,6 +1193,7 @@ export class ConversationStore {
       if (roastIntervalMinutes !== undefined) draft.settings.roastIntervalMinutes = roastIntervalMinutes
       if (roastIdlePauseMinutes !== undefined) draft.settings.roastIdlePauseMinutes = roastIdlePauseMinutes
       if (roastBurstLimit !== undefined) draft.settings.roastBurstLimit = roastBurstLimit
+      if (roastPrompt !== undefined) draft.settings.roastPrompt = roastPrompt.slice(0, 4000)
       if (eyeEnabled !== undefined) draft.settings.eyeEnabled = eyeEnabled
       if (eyeIntervalSeconds !== undefined) draft.settings.eyeIntervalSeconds = eyeIntervalSeconds
       if (outputStyle !== undefined) {

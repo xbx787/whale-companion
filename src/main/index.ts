@@ -34,7 +34,7 @@ import { registerLocalAsrIpc } from './ipc-voice'
 import { UpdateService } from './update-service'
 import { RoastService } from './roast-service'
 import { generateRoast } from './roast-generate'
-import { lookAtScreen } from './eye-service'
+import { captureScreenBase64 } from './eye-service'
 import { LocalAsr } from './local-asr'
 import { resolveSherpaModule, VoiceModelStore } from './voice-model'
 import { WinMcpClient } from './win-mcp-client'
@@ -178,7 +178,27 @@ const roastService = new RoastService({
       const settings = activeController().currentSettings()
       const key = getDeepSeekBalanceKey(settings, deepseekKey)
       if (!key) return null
-      return await generateRoast(key, { scene, hour: new Date().getHours(), recent })
+      // 带一点当前对话的上下文，但只给两小段，避免每条吐槽都扯回工作。
+      let conversation = ''
+      try {
+        const timeline = activeController().getSnapshot().timeline
+        conversation = timeline
+          .filter((item) => (item as { kind?: string }).kind === 'user')
+          .slice(-2)
+          .map((item) => (typeof (item as { text?: unknown }).text === 'string' ? (item as { text: string }).text : ''))
+          .filter(Boolean)
+          .join(' / ')
+          .slice(0, 200)
+      } catch { /* 会话还没就绪就不带上下文 */ }
+      const window = await foregroundWindowTitle()
+      // 偷窥开关现在只管“这条吐槽要不要附带一张当前屏幕”，不再单独定时。
+      let image: string | undefined
+      if (settings.eyeEnabled === true) {
+        const shot = await captureScreenBase64()
+        if (shot) image = shot
+      }
+      const prompt = typeof settings.roastPrompt === 'string' ? settings.roastPrompt.trim() : ''
+      return await generateRoast(key, { scene, hour: new Date().getHours(), recent, conversation, window, image, prompt })
     } catch {
       return null
     }
@@ -228,35 +248,36 @@ function toggleBalanceCard(): void {
   // 吐槽状态下再点一下：收起。
   setBalanceOpen(false)
 }
-/** 眼睛模式：间隔到点、最近有交互、开关打开，才截屏看一眼。 */
-let lastEyeAt = 0
-async function eyeTick(): Promise<void> {
-  let settings
-  try {
-    settings = activeController().currentSettings()
-  } catch {
-    return
-  }
-  if (settings.eyeEnabled !== true) return
-  const now = Date.now()
-  if (now - lastUserInputAt >= (settings.roastIdlePauseMinutes ?? 10) * 60_000) return
-  const interval = (settings.eyeIntervalSeconds ?? 60) * 1_000
-  if (lastEyeAt && now - lastEyeAt < interval) return
-  lastEyeAt = now
-  // 和余额卡同一套取 key 的规则：优先用设置里的官方 DeepSeek 配置，
-  // 环境变量只作兜底，不然只有快捷方式带 env 时偷窥模式才工作。
-  const key = getDeepSeekBalanceKey(settings, deepseekKey)
-  if (!key) return
-  const result = await lookAtScreen(key)
-  if (!result) return
-  if (!balanceOpen) setBalanceOpen(true)
-  roastService.publish(result.text)
+/** 当前前台窗口标题：吐槽只提真实看到的东西，拿不到就返回空。 */
+function foregroundWindowTitle(): Promise<string> {
+  const script = [
+    'Add-Type @"',
+    'using System;',
+    'using System.Runtime.InteropServices;',
+    'using System.Text;',
+    'public class FG {',
+    '  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();',
+    '  [DllImport("user32.dll")] public static extern int GetWindowText(IntPtr h, StringBuilder s, int n);',
+    '}',
+    '"@',
+    '$h = [FG]::GetForegroundWindow()',
+    '$sb = New-Object System.Text.StringBuilder 256',
+    '[FG]::GetWindowText($h, $sb, 256) | Out-Null',
+    '$t = $sb.ToString()',
+    "if ($t -like '小鲸*') { '' } else { $t }"
+  ].join('\n')
+  return new Promise((resolve) => {
+    execFile('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script],
+      { windowsHide: true, timeout: 4_000 },
+      (error, stdout) => {
+        if (error) { resolve(''); return }
+        const line = stdout.trim().split(/\r?\n/).filter(Boolean).pop() ?? ''
+        resolve(line.slice(0, 80))
+      })
+  })
 }
-function startEyeLoop(): void {
-  // 偷窥间隔最短 30 秒，轮询用 15 秒，保证 30 秒档不会拖成 45 秒。
-  const timer = setInterval(() => { void eyeTick() }, 15_000)
-  timer.unref?.()
-}
+
+/** 偷窥不再单独定时：开关打开时，每条吐槽生成会附带一张当前屏幕。 */
 let bubbleLayout: BubbleLayout = 'empty'
 let compactBubbleHeight: number | undefined
 let bubbleExpanded = false
@@ -1937,7 +1958,7 @@ function isScreenPoint(value: unknown): value is Electron.Point {
 function conversationSettingsPatch(value: unknown): Partial<ConversationSettings> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('会话设置无效。')
   const input = value as Record<string, unknown>
-  const editable = ['visibleConversationTabs', 'autoArchiveAfterDays', 'effort', 'goalMaxIterations', 'goalMaxMinutes', 'memoryEnabled', 'uiSize', 'avatarSize', 'avatarRenderer', 'toolRowDetail', 'webSearchEnabled', 'personaId', 'agentKernel', 'autoCompactPercent', 'panelAutoCollapseMinutes', 'roastEnabled', 'roastIntervalMinutes', 'roastIdlePauseMinutes', 'roastBurstLimit', 'eyeEnabled', 'eyeIntervalSeconds', 'assistantAvatar', 'enableAutoTitleGeneration', 'showMessageTimestamps', 'showSenderBadges', 'senderRouteStyle', 'compactTimeline', 'userName', 'assistantName', 'panelPlacement', 'panelTheme',
+  const editable = ['visibleConversationTabs', 'autoArchiveAfterDays', 'effort', 'goalMaxIterations', 'goalMaxMinutes', 'memoryEnabled', 'uiSize', 'avatarSize', 'avatarRenderer', 'toolRowDetail', 'webSearchEnabled', 'personaId', 'agentKernel', 'autoCompactPercent', 'panelAutoCollapseMinutes', 'roastEnabled', 'roastIntervalMinutes', 'roastIdlePauseMinutes', 'roastBurstLimit', 'roastPrompt', 'eyeEnabled', 'eyeIntervalSeconds', 'assistantAvatar', 'enableAutoTitleGeneration', 'showMessageTimestamps', 'showSenderBadges', 'senderRouteStyle', 'compactTimeline', 'userName', 'assistantName', 'panelPlacement', 'panelTheme',
     'outputStyle', 'appendSystemPrompt', 'autoScroll', 'expandFileEditsByDefault', 'sessionSort', 'titleLocale', 'titleModel', 'loadUserSettings']
   if (Object.keys(input).some((key) => !editable.includes(key))) throw new Error('会话设置无效。')
   const patch: Partial<ConversationSettings> = {}
@@ -2030,6 +2051,10 @@ function conversationSettingsPatch(value: unknown): Partial<ConversationSettings
   if (input.roastBurstLimit !== undefined) {
     if (!isRoastBurstLimit(input.roastBurstLimit)) throw new Error('吐槽连续次数无效。')
     patch.roastBurstLimit = input.roastBurstLimit
+  }
+  if (input.roastPrompt !== undefined) {
+    if (typeof input.roastPrompt !== 'string') throw new Error('吐槽提示词无效。')
+    patch.roastPrompt = input.roastPrompt.slice(0, 4000)
   }
   for (const key of ['roastEnabled', 'eyeEnabled'] as const) {
     if (input[key] === undefined) continue
@@ -2249,6 +2274,7 @@ function buildSettingsIpcDeps() {
   return {
     settingsTrusted,
     activeController,
+    personaDirectory: path.join(dataRoot, 'persona'),
     memory,
     updateService,
     conversationSettingsPatch,
@@ -2642,7 +2668,6 @@ if (ownsSingleInstance) void app.whenReady().then(async () => {
   }
   createTray()
   roastService.start()
-  startEyeLoop()
   // 卡片不随启动弹出：第一次中键点人物才打开（余额），再点切吐槽。
   // 启动后自动检查一次更新；关掉自动检查就跳过。结果缓存在 UpdateService 里，
   // 面板和设置页直接读，检查失败不打扰。

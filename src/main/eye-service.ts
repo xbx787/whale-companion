@@ -53,7 +53,7 @@ export async function analyzeScreen(base64: string, apiKey: string, model = 'dee
           ]
         }]
       }),
-      signal: AbortSignal.timeout(20_000)
+      signal: AbortSignal.timeout(45_000)
     })
     if (!response.ok) return null
     const body = await response.json() as { choices?: Array<{ message?: { content?: unknown } }> }

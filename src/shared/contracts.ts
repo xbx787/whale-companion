@@ -330,6 +330,8 @@ export interface ConversationSettings {
   roastIdlePauseMinutes?: number
   /** 连续自动轮换多少次后间隔翻倍；缺省 5。 */
   roastBurstLimit?: number
+  /** 吐槽提示词；留空使用内置提示词。 */
+  roastPrompt?: string
   /** 眼睛模式：定时截屏交给模型分析，默认关。 */
   eyeEnabled?: boolean
   /** 偷窥模式多久看一次屏幕，秒；缺省 60，30 秒到 5 分钟。 */

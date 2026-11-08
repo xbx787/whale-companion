@@ -1,10 +1,32 @@
 import { app, ipcMain } from 'electron'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import path from 'node:path'
 import { publicSettings } from './secret-storage'
 import type { SettingsIpcDeps } from './index'
 
 /** 设置窗口相关的 IPC。依赖由 index.ts 的 buildSettingsIpcDeps 注入，
  *  可变状态用 getter 读实时值。拆出来以后 settings 这块的改动不用再翻主文件。 */
 export function registerSettingsIpc(deps: SettingsIpcDeps): void {
+  ipcMain.handle('pet:persona:get', (event) => {
+    if (!deps.settingsTrusted(event)) throw new Error('无效的界面请求。')
+    const id = deps.activeController().currentSettings().personaId ?? 'xiaojing'
+    const file = path.join(deps.personaDirectory, `${id}.md`)
+    return { personaId: id, text: existsSync(file) ? readFileSync(file, 'utf8') : '' }
+  })
+  ipcMain.handle('pet:persona:set', (event, text: unknown) => {
+    if (!deps.settingsTrusted(event)) throw new Error('无效的界面请求。')
+    if (typeof text !== 'string' || text.length > 20_000) throw new Error('人设文本无效。')
+    const id = deps.activeController().currentSettings().personaId ?? 'xiaojing'
+    const file = path.join(deps.personaDirectory, `${id}.md`)
+    // 空文本 = 删掉自定义文件，回到内置预设。
+    if (!text.trim()) {
+      if (existsSync(file)) rmSync(file, { force: true })
+      return { personaId: id, text: '' }
+    }
+    mkdirSync(deps.personaDirectory, { recursive: true })
+    writeFileSync(file, text, 'utf8')
+    return { personaId: id, text }
+  })
   ipcMain.handle('pet:settings:preview-opacity', (event, request: unknown) => {
     if (!deps.settingsTrusted(event)) return
     const { target, value } = (request ?? {}) as { target?: unknown; value?: unknown }

@@ -302,7 +302,7 @@ describe('persistent conversation library', () => {
       goalMaxIterations: 30, goalMaxMinutes: 0, memoryEnabled: true, uiSize: 'small', avatarSize: 'small', avatarRenderer: 'sprite', panelPlacement: 'top', panelTheme: 'dark',
       webSearchEnabled: true, personaId: 'xiaojing', agentKernel: 'dsh', autoCompactPercent: 80,
       panelAutoCollapseMinutes: 10,
-      roastEnabled: true, roastIntervalMinutes: 8, roastIdlePauseMinutes: 10, roastBurstLimit: 5,
+      roastEnabled: true, roastIntervalMinutes: 8, roastIdlePauseMinutes: 10, roastBurstLimit: 5, roastPrompt: '',
       eyeEnabled: false, eyeIntervalSeconds: 60,
       toolRowDetail: 'brief',
       autoScroll: true, expandFileEditsByDefault: false, sessionSort: 'updated', titleLocale: 'auto',

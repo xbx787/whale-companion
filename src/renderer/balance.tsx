@@ -50,7 +50,7 @@ export function BalanceCard({ visible, snapshot, loading, error, onRefresh, onCl
           <div className="balance-actions">
             <button type="button" className={`balance-roast-refresh${refreshing ? ' is-spinning' : ''}`}
               aria-label="换一条" title={refreshing ? '正在生成' : '换一条'} disabled={refreshing}
-              onClick={() => { void refreshRoast(); }}>↻</button>
+              onClick={() => { void refreshRoast(); }}><span className="balance-refresh-glyph">↻</span></button>
             <button type="button" aria-label="收起吐槽卡片" title="收起" onClick={onClose}>×</button>
           </div>
         </div>

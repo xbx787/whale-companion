@@ -37,6 +37,9 @@ export function SettingsPage() {
   const [goalIterationsDraft, setGoalIterationsDraft] = useState('30')
   const [goalMinutesDraft, setGoalMinutesDraft] = useState('180')
   const [appendPromptDraft, setAppendPromptDraft] = useState('')
+  const [roastPromptDraft, setRoastPromptDraft] = useState('')
+  const [personaDraft, setPersonaDraft] = useState('')
+  const [personaBusy, setPersonaBusy] = useState(false)
   const [busy, setBusy] = useState(false)
   const [version, setVersion] = useState('')
   const [capabilities, setCapabilities] = useState<AgentCapabilities | null>(null)
@@ -121,6 +124,7 @@ export function SettingsPage() {
       setUserNameDraft(current.userName)
       setAssistantNameDraft(current.assistantName)
       setAppendPromptDraft(current.appendSystemPrompt ?? '')
+    setRoastPromptDraft(current.roastPrompt ?? '')
     }).catch((cause: unknown) => {
       if (active) setNotice({ text: errorMessage(cause), error: true })
     })
@@ -142,6 +146,9 @@ export function SettingsPage() {
     }).catch((cause: unknown) => {
       if (active) setNotice({ text: errorMessage(cause), error: true })
     }).finally(() => { if (active) setMemoryLoading(false) })
+    void window.whaleSettings.personaText?.().then((result) => {
+      if (active) setPersonaDraft(result.text)
+    }).catch(() => undefined)
     return () => { active = false }
   }, [tab])
 
@@ -333,6 +340,7 @@ export function SettingsPage() {
       setGoalIterationsDraft(String(current.goalMaxIterations))
       setGoalMinutesDraft(String(current.goalMaxMinutes))
       setAppendPromptDraft(current.appendSystemPrompt ?? '')
+    setRoastPromptDraft(current.roastPrompt ?? '')
       setNotice({ text: '已保存', error: false })
     } catch (cause) {
       setNotice({ text: errorMessage(cause), error: true })
@@ -355,6 +363,24 @@ export function SettingsPage() {
     const next = appendPromptDraft.trim()
     if (next === (settings?.appendSystemPrompt ?? '')) return
     void update({ appendSystemPrompt: next })
+  }
+
+  function saveRoastPrompt(): void {
+    const next = roastPromptDraft.trim()
+    if (next === (settings?.roastPrompt ?? '')) return
+    void update({ roastPrompt: next })
+  }
+
+  async function savePersonaText(): Promise<void> {
+    setPersonaBusy(true)
+    try {
+      const saved = await window.whaleSettings.savePersonaText?.(personaDraft)
+      setNotice({ text: saved?.text ? '人设已保存。' : '已恢复内置人设。', error: false })
+    } catch (cause) {
+      setNotice({ text: errorMessage(cause), error: true })
+    } finally {
+      setPersonaBusy(false)
+    }
   }
 
   function saveGoalBudget(): void {
@@ -1013,17 +1039,19 @@ export function SettingsPage() {
           </select>
         </div>
         <div className="settings-row">
-          <div className="settings-copy"><label id="eye-enabled-label">偷窥模式</label><p>隔一阵看一眼屏幕，给一句吐槽或建议。截图只发给模型做完这次分析，不会存成文件。默认关闭。</p></div>
+          <div className="settings-copy"><label id="eye-enabled-label">偷窥模式</label><p>开启后，每条吐槽生成时会附带一张当前屏幕给模型看一眼，顺便提醒任务或桌面上的异常。截图只在内存，不存文件。默认关闭。</p></div>
           <button type="button" role="switch" aria-labelledby="eye-enabled-label" aria-checked={settings?.eyeEnabled === true}
             className={`settings-switch${settings?.eyeEnabled === true ? ' is-on' : ''}`} disabled={!settings || busy}
             onClick={() => { if (settings?.eyeEnabled === true) void update({ eyeEnabled: false }); else setEyeConfirm(true) }} />
         </div>
-        <div className="settings-row">
-          <div className="settings-copy"><label htmlFor="peek-interval">读屏间隔</label><p>偷窥模式多久看一次屏幕。</p></div>
-          <select id="peek-interval" value={settings?.eyeIntervalSeconds ?? 60} disabled={!settings || busy}
-            onChange={(event) => { void update({ eyeIntervalSeconds: Number(event.target.value) }) }}>
-            {PEEK_INTERVAL_CHOICES.map((seconds) => <option key={seconds} value={seconds}>{seconds % 60 === 0 ? `${seconds / 60} 分钟` : `${seconds} 秒`}</option>)}
-          </select>
+        <div className="settings-row settings-prompt-row">
+          <div className="settings-copy"><label htmlFor="roast-prompt">吐槽提示词</label><p>生成吐槽时用的系统提示词，留空使用内置。改完点应用。</p></div>
+          <form onSubmit={(event) => { event.preventDefault(); saveRoastPrompt() }}>
+            <textarea id="roast-prompt" rows={4} maxLength={4000} value={roastPromptDraft} disabled={!settings || busy}
+              placeholder="留空使用内置提示词"
+              onChange={(event) => setRoastPromptDraft(event.target.value)} />
+            <button type="submit" disabled={!settings || busy || roastPromptDraft.trim() === (settings?.roastPrompt ?? '')}>应用</button>
+          </form>
         </div>
       </section>}
       {tab === 'models' && <section className="settings-section" role="tabpanel" id="settings-panel-models" aria-labelledby="settings-tab-models">
@@ -1156,6 +1184,15 @@ export function SettingsPage() {
               <small>{preset.tagline}</small>
             </button>
           })}
+        </div>
+        <div className="settings-row settings-prompt-row">
+          <div className="settings-copy"><label htmlFor="persona-text">人设文本</label><p>当前预设的完整人设提示词。留空恢复内置，保存后下一条消息生效。</p></div>
+          <form onSubmit={(event) => { event.preventDefault(); void savePersonaText() }}>
+            <textarea id="persona-text" rows={8} maxLength={20000} value={personaDraft} disabled={!settings || personaBusy}
+              placeholder="留空使用内置人设"
+              onChange={(event) => setPersonaDraft(event.target.value)} />
+            <button type="submit" disabled={!settings || personaBusy}>保存</button>
+          </form>
         </div>
         <div className="settings-row">
           <div className="settings-copy"><label htmlFor="user-avatar">你的头像</label><p>消息左侧的小头像。PNG 或 JPEG，小于 2 MB。</p></div>

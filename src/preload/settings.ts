@@ -53,6 +53,10 @@ export interface SettingsAPI {
   /** 更新：检查 GitHub 最新版本、自动检查开关。 */
   checkUpdates?(): Promise<UpdateStatus>
   setAutoUpdate?(enabled: boolean): Promise<boolean>
+  /** 当前人设文件的正文；空字符串表示用内置预设。 */
+  personaText?(): Promise<{ personaId: string; text: string }>
+  /** 写回人设文件；空文本表示删掉自定义、回到内置。 */
+  savePersonaText?(text: string): Promise<{ personaId: string; text: string }>
   autoUpdateEnabled?(): Promise<boolean>
   onVoiceJobProgress(callback: (progress: VoiceJobProgress) => void): () => void
   /** Installed entries across the MCP, skill, and plugin libraries. */
@@ -113,6 +117,8 @@ const api: SettingsAPI = {
   voiceModelCancel: () => ipcRenderer.invoke('pet:voice-model-cancel'),
   previewOpacity: (request) => ipcRenderer.invoke('pet:settings:preview-opacity', request),
   checkUpdates: () => ipcRenderer.invoke('pet:settings:check-updates'),
+  personaText: () => ipcRenderer.invoke('pet:persona:get'),
+  savePersonaText: (text) => ipcRenderer.invoke('pet:persona:set', text),
   setAutoUpdate: (enabled) => ipcRenderer.invoke('pet:settings:auto-update', enabled),
   autoUpdateEnabled: () => ipcRenderer.invoke('pet:settings:auto-update-state'),
   onVoiceJobProgress: (callback) => {
