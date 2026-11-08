@@ -132,6 +132,8 @@ function revealPanel(): void {
   panelWindow.focus()
 }
 let balanceOpen = false
+/** 面板打开时余额卡只是临时收起，关掉面板要把它放回来，否则卡就再也不出现。 */
+let balanceOpenBeforePanel = false
 let lastUserInputAt = Date.now()
 /** 吐槽卡复用余额窗口的位置和样式：窗口开着、最近有操作才轮换。 */
 const roastService = new RoastService({
@@ -1503,7 +1505,10 @@ function setBalanceOpen(open: boolean): void {
 }
 
 function showPanel(): void {
-  if (balanceOpen) setBalanceOpen(false)
+  if (balanceOpen) {
+    balanceOpenBeforePanel = true
+    setBalanceOpen(false)
+  }
   if (!panelOpen) {
     panelOpen = true
     syncStageBounds()
@@ -1846,6 +1851,11 @@ function hidePanel(): void {
   if (shapeShrinkTimer) clearTimeout(shapeShrinkTimer)
   shapeShrinkTimer = undefined
   applyPointerShape()
+  // 面板盖住了余额卡才收起来，面板关掉后把它放回来；用户主动关卡不在此列。
+  if (balanceOpenBeforePanel) {
+    balanceOpenBeforePanel = false
+    showRoastCard()
+  }
 }
 
 function isScreenPoint(value: unknown): value is Electron.Point {
