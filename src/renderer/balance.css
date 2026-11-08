@@ -60,6 +60,9 @@
 }
 .balance-actions button:hover, .balance-actions button:focus-visible { color: #fff; background: rgba(184, 210, 255, .14); }
 .balance-actions button:disabled { opacity: .4; cursor: default; }
+/* 模型写一条要一两秒，刷新键转起来，别让人以为没点上。 */
+.balance-actions button.is-spinning { opacity: 1; animation: balance-refresh-spin .9s linear infinite; }
+@keyframes balance-refresh-spin { to { transform: rotate(360deg); } }
 
 .balance-amounts { gap: 10px; justify-content: center; min-width: 0; overflow: hidden; }
 .balance-amount { display: flex; align-items: baseline; gap: 2px; min-width: 0; white-space: nowrap; }

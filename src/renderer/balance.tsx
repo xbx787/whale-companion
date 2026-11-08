@@ -13,7 +13,7 @@ interface BalanceCardProps {
   onClose: () => void;
   /** 有值时显示吐槽卡，否则显示余额。 */
   roast?: { text: string; at: number } | null;
-  onRefreshRoast?: () => void;
+  onRefreshRoast?: () => void | Promise<void>;
 }
 
 function formatNext(at: number, nextTier: 'peak' | 'off_peak'): string {
@@ -25,7 +25,12 @@ function formatNext(at: number, nextTier: 'peak' | 'off_peak'): string {
 
 export function BalanceCard({ visible, snapshot, loading, error, onRefresh, onClose, roast, onRefreshRoast }: BalanceCardProps) {
   const [now, setNow] = useState(Date.now());
-  useEffect(() => {
+  const [refreshing, setRefreshing] = useState(false);
+  async function refreshRoast(): Promise<void> {
+    if (refreshing) return;
+    setRefreshing(true);
+    try { await onRefreshRoast?.(); } finally { setRefreshing(false); }
+  }  useEffect(() => {
     if (!visible) return;
     setNow(Date.now());
     const timer = window.setInterval(() => setNow(Date.now()), 15_000);
@@ -34,18 +39,22 @@ export function BalanceCard({ visible, snapshot, loading, error, onRefresh, onCl
   if (!visible) return null;
 
   if (roast) {
-    const at = new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(roast.at));
+    const at = roast.at
+      ? new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(roast.at))
+      : '';
     return (
       <aside className="balance-peek is-roast" aria-label="吐槽">
         <div className="balance-top">
           <span className="balance-brand"><i aria-hidden="true" />吐槽</span>
           <span className="balance-updated">{at}</span>
           <div className="balance-actions">
-            <button type="button" aria-label="换一条" title="换一条" onClick={onRefreshRoast}>↻</button>
+            <button type="button" className={`balance-roast-refresh${refreshing ? ' is-spinning' : ''}`}
+              aria-label="换一条" title={refreshing ? '正在生成' : '换一条'} disabled={refreshing}
+              onClick={() => { void refreshRoast(); }}>↻</button>
             <button type="button" aria-label="收起吐槽卡片" title="收起" onClick={onClose}>×</button>
           </div>
         </div>
-        <p className="balance-roast-text">{roast.text}</p>
+        <p className="balance-roast-text">{roast.text || '正在想…'}</p>
       </aside>
     );
   }

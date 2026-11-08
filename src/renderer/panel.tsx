@@ -277,8 +277,6 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
   const composerOpenByConversation = useRef<Map<string, boolean>>(readComposerOpenPrefs());
   const [autoCompactPreview, setAutoCompactPreview] = useState<number | null>(null);
   function setComposerOpen(open: boolean) {
-    // 不再有收起形态：紧凑面板永远保持完整输入框，收起请求一律忽略。
-    open = true;
     if (!open) composerExit.beginClose();
     if (destinationRef.current === 'side') {
       const id = sideChatRef.current?.sessionId;

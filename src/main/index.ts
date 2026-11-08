@@ -33,6 +33,7 @@ import { registerPhoneIpc } from './ipc-phone'
 import { registerLocalAsrIpc } from './ipc-voice'
 import { UpdateService } from './update-service'
 import { RoastService } from './roast-service'
+import { generateRoast } from './roast-generate'
 import { lookAtScreen } from './eye-service'
 import { LocalAsr } from './local-asr'
 import { resolveSherpaModule, VoiceModelStore } from './voice-model'
@@ -112,6 +113,13 @@ setPersonaDirectory(path.join(dataRoot, 'persona'))
 app.setPath('userData', userDataDirectory)
 if (process.platform === 'win32') app.setAppUserModelId('local.desktop.resident.agent')
 
+/** 窗口标题是任务管理器里区分用途的唯一标识：页面自带的 <title> 不许覆盖。 */
+function lockWindowTitle(win: BrowserWindow, title: string): void {
+  win.setTitle(title)
+  win.on('page-title-updated', (event) => event.preventDefault())
+  win.webContents.on('did-finish-load', () => { if (!win.isDestroyed()) win.setTitle(title) })
+}
+
 /** 给 AUMID 注册显示名和图标，任务管理器/任务栏分组才会写“小鲸”而不是 Electron。 */
 function registerAppIdentity(): void {
   if (process.platform !== 'win32') return
@@ -123,11 +131,6 @@ function registerAppIdentity(): void {
   add('IconUri', process.execPath)
 }
 registerAppIdentity()
-
-// 窗口标题是任务管理器里区分进程用途的唯一标识，别让页面自带的 <title> 覆盖。
-app.on('web-contents-created', (_event, contents) => {
-  contents.on('page-title-updated', (event) => event.preventDefault())
-})
 
 let avatarWindow: BrowserWindow | undefined
 /** 对话面板独立成窗：透明面积只剩面板本身，头像窗可以缩到角色大小。 */
@@ -149,8 +152,6 @@ function revealPanel(): void {
   panelWindow.focus()
 }
 let balanceOpen = false
-/** 面板打开时余额卡只是临时收起，关掉面板要把它放回来，否则卡就再也不出现。 */
-let balanceOpenBeforePanel = false
 /** 卡片当前显示什么：中键点人物在余额和吐槽之间来回切。 */
 let balanceContent: 'balance' | 'roast' = 'roast'
 let lastUserInputAt = Date.now()
@@ -171,6 +172,17 @@ const roastService = new RoastService({
   },
   visible: () => Boolean(balanceOpen && balanceWindow && !balanceWindow.isDestroyed() && balanceWindow.isVisible()),
   lastInputAt: () => lastUserInputAt,
+  // 能连模型就用模型写，拿不到 key 或失败时由 roastService 决定是否回退本地。
+  generate: async (scene, recent) => {
+    try {
+      const settings = activeController().currentSettings()
+      const key = getDeepSeekBalanceKey(settings, deepseekKey)
+      if (!key) return null
+      return await generateRoast(key, { scene, hour: new Date().getHours(), recent })
+    } catch {
+      return null
+    }
+  },
   emit: (text, at) => {
     balanceContent = 'roast'
     if (!balanceOpen) setBalanceOpen(true)
@@ -191,7 +203,7 @@ function pushBalanceCard(value: { text: string; at: number } | null): void {
   }
 }
 
-/** 中键点人物：第一下开余额，第二下切吐槽，再点回到余额。 */
+/** 中键点人物：余额 → 吐槽 → 收起，三态循环。 */
 function toggleBalanceCard(): void {
   if (!balanceOpen) {
     balanceContent = 'balance'
@@ -199,14 +211,22 @@ function toggleBalanceCard(): void {
     pushBalanceCard(null)
     return
   }
-  if (balanceContent === 'roast') {
-    balanceContent = 'balance'
-    pushBalanceCard(null)
+  if (balanceContent === 'balance') {
+    balanceContent = 'roast'
+    const current = roastService.current()
+    // 没有现成内容也先切到吐槽布局，显示“正在想”，别让卡片停在余额上。
+    pushBalanceCard(current ?? { text: '', at: Date.now() })
+    if (!current) {
+      void roastService.refresh('general').then((text) => {
+        if (!text && balanceContent === 'roast') {
+          pushBalanceCard({ text: '这次没想出来，再点一下刷新。', at: Date.now() })
+        }
+      })
+    }
     return
   }
-  balanceContent = 'roast'
-  pushBalanceCard(roastService.current() ?? null)
-  if (!roastService.current()) roastService.refresh('general')
+  // 吐槽状态下再点一下：收起。
+  setBalanceOpen(false)
 }
 /** 眼睛模式：间隔到点、最近有交互、开关打开，才截屏看一眼。 */
 let lastEyeAt = 0
@@ -1268,6 +1288,7 @@ function createAvatarWindow(): BrowserWindow {
     app.quit()
   })
   loadPage(win)
+  lockWindowTitle(win, '小鲸 角色')
   return win
 }
 
@@ -1364,6 +1385,7 @@ function createPanelWindow(): BrowserWindow {
     menu.popup({ window: win })
   })
   loadPanelPage(win)
+  lockWindowTitle(win, '小鲸 面板')
   return win
 }
 
@@ -1405,16 +1427,22 @@ function createBalanceWindow(): BrowserWindow {
     }
   })
   // Wait for the card's first painted frame before showing the transparent window.
-  win.once('ready-to-show', () => {
+  // 透明窗口的 ready-to-show 偶尔不触发，did-finish-load 再兜一次。
+  let revealed = false
+  const reveal = (): void => {
+    if (revealed || win.isDestroyed()) return
+    revealed = true
     balanceWindowReady = true
-    if (balanceOpen && !win.isDestroyed()) {
+    if (balanceOpen) {
       syncBalancePosition()
       win.showInactive()
     }
-    // 窗口刚起来时把当前这条吐槽补上，避免先闪一帧空卡。
+    // 窗口刚起来时把当前内容补上，避免先闪一帧空白。
     const roast = balanceContent === 'roast' ? roastService.current() : null
-    if (!win.isDestroyed()) win.webContents.send('pet:roast-text', roast)
-  })
+    win.webContents.send('pet:roast-text', roast)
+  }
+  win.once('ready-to-show', reveal)
+  win.webContents.once('did-finish-load', reveal)
   win.on('closed', () => {
     if (balanceWindow !== win) return
     balanceWindow = undefined
@@ -1423,6 +1451,7 @@ function createBalanceWindow(): BrowserWindow {
     if (avatarWindow && !avatarWindow.isDestroyed()) avatarWindow.webContents.send('pet:balance-open', false)
   })
   loadPage(win, true)
+  lockWindowTitle(win, '小鲸 余额')
   return win
 }
 
@@ -1457,6 +1486,7 @@ function createSettingsWindow(initialTab?: string): BrowserWindow {
   else if (initialTab) void win.loadFile(path.join(__dirname, '../renderer/settings.html'), { query: { tab: initialTab } })
   else void win.loadFile(path.join(__dirname, '../renderer/settings.html'))
   sendUiSizeWhenLoaded(win)
+  lockWindowTitle(win, '小鲸 设置')
   win.webContents.on('will-navigate', (event) => event.preventDefault())
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
   return win
@@ -1553,10 +1583,6 @@ function setBalanceOpen(open: boolean): void {
 }
 
 function showPanel(): void {
-  if (balanceOpen) {
-    balanceOpenBeforePanel = true
-    setBalanceOpen(false)
-  }
   if (!panelOpen) {
     panelOpen = true
     syncStageBounds()
@@ -1625,6 +1651,7 @@ function createOnboardingWindow(): BrowserWindow {
   const base = process.env.ELECTRON_RENDERER_URL
   if (base) void win.loadURL(`${base}/onboarding.html`)
   else void win.loadFile(path.join(__dirname, '../renderer/onboarding.html'))
+  lockWindowTitle(win, '小鲸 首次配置')
   win.webContents.on('will-navigate', (event) => event.preventDefault())
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
   return win
@@ -1718,6 +1745,7 @@ function requestApproval(title: string, detail?: string, timeoutMs = 5 * 60_000,
       show: false,
       webPreferences: { sandbox: true }
     })
+    lockWindowTitle(win, '小鲸 确认')
     win.setAlwaysOnTop(true, 'screen-saver')
     let settled = false
     const finish = (value: boolean | null): void => {
@@ -1900,11 +1928,6 @@ function hidePanel(): void {
   if (shapeShrinkTimer) clearTimeout(shapeShrinkTimer)
   shapeShrinkTimer = undefined
   applyPointerShape()
-  // 面板盖住了余额卡才收起来，面板关掉后把它放回来；用户主动关卡不在此列。
-  if (balanceOpenBeforePanel) {
-    balanceOpenBeforePanel = false
-    showRoastCard()
-  }
 }
 
 function isScreenPoint(value: unknown): value is Electron.Point {
@@ -2620,10 +2643,7 @@ if (ownsSingleInstance) void app.whenReady().then(async () => {
   createTray()
   roastService.start()
   startEyeLoop()
-  // 吐槽模式默认开启：启动后放一张卡，窗口就绪会补发当前这条。
-  if ((await activeController().getLibraryState()).settings.roastEnabled !== false) {
-    setTimeout(() => { showRoastCard() }, 1_200)
-  }
+  // 卡片不随启动弹出：第一次中键点人物才打开（余额），再点切吐槽。
   // 启动后自动检查一次更新；关掉自动检查就跳过。结果缓存在 UpdateService 里，
   // 面板和设置页直接读，检查失败不打扰。
   if (!process.argv.includes('--self-test')) {

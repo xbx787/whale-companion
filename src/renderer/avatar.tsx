@@ -729,7 +729,7 @@ function BalanceOverlay() {
     loading={loading}
     error={error}
     roast={roast}
-    onRefreshRoast={() => { void petBridge().refreshRoast().catch(() => undefined); }}
+    onRefreshRoast={async () => { await petBridge().refreshRoast() }}
     onRefresh={() => { void refreshBalance(); }}
     onClose={() => { void petBridge().setBalanceOpen(false).catch(() => setError('余额卡片暂时无法收起。')); }}
   />;
