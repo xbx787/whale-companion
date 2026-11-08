@@ -14,8 +14,8 @@ export function registerBalanceIpc(deps: BalanceIpcDeps): void {
   })
   ipcMain.handle('pet:toggle-balance', (event) => {
     if (!deps.trusted(event)) throw new Error('无效的界面请求。')
-    // 在主进程翻转，不用渲染层的缓存值：缓存会漂移，守卫会把后续翻转吞掉。
-    deps.setBalanceOpen(!deps.balanceOpen)
+    // 中键点人物：第一下余额，第二下吐槽，再点回到余额。
+    deps.toggleBalance()
   })
   ipcMain.handle('pet:get-balance', async (event) => {
     if (!deps.trusted(event) && !deps.balanceTrusted(event)) throw new Error('无效的界面请求。')

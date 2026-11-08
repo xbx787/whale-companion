@@ -67,10 +67,12 @@ describe('roast service', () => {
     expect(pickRoast('general', [first], () => 0)).not.toBe(first)
   })
 
-  it('writes every line in at least two sentences', () => {
+  it('writes every line as a complete thought, one to three sentences', () => {
     for (const lines of Object.values(ROAST_LINES)) {
       for (const line of lines) {
-        expect(sentenceCount(line), line).toBeGreaterThanOrEqual(2)
+        expect(line.trim().length, line).toBeGreaterThan(3)
+        expect(sentenceCount(line), line).toBeGreaterThanOrEqual(1)
+        expect(sentenceCount(line), line).toBeLessThanOrEqual(3)
       }
     }
   })

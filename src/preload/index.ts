@@ -100,7 +100,7 @@ const api: PetAPI = {
   openSettings: (tab?: string) => ipcRenderer.invoke('pet:open-settings', tab),
   updateStatus: () => ipcRenderer.invoke('pet:update-status'),
   refreshRoast: () => ipcRenderer.invoke('pet:roast-refresh'),
-  onRoastText: (callback: (roast: { text: string; at: number }) => void) => {
+  onRoastText: (callback: (roast: { text: string; at: number } | null) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, value: { text: string; at: number }): void => { callback(value) }
     ipcRenderer.on('pet:roast-text', handler)
     return () => { ipcRenderer.removeListener('pet:roast-text', handler) }

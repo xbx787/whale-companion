@@ -935,7 +935,7 @@ export interface PetAPI {
   updateStatus(): Promise<UpdateStatus | null>
   /** 吐槽卡：手动换一条；主进程推新内容时回调。 */
   refreshRoast(): Promise<string | null>
-  onRoastText(callback: (roast: { text: string; at: number }) => void): () => void
+  onRoastText(callback: (roast: { text: string; at: number } | null) => void): () => void
   /** Opens the first-run configuration wizard (DeepSeek setup). */
   openOnboarding(): Promise<void>
   setAvatarState(state: AvatarState): Promise<void>

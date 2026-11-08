@@ -112,6 +112,23 @@ setPersonaDirectory(path.join(dataRoot, 'persona'))
 app.setPath('userData', userDataDirectory)
 if (process.platform === 'win32') app.setAppUserModelId('local.desktop.resident.agent')
 
+/** 给 AUMID 注册显示名和图标，任务管理器/任务栏分组才会写“小鲸”而不是 Electron。 */
+function registerAppIdentity(): void {
+  if (process.platform !== 'win32') return
+  const key = 'HKCU\\Software\\Classes\\AppUserModelId\\local.desktop.resident.agent'
+  const add = (value: string, data: string): void => {
+    execFile('reg', ['add', key, '/v', value, '/t', 'REG_SZ', '/d', data, '/f'], { windowsHide: true }, () => undefined)
+  }
+  add('DisplayName', '小鲸')
+  add('IconUri', process.execPath)
+}
+registerAppIdentity()
+
+// 窗口标题是任务管理器里区分进程用途的唯一标识，别让页面自带的 <title> 覆盖。
+app.on('web-contents-created', (_event, contents) => {
+  contents.on('page-title-updated', (event) => event.preventDefault())
+})
+
 let avatarWindow: BrowserWindow | undefined
 /** 对话面板独立成窗：透明面积只剩面板本身，头像窗可以缩到角色大小。 */
 let panelWindow: BrowserWindow | undefined
@@ -134,6 +151,8 @@ function revealPanel(): void {
 let balanceOpen = false
 /** 面板打开时余额卡只是临时收起，关掉面板要把它放回来，否则卡就再也不出现。 */
 let balanceOpenBeforePanel = false
+/** 卡片当前显示什么：中键点人物在余额和吐槽之间来回切。 */
+let balanceContent: 'balance' | 'roast' = 'roast'
 let lastUserInputAt = Date.now()
 /** 吐槽卡复用余额窗口的位置和样式：窗口开着、最近有操作才轮换。 */
 const roastService = new RoastService({
@@ -153,16 +172,40 @@ const roastService = new RoastService({
   visible: () => Boolean(balanceOpen && balanceWindow && !balanceWindow.isDestroyed() && balanceWindow.isVisible()),
   lastInputAt: () => lastUserInputAt,
   emit: (text, at) => {
+    balanceContent = 'roast'
     if (!balanceOpen) setBalanceOpen(true)
-    // 吐槽卡比余额卡高：内容一换就重算窗口高度。
-    syncBalancePosition()
-    for (const win of [avatarWindow, balanceWindow]) {
-      if (win && !win.isDestroyed()) win.webContents.send('pet:roast-text', { text, at })
-    }
+    pushBalanceCard({ text, at })
   }
 })
 function showRoastCard(): void {
+  balanceContent = 'roast'
   if (!balanceOpen) setBalanceOpen(true)
+  if (!roastService.current()) roastService.refresh('general')
+}
+
+/** 把卡片内容推给角色窗口和独立卡片窗口；null 表示回到余额。 */
+function pushBalanceCard(value: { text: string; at: number } | null): void {
+  syncBalancePosition()
+  for (const win of [avatarWindow, balanceWindow]) {
+    if (win && !win.isDestroyed()) win.webContents.send('pet:roast-text', value)
+  }
+}
+
+/** 中键点人物：第一下开余额，第二下切吐槽，再点回到余额。 */
+function toggleBalanceCard(): void {
+  if (!balanceOpen) {
+    balanceContent = 'balance'
+    setBalanceOpen(true)
+    pushBalanceCard(null)
+    return
+  }
+  if (balanceContent === 'roast') {
+    balanceContent = 'balance'
+    pushBalanceCard(null)
+    return
+  }
+  balanceContent = 'roast'
+  pushBalanceCard(roastService.current() ?? null)
   if (!roastService.current()) roastService.refresh('general')
 }
 /** 眼睛模式：间隔到点、最近有交互、开关打开，才截屏看一眼。 */
@@ -1168,6 +1211,7 @@ function createAvatarWindow(): BrowserWindow {
       height: STAGE_HEIGHT
     }
   const win = new BrowserWindow({
+    title: '小鲸 角色',
     x,
     y,
     width,
@@ -1238,6 +1282,7 @@ function resizeGhostAt(pos: { x: number; y: number } | null): void {
   }
   if (!resizeGhostWindow || resizeGhostWindow.isDestroyed()) {
     const win = new BrowserWindow({
+      title: '小鲸 调整手柄',
       width: RESIZE_GHOST_SIZE,
       height: RESIZE_GHOST_SIZE,
       frame: false,
@@ -1282,6 +1327,7 @@ function createPanelWindow(): BrowserWindow {
     ? avatar.getBounds()
     : { x: 0, y: 0, width: stageSize.width, height: stageSize.height }
   const win = new BrowserWindow({
+    title: '小鲸 面板',
     x: bounds.x,
     y: bounds.y,
     width: bounds.width,
@@ -1335,6 +1381,7 @@ function createBalanceWindow(): BrowserWindow {
   if (!avatar || avatar.isDestroyed()) throw new Error('桌面角色尚未就绪。')
   const initial = balanceBoundsFor(avatar.getBounds())
   const win = new BrowserWindow({
+    title: '小鲸 余额',
     parent: avatar,
     x: initial.x,
     y: initial.y,
@@ -1365,8 +1412,8 @@ function createBalanceWindow(): BrowserWindow {
       win.showInactive()
     }
     // 窗口刚起来时把当前这条吐槽补上，避免先闪一帧空卡。
-    const roast = roastService.current()
-    if (roast && !win.isDestroyed()) win.webContents.send('pet:roast-text', roast)
+    const roast = balanceContent === 'roast' ? roastService.current() : null
+    if (!win.isDestroyed()) win.webContents.send('pet:roast-text', roast)
   })
   win.on('closed', () => {
     if (balanceWindow !== win) return
@@ -1495,6 +1542,7 @@ function setBalanceOpen(open: boolean): void {
       syncBalancePosition()
       balanceWindow.showInactive()
     }
+    pushBalanceCard(balanceContent === 'roast' ? roastService.current() : null)
   } else if (balanceWindow && !balanceWindow.isDestroyed()) {
     balanceWindow.hide()
   }
@@ -1654,6 +1702,7 @@ function requestApproval(title: string, detail?: string, timeoutMs = 5 * 60_000,
     // 批准时把余额框收起来：同一位置只留批准/拒绝。
     if (balanceOpen) setBalanceOpen(false)
     const win = new BrowserWindow({
+      title: '小鲸 确认',
       // 左右各留 8px 给卡片阴影，不然阴影会被窗口边缘切掉。
       width: cardWidth + 16,
       // 先给足高度让正文按最终宽度排版，量完实际高度再缩到内容大小。
@@ -2272,6 +2321,7 @@ function buildBalanceIpcDeps() {
     balanceTrusted,
     settingsTrusted,
     setBalanceOpen,
+    toggleBalance: toggleBalanceCard,
     get balanceOpen() { return balanceOpen },
     activeController,
     deepseekKey,
