@@ -155,6 +155,16 @@ let balanceOpen = false
 /** 卡片当前显示什么：中键点人物在余额和吐槽之间来回切。 */
 let balanceContent: 'balance' | 'roast' = 'roast'
 let lastUserInputAt = Date.now()
+/** 上次给出完整时间的日期：只在启动后第一次或跨天时给。 */
+let lastRoastDay = ''
+/** 中午、傍晚、凌晨这些节点，允许模型自然地提一句。 */
+function timeMoment(hour: number): string | undefined {
+  if (hour >= 5 && hour < 8) return '清晨'
+  if (hour >= 11 && hour < 13) return '中午'
+  if (hour >= 17 && hour < 19) return '傍晚'
+  if (hour >= 23 || hour < 5) return '深夜或凌晨'
+  return undefined
+}
 /** 吐槽卡复用余额窗口的位置和样式：窗口开着、最近有操作才轮换。 */
 const roastService = new RoastService({
   settings: () => {
@@ -198,7 +208,16 @@ const roastService = new RoastService({
         if (shot) image = shot
       }
       const prompt = typeof settings.roastPrompt === 'string' ? settings.roastPrompt.trim() : ''
-      return await generateRoast(key, { scene, hour: new Date().getHours(), recent, conversation, window, image, prompt })
+      const now = new Date()
+      const today = now.toDateString()
+      // 时间平时不提；只有启动后第一次、跨天，或者正好是中午/傍晚/凌晨才给。
+      const allowTime = lastRoastDay !== today
+      const moment = timeMoment(now.getHours())
+      const text = await generateRoast(key, {
+        scene, hour: now.getHours(), recent, conversation, window, image, prompt, allowTime, moment
+      })
+      if (text) lastRoastDay = today
+      return text
     } catch {
       return null
     }
@@ -2374,7 +2393,17 @@ function buildBalanceIpcDeps() {
     get balanceOpen() { return balanceOpen },
     activeController,
     deepseekKey,
-    roastRefresh: () => roastService.refresh('general'),
+    // 手动换一条：生成失败时把失败写在卡片上，别让按钮转完什么都没发生。
+    roastRefresh: async () => {
+      const started = Date.now()
+      const text = await roastService.refresh('general')
+      try {
+        appendFileSync(path.join(dataRoot, 'roast.log'),
+          `${new Date().toISOString()} ${text ? 'ok' : 'fail'} ${Date.now() - started}ms\n`)
+      } catch { /* 日志失败不影响功能 */ }
+      if (!text) pushBalanceCard({ text: '这次没想出来，再点一下刷新。', at: Date.now() })
+      return text
+    },
   }
 }
 export type BalanceIpcDeps = ReturnType<typeof buildBalanceIpcDeps>

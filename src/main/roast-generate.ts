@@ -4,7 +4,7 @@
 const PROMPT = [
   '你是小鲸，住在主人 Windows 桌面角落的鲸鱼娘。现在要写一条给主人看的吐槽。',
   '要求：像人随口说的，可以是一句、两句或三句，也可以反问；可以生活化地打趣，但不攻击主人本人。',
-  '具体一点：提手边的事、状态、对话里的内容；时间只是背景，不要每条都拿几点说事，也不要每条都提窗口标题。',
+  '具体一点：提手边的事、状态、对话里的内容；没给时间或时段就别提几点，也不要每条都提窗口标题。',
   '不要空泛地讲道理，不要对仗，不要每句都像金句。',
   '有时可以顺带提一句最近对话里的内容，但不要每条都提；生活、爱好、时间、身体状态也都可以聊。',
   '只根据给出的信息说话。不要编造没给出的具体事物：应用、文件、歌曲、视频通话、课程、设置、学习计时，一律不要凭空提。',
@@ -24,7 +24,7 @@ const SCENE_LABEL: Record<string, string> = {
 
 export async function generateRoast(
   apiKey: string,
-  input: { scene: string; hour: number; recent: readonly string[]; conversation?: string; window?: string; image?: string; prompt?: string }
+  input: { scene: string; hour: number; recent: readonly string[]; conversation?: string; window?: string; image?: string; prompt?: string; allowTime?: boolean; moment?: string }
 ): Promise<string | null> {
   try {
     const body: Record<string, unknown> = {
@@ -39,7 +39,9 @@ export async function generateRoast(
             ? [
                 {
                   type: 'text',
-                  text: `现在是 ${input.hour} 点，场景是${SCENE_LABEL[input.scene] ?? '平常在用电脑'}。` +
+                  text: (input.allowTime && input.hour >= 0 ? `现在是 ${input.hour} 点。` : '') +
+                    (input.moment ? `现在大概是${input.moment}。` : '') +
+                    `场景是${SCENE_LABEL[input.scene] ?? '平常在用电脑'}。` +
                     (input.window ? `\n当前前台窗口：${input.window}` : '\n当前拿不到前台窗口，别猜。') +
                     (input.conversation ? `\n最近对话里提到：${input.conversation}` : '') +
                     (input.recent.length ? `\n最近说过这些，别重复：\n${input.recent.join('\n')}` : '') +
@@ -47,7 +49,9 @@ export async function generateRoast(
                 },
                 { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${input.image}` } }
               ]
-            : `现在是 ${input.hour} 点，场景是${SCENE_LABEL[input.scene] ?? '平常在用电脑'}。` +
+            : (input.allowTime && input.hour >= 0 ? `现在是 ${input.hour} 点。` : '') +
+              (input.moment ? `现在大概是${input.moment}。` : '') +
+              `场景是${SCENE_LABEL[input.scene] ?? '平常在用电脑'}。` +
               (input.window ? `\n当前前台窗口：${input.window}` : '\n当前拿不到前台窗口，别猜。') +
               (input.conversation ? `\n最近对话里提到：${input.conversation}` : '') +
               (input.recent.length ? `\n最近说过这些，别重复：\n${input.recent.join('\n')}` : '')
