@@ -31,6 +31,7 @@ body.avatar-window { -webkit-user-select: none; user-select: none; }
 .avatar-stage[data-persona='yukino'] { --avatar-breath-duration: 5.8s; --avatar-task-duration: 3.05s; }
 
 .avatar-hit-target {
+  opacity: var(--avatar-opacity, 1);
   position: absolute;
   /* 以当前人设基础立绘计算一次几何：表情切换不改按钮宽高。
      中心固定在距右边 88px；上下各 6px 留给视觉层的轻微运动。 */
@@ -58,6 +59,7 @@ body.avatar-window { -webkit-user-select: none; user-select: none; }
 /* 舞台（200×220）的直接子元素：top/right 都相对人物窗口。不要把它放回
    `.avatar-hit-target` 里，否则会相对按钮（人物大小）定位，点落到头发上。
    2px 的抬升是用户要求的观感微调，别并进状态锚点。 */
+/* 149 的定位：状态条贴着人物右上角，点的偏移相对这个锚点算。 */
 .avatar-status-strip { position: absolute; z-index: 8; top: calc(var(--avatar-dot-y) + 20.2px); right: calc(88px - var(--avatar-w, 116.5px) / 2 + 2.4px); width: 0; height: 0; pointer-events: none; }
 /* 点不再排成一条直线：以 50px 为半径沿右上角转成弧形，每个点的偏移由
    avatar.tsx 按角度算好写进变量。这个容器只提供锚点，不参与布局。 */
@@ -65,13 +67,13 @@ body.avatar-window { -webkit-user-select: none; user-select: none; }
 /* 固定宽高 + 整设备像素取整：对话数变化时点不能被压成椭圆，圆边也不会
    被 125% 缩放抹糊。translate 让 right/top 落成点的中心。 */
 .avatar-status-dot { position: absolute; right: var(--avatar-dot-right, 0px); top: var(--avatar-dot-top, 0px); transform: translate(50%, -50%); width: var(--avatar-dot-size, 7px); height: var(--avatar-dot-size, 7px); border-radius: 50%; background: #86b3f2; opacity: .88; }
-.avatar-status-dot.is-busy { background: #f3c36f; opacity: 1; }
-.avatar-status-dot.is-waiting { background: #b79cff; opacity: 1; }
-.avatar-status-dot.is-done { background: #80d6a1; opacity: .9; }
-.avatar-status-dot.is-failed { background: #f48790; opacity: 1; }
-.avatar-status-dot.is-cancelled { background: #9aa7bd; opacity: .9; }
-.avatar-status-dot.is-current { opacity: 1; box-shadow: 0 0 0 1.5px rgba(126, 190, 255, .9), 0 0 5px 1.5px rgba(74, 146, 255, .65); }
-.avatar-status-dot.is-current.is-waiting { box-shadow: 0 0 0 1.5px rgba(176, 160, 255, .95), 0 0 6px 1.5px rgba(110, 130, 255, .7); }
+.avatar-status-dot.is-busy { background: #f3c36f; opacity: 1; box-shadow: 0 0 4px 1px rgba(243, 195, 111, .6); }
+.avatar-status-dot.is-waiting { background: #d18bff; opacity: 1; box-shadow: 0 0 7px 2.5px rgba(199, 125, 255, .9); }
+.avatar-status-dot.is-done { background: #8ce3ae; opacity: 1; box-shadow: 0 0 4px 1px rgba(140, 227, 174, .55); }
+.avatar-status-dot.is-failed { background: #f48790; opacity: 1; box-shadow: 0 0 4px 1px rgba(244, 135, 144, .65); }
+.avatar-status-dot.is-cancelled { background: #9aa7bd; opacity: 1; box-shadow: 0 0 4px 1px rgba(154, 167, 189, .45); }
+/* 当前会话不加环也不提亮，所有同状态点颜色必须完全一致。 */
+.avatar-status-dot.is-current { opacity: 1; }
 /* 不足五个对话时的空槽：只留一圈细边，五个点的位置保持不变。 */
 .avatar-status-dot.is-empty { background: transparent; border: 1px solid rgba(150, 190, 245, .5); opacity: .55; }
 /* 只呼吸透明度，不改尺寸：几个对话点必须始终等大。 */
@@ -81,8 +83,8 @@ body.avatar-window { -webkit-user-select: none; user-select: none; }
 }
 @media (prefers-reduced-motion: no-preference) {
   .avatar-status-dot.is-pulsing.is-busy { animation: avatar-task-pulse 2s ease-in-out infinite; }
-/* 等待用户回答：同一呼吸曲线，周期缩到 1 秒，比运行中的黄色更急。 */
-.avatar-status-dot.is-pulsing.is-waiting { animation: avatar-task-pulse 1s ease-in-out infinite; }
+/* 等待用户回答：同一呼吸曲线，周期 0.5 秒。 */
+.avatar-status-dot.is-pulsing.is-waiting { animation: avatar-task-pulse .5s ease-in-out infinite; }
 }
 /* All visual layers sit inside the immutable hit target. Each channel owns a
    separate transform so breathing, task, voice, idle and one-shot motion can

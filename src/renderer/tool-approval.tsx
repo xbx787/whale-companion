@@ -28,9 +28,9 @@ export function ToolApprovalPanel({ request, onDecide }: {
       </details>}
     </section>
     <div className="panel-permission-actions">
-      <button type="button" className="panel-permission-deny" disabled={busy} onClick={() => { void decide('deny') }}>拒绝</button>
-      <button type="button" className="panel-permission-always" disabled={busy} onClick={() => { void decide('always') }}>始终允许</button>
-      <button type="button" className="panel-permission-allow" disabled={busy} onClick={() => { void decide('once') }}>{busy ? '发送中…' : '允许一次'}</button>
+      <button type="button" className="panel-permission-deny" disabled={busy} title="不执行这一步，并把结果告诉小鲸，让它换个办法。" onClick={() => { void decide('deny') }}>拒绝</button>
+      <button type="button" className="panel-permission-always" disabled={busy} title="这个工具以后不再询问，直接执行。可以在审批模式里改回来。" onClick={() => { void decide('always') }}>始终允许</button>
+      <button type="button" className="panel-permission-allow" disabled={busy} title="只放行这一步。下次同类操作还会再问。" onClick={() => { void decide('once') }}>{busy ? '发送中…' : '允许一次'}</button>
     </div>
   </div>
 }

@@ -59,6 +59,15 @@ function Stop-Preview {
   Write-Output "已关闭预览实例：$($targets.Id -join ', ')"
 }
 
+# 启动前必须确认上一个预览真的退出了：同时跑两个预览会互相抢窗口和配置。
+function Wait-PreviewStopped {
+  $deadline = (Get-Date).AddSeconds(10)
+  while ((Get-PreviewProcesses) -and (Get-Date) -lt $deadline) {
+    Start-Sleep -Milliseconds 150
+  }
+  return -not (Get-PreviewProcesses)
+}
+
 if ($Close) {
   Stop-Preview
   return
@@ -66,6 +75,7 @@ if ($Close) {
 
 New-Item -ItemType Directory -Force -Path $tmpDir, $dataDir | Out-Null
 Stop-Preview | Out-Null
+if (-not (Wait-PreviewStopped)) { throw '上一个预览实例没有退出，先手动关闭再启动。' }
 
 # 1. 数据：从本体复制设置和外观，预览不另起一套。
 $conversationsDir = Join-Path $dataDir 'conversations'

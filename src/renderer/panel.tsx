@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type AnimationEvent, type MouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { normalizeApprovalMode, type AppSnapshot, type AskAnswers, type AskQuestionRequest, ApprovalMode, BubbleLayout, AppCommandOption, ContextUsageSnapshot, ConversationSummary, EffortLevel, ModelMode, ModelProfile, PanelDirection, PanelPlacement, PendingMessage, PetAPI, PhoneLinkStatus, PhoneSession, ProposedAction, SideChatSnapshot, TaskMetrics, TaskStatus, TimelineEntry, type ToolRowDetail, UserAttachment, VoiceConfig } from '../shared/contracts';
-import { AUTO_COMPACT_DEFAULT_PERCENT, AUTO_COMPACT_MAX_PERCENT, AUTO_COMPACT_MIN_PERCENT, PANEL_MIN_HEIGHT, PANEL_MIN_WIDTH } from '../shared/contracts';
+import { AUTO_COMPACT_DEFAULT_PERCENT, AUTO_COMPACT_MAX_PERCENT, AUTO_COMPACT_MIN_PERCENT, PANEL_AUTO_COLLAPSE_DEFAULT_MINUTES, PANEL_MIN_HEIGHT, PANEL_MIN_WIDTH } from '../shared/contracts';
 import { formatCommandDuration, formatDuration, formatToolDuration } from './duration'
 import { isImageAttachmentName } from '../shared/image-preview';
 import { EffortSlider } from './effort-slider';
@@ -91,7 +91,7 @@ import {
 } from './panel-icons';
 import {
   APPROVAL_MODE_HINTS, MAIN_ONLY_SIDE_COMMANDS, taskLabels, sideOnlySlashError, senderBadge, localizeAskRequest, conversationStatus, statusRunning,
-  restoreAskAnswers, kindLabels, mergeComposerDraft, mergeComposerAttachments,
+  restoreAskAnswers, kindLabels, mergeComposerDraft, mergeComposerAttachments, panelAutoCollapseDue,
   type DroppedAttachment
 } from './panel-utils';
 import { personaAvatarUrl } from './avatar-art';
@@ -150,12 +150,24 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
     return () => { document.body.classList.remove('panel-theme-light'); };
   }, [panelTheme]);
   const [sideChat, setSideChat] = useState<SideChatSnapshot | null>(null);
+  const [updateNotice, setUpdateNotice] = useState<{ latest: string; url: string } | null>(null);
+  const [closingTabId, setClosingTabId] = useState<string | null>(null);
   const sideSessionId = sideChat?.parentConversationId === (mainSnapshot?.conversationLibrary?.activeConversationId ?? null)
     ? sideChat?.sessionId ?? null : null;
   const sideExpanded = Boolean(sideSessionId && sideChat?.expanded && sideChat.snapshot);
   const snapshot = sideExpanded ? sideChat!.snapshot : mainSnapshot;
   const sideChatRef = useRef<SideChatSnapshot | null>(null);
   const sideSnapshots = useRef(new Map<string, SideChatSnapshot>());
+  // 自动检查结果由主进程缓存，面板显示时读一次；有新版挂一条提示，不自动下载。
+  useEffect(() => {
+    if (!visible) return;
+    let active = true;
+    void petBridge().updateStatus().then((status) => {
+      if (!active || !status?.updateAvailable) return;
+      setUpdateNotice({ latest: status.latest, url: status.url });
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, [visible]);
   const destinationRef = useRef<'main' | 'side'>('main');
   const sideComposerStash = useRef(new Map<string, StashedComposer<DroppedAttachment>>());
   const mainComposerOpenRef = useRef(false);
@@ -1374,8 +1386,13 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
       return;
     }
     if (!manager.available) {
-      setVoiceError('还没有配置语音服务。请在设置 → 语音里填写 SiliconFlow API Key。');
-      void run((bridge) => bridge.openSettings());
+      void run(async (bridge) => {
+        const model = await bridge.voiceModelStatus().catch(() => null);
+        setVoiceError(model?.state === 'missing'
+          ? '本地语音模型还没下载。已打开设置 → 语音，点「下载模型」后就能离线识别。'
+          : '还没有配置语音服务。请在设置 → 语音里填写 SiliconFlow API Key，或下载本地语音模型。');
+        await bridge.openSettings();
+      });
       return;
     }
     setVoiceError(null);
@@ -1597,17 +1614,24 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
     }).catch(() => undefined);
   }, [library?.activeConversationId, sideExpanded]);
 
-  /** 关闭顶部标签：只从标签条移除，会话仍留在未归档列表。 */
+  /** 关闭顶部标签：先播 180ms 收起动画，再从标签条移除；编号跟着重排。 */
   async function closeQuickTab(item: ConversationSummary) {
-    // 关掉的是当前标签时，先把视图切到下一个可见标签，否则当前会话会被
-    // 「当前标签必须显示」的规则又插回来。
-    if (item.id === library?.activeConversationId) {
-      const next = quickTabs.find((tab) => tab.id !== item.id)
-      if (next) await selectConversation(next)
+    if (closingTabId) return
+    setClosingTabId(item.id)
+    await new Promise((resolve) => setTimeout(resolve, 180))
+    try {
+      // 关掉的是当前标签时，先把视图切到下一个可见标签，否则当前会话会被
+      // 「当前标签必须显示」的规则又插回来。
+      if (item.id === library?.activeConversationId) {
+        const next = quickTabs.find((tab) => tab.id !== item.id)
+        if (next) await selectConversation(next)
+      }
+      const hidden = new Set(library?.settings.hiddenTabIds ?? []);
+      hidden.add(item.id);
+      await run((bridge) => bridge.setHiddenTabs([...hidden]));
+    } finally {
+      setClosingTabId(null)
     }
-    const hidden = new Set(library?.settings.hiddenTabIds ?? []);
-    hidden.add(item.id);
-    await run((bridge) => bridge.setHiddenTabs([...hidden]));
   }
 
   async function selectConversation(item: ConversationSummary) {
@@ -1750,9 +1774,36 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
     (!snapshot || recentSessions.length > 0);
   // 不再有 empty 布局：紧凑态永远是完整的输入框小窗，不会再缩成一个按钮。
   const layout: BubbleLayout = !compactEmpty ? 'full' : attachments.length ? 'composer_attachments' : 'composer';
-  // 首帧测量常常偏小（字体还没落位），底部那排按钮会被窗口裁掉一截；
-  // 留几像素余量，宁可窗口略高也不要切到控件。
-  const compactComposerHeight = Math.max(120, (composeDockHeight || (112 + composerHeight + (attachments.length ? 26 : 0))) + 6);
+  // 首帧测量常偏小（字体还没落位），底部那排按钮会被窗口裁掉一截；
+  // 测量口径已经把状态行和 padding 算进去了，这里只留 2px 防舍入。
+  const compactComposerHeight = Math.max(120, (composeDockHeight || (112 + composerHeight + (attachments.length ? 26 : 0))) + 2);
+  // 闲置自动收起：面板没人操作、也没有任务在跑时，到设定分钟数就把对话框收掉。
+  // 点角色重新打开会重载快照；runtime 由空闲回收按同一个阈值释放，下次发消息
+  // 时用 sdkSessionId 恢复，所以收起不等于丢上下文。
+  const autoCollapseMinutes = library?.settings.panelAutoCollapseMinutes ?? PANEL_AUTO_COLLAPSE_DEFAULT_MINUTES;
+  const panelBusy = Boolean(snapshot?.question || snapshot?.plan || snapshot?.permission || snapshot?.proposal) ||
+    ['planning', 'awaiting_approval', 'executing', 'verifying'].includes(status) ||
+    pendingMessages.length > 0 ||
+    (library?.conversations ?? []).some((item) => statusRunning(item)) ||
+    Boolean(sideChat && (sideChat.pendingMessages.length > 0 ||
+      ['planning', 'awaiting_approval', 'executing', 'verifying'].includes(sideChat.snapshot?.taskStatus ?? '')));
+  const lastPanelActivityRef = useRef(Date.now());
+  useEffect(() => {
+    if (!visible) return;
+    // 面板刚打开就从现在算起，不会一露头就被收走。
+    lastPanelActivityRef.current = Date.now();
+    const markActive = (): void => { lastPanelActivityRef.current = Date.now(); };
+    const events = ['pointerdown', 'keydown', 'wheel', 'input', 'focus'] as const;
+    for (const name of events) window.addEventListener(name, markActive, { capture: true, passive: true });
+    const timer = window.setInterval(() => {
+      if (!panelAutoCollapseDue({ visible: true, busy: panelBusy, lastActivity: lastPanelActivityRef.current, now: Date.now(), minutes: autoCollapseMinutes })) return;
+      try { void petBridge().hidePanel().catch(() => undefined); } catch { /* 静态预览没有桌面桥。 */ }
+    }, 10_000);
+    return () => {
+      window.clearInterval(timer);
+      for (const name of events) window.removeEventListener(name, markActive, { capture: true });
+    };
+  }, [visible, panelBusy, autoCollapseMinutes]);
   // 30fps 的呼吸式动效：扫光与脉冲点改用 CSS 变量推进，值每 1/30 秒走一步——
   // 合成器只在步进的帧上提交新内容（60fps 时是每帧），dwm 的合成次数减半。
   // 没有动效在跑时这个计时器根本不启动，变量停在各自的静止位。
@@ -2185,10 +2236,17 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
               closed: the "+" stays put so a new session is one click away,
               and the row never blinks out under the pointer. */}
           <nav className={`panel-quick-tabs${tabDragOrder ? ' is-dragging' : ''}`} ref={quickTabsRef} aria-label={expanded ? '顶部会话标签' : '顶部会话数字快捷切换'}>
-            {quickTabs.map((item, index) => <button key={item.id} type="button" data-tab-id={item.id} className={`panel-quick-tab${item.id === library?.activeConversationId ? ' is-current' : ''}${tabDragOrder && tabDragRef.current?.id === item.id ? ' is-dragging' : ''}`} aria-label={`${index + 1}：${item.title}，${taskLabels[conversationStatus(item)]}`} aria-current={item.id === library?.activeConversationId ? 'page' : undefined} title={`${item.title}，${taskLabels[conversationStatus(item)]}`} aria-disabled={libraryBusy || item.id === library?.activeConversationId} onContextMenu={(event) => showTabMenu(event, item)} onPointerDown={(event) => beginTabDrag(event, item)} onClick={() => { if (tabClickSuppressRef.current) { tabClickSuppressRef.current = false; return; } if (!libraryBusy && item.id !== library?.activeConversationId) void selectConversation(item); }}><i className={`panel-task-dot panel-task-dot-${conversationStatus(item)}`} aria-hidden="true" /><span className="panel-quick-tab-label">{expanded && !tabCompact ? item.title : index + 1}</span>{expanded && <span role="button" tabIndex={-1} className="panel-quick-tab-close" aria-label={`关闭标签：${item.title}`} title="关闭标签，会话保留在未归档" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); void closeQuickTab(item); }}>×</span>}</button>)}
+            {quickTabs.map((item, index) => <button key={item.id} type="button" data-tab-id={item.id} className={`panel-quick-tab${item.id === library?.activeConversationId ? ' is-current' : ''}${closingTabId === item.id ? ' is-closing' : ''}${tabDragOrder && tabDragRef.current?.id === item.id ? ' is-dragging' : ''}`} aria-label={`${index + 1}：${item.title}，${taskLabels[conversationStatus(item)]}`} aria-current={item.id === library?.activeConversationId ? 'page' : undefined} title={`${item.title}，${taskLabels[conversationStatus(item)]}`} aria-disabled={libraryBusy || item.id === library?.activeConversationId} onContextMenu={(event) => showTabMenu(event, item)} onPointerDown={(event) => beginTabDrag(event, item)} onClick={() => { if (tabClickSuppressRef.current) { tabClickSuppressRef.current = false; return; } if (!libraryBusy && item.id !== library?.activeConversationId) void selectConversation(item); }}><i className={`panel-task-dot panel-task-dot-${conversationStatus(item)}`} aria-hidden="true" /><span className="panel-quick-tab-label">{expanded && !tabCompact ? item.title : index + 1}</span>{expanded && <span role="button" tabIndex={-1} className="panel-quick-tab-close" aria-label={`关闭标签：${item.title}`} title="关闭标签，会话保留在未归档" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); void closeQuickTab(item); }}>×</span>}</button>)}
             {showNewTabButton(quickTabs.length, tabLimit) && <button type="button" className="panel-quick-tab panel-quick-tab-new" aria-label="新建会话" title={recentSessions.length >= UNARCHIVED_LIMIT ? `未归档最多 ${UNARCHIVED_LIMIT} 个会话，先归档一个再新建` : '新建会话'} disabled={libraryBusy || recentSessions.length >= UNARCHIVED_LIMIT} onClick={() => { if (!libraryBusy && recentSessions.length < UNARCHIVED_LIMIT) void createConversation(); }}><PlusIcon /></button>}
           </nav>
         </header>}
+        {!compactEmpty && updateNotice && <div className="panel-update-banner" role="status">
+          <span>发现新版本 {updateNotice.latest}</span>
+          <div className="panel-update-actions">
+            <button type="button" onClick={() => { void petBridge().openExternal(updateNotice.url).catch(() => undefined); }}>查看</button>
+            <button type="button" aria-label="关闭更新提示" title="关闭" onClick={() => setUpdateNotice(null)}>×</button>
+          </div>
+        </div>}
         {rightRail !== 'closed' && <RightRail railTab={railTab} snapshot={snapshot} preview={preview} bottom={drawerBottom ?? 0} onClose={() => setRightRail('closed')} />}
         <div className="panel-chat-body">
         {(libraryOpen || drawerExit.closing) && drawerBottom !== null && <aside className={`panel-library-drawer${libraryOpen ? '' : ' is-closing'}`} style={{ bottom: drawerBottom ?? 0 }} aria-label="会话列表" onAnimationEnd={drawerExit.endClose}>
@@ -2396,7 +2454,6 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
                     event.target.value = '';
                     if (files.length) void addFiles(files);
                   }} />
-                {compactEmpty && (library?.conversations.length ?? 0) > 1 && <button type="button" className="panel-tool-button panel-conversations-button" aria-label="会话库" title="会话库" onClick={openLibrary}><ConversationsIcon /></button>}
                 <ModelPicker wrapperRef={modelPickerRef} open={modelPickerOpen} dsh={snapshot?.mode === 'dsh'} sideExpanded={sideExpanded} goalOn={goalPrompting || Boolean(snapshot?.goal)} planOn={Boolean(snapshot?.planMode)} webOn={library?.settings.webSearchEnabled !== false} goalTitle={goalPrompting || snapshot?.goal ? '关闭目标模式' : '打开后写目标；按 Tab 补上“全部完成前不要停”，回车设定'} profiles={library?.settings.modelProfiles ?? []} activeId={library?.settings.activeModelProfileId} effort={snapshot?.effort ?? 'max'} onToggle={() => setModelPickerOpen((open) => !open)} onClose={() => setModelPickerOpen(false)} onToggleGoal={toggleGoal} onChoosePlan={choosePlanMode} onToggleWeb={() => { void run((bridge) => bridge.setWebSearchEnabled(library?.settings.webSearchEnabled === false)); }} onPickProfile={(id) => { void switchModelProfile(id); }} onManage={() => { void run((bridge) => bridge.openSettings()); }} onOpenOnboarding={() => { void run((bridge) => bridge.openOnboarding()); }} onEffort={chooseEffort} phoneState={phoneStatus} onOpenPhone={openPhonePanel} />
                 {snapshot?.mode === 'dsh' && <ApprovalMenu wrapperRef={approvalMenuRef} mode={approvalMode} open={approvalMenuOpen} disabled={sideExpanded} onToggle={() => setApprovalMenuOpen((open) => !open)} onClose={() => setApprovalMenuOpen(false)} onChoose={(mode) => { void chooseApprovalMode(mode); }} />}
                 <button type="button" className="panel-tool-button panel-attachment-button" aria-label="添加附件"

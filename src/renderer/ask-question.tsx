@@ -157,10 +157,10 @@ export function AskQuestionPanel({ request, onSubmit, onSkip }: {
       <footer className="panel-ask-footer">
         <div className="panel-ask-feedback" role="status">{error}</div>
         <div className="panel-ask-actions">
-          <button type="button" className="panel-ask-skip" disabled={busy} onClick={() => { void skip() }}>跳过</button>
-          {multi && index > 0 && <button type="button" className="panel-ask-nav" disabled={busy} onClick={() => setTab(index - 1)}>上一题</button>}
-          {!last && <button type="button" className="panel-ask-nav" disabled={busy} onClick={goNext}>下一题</button>}
-          {last && <button type="button" className="panel-ask-submit" disabled={busy} onClick={() => { void submit() }}>{busy ? '发送中…' : '提交'}</button>}
+          <button type="button" className="panel-ask-skip" disabled={busy} title="不回答这一题，小鲸会按默认或自行判断继续。" onClick={() => { void skip() }}>跳过</button>
+          {multi && index > 0 && <button type="button" className="panel-ask-nav" disabled={busy} title="回到上一题，已经选过的答案会保留。" onClick={() => setTab(index - 1)}>上一题</button>}
+          {!last && <button type="button" className="panel-ask-nav" disabled={busy} title="先不提交，继续看下一题。" onClick={goNext}>下一题</button>}
+          {last && <button type="button" className="panel-ask-submit" disabled={busy} title="把选中的答案发回去，小鲸继续当前任务。" onClick={() => { void submit() }}>{busy ? '发送中…' : '提交'}</button>}
         </div>
       </footer>
     </section>

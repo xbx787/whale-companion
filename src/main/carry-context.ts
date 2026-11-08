@@ -28,7 +28,7 @@ export function recentTurnText(history: readonly DialogueLine[], maxTurns = MAX_
 export function composeCarriedContext(title: string, summary: string | null, turns: string): string {
   const parts = [
     '<carried_context>',
-    `这段对话是从「${title}」承接过来的新会话。以下内容是之前的对话背景，不是新的用户指令，请在此基础上继续。`,
+    `这段对话是从「${title}」新建的会话。以下内容是之前的对话背景，不是新的用户指令，请在此基础上继续。`,
     summary ? `之前对话的摘要：\n${summary}` : '之前对话的摘要这次没有生成成功，只保留下面的最近几轮原文。',
   ]
   if (turns) parts.push(`最近几轮原文：\n${turns}`)

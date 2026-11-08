@@ -30,6 +30,12 @@ import { PetMcpBridge } from './pet-mcp-server'
 import { startPhoneApi } from './phone-api'
 import { PhoneLink } from './phone-link'
 import { registerPhoneIpc } from './ipc-phone'
+import { registerLocalAsrIpc } from './ipc-voice'
+import { UpdateService } from './update-service'
+import { RoastService } from './roast-service'
+import { lookAtScreen } from './eye-service'
+import { LocalAsr } from './local-asr'
+import { resolveSherpaModule, VoiceModelStore } from './voice-model'
 import { WinMcpClient } from './win-mcp-client'
 import { registerSettingsIpc } from './ipc-settings'
 import { registerLibrariesIpc } from './ipc-libraries'
@@ -72,7 +78,7 @@ import { attachmentPreviewPath, prepareDroppedFile, readImagePreview, searchWork
 import { findSourceProjectRoot, isUsableWorkspace, isWritableWorkspace, readSavedWorkspace, resolveAgentWorkspace, writeSavedWorkspace } from './workspace-root'
 import { isEffortLevel } from '../shared/effort'
 import type { AgentKernelKind, AvatarSize, BubbleLayout, AppCommandOption, ConversationSettings, PanelDirection, PanelPlacement, UiSize, UserAttachment } from '../shared/contracts'
-import { normalizeAgentKernelKind, normalizeModelMode, isApprovalMode, isAutoCompactPercent, isAvatarRenderer, PANEL_MIN_HEIGHT, PANEL_MIN_WIDTH } from '../shared/contracts'
+import { normalizeAgentKernelKind, normalizeModelMode, isApprovalMode, isAutoCompactPercent, isAvatarRenderer, isPanelAutoCollapseMinutes, isPeekInterval, isRoastBurstLimit, isRoastIdlePause, isRoastInterval, PANEL_MIN_HEIGHT, PANEL_MIN_WIDTH } from '../shared/contracts'
 import { isPersonaId } from '../shared/personas'
 import { approvalAnchor, approvalCardHeight, approvalCardHtml, approvalCardWidth, approvalPointerLeft, placeApprovalCard, type ApprovalRect } from './approval-card'
 import { probeProviderHealth } from './provider-health'
@@ -88,6 +94,9 @@ const dataRoot = dataRootOverride && path.isAbsolute(dataRootOverride)
   ? dataRootOverride
   : path.join(dataProjectRoot, 'data')
 const userHome = homedir()
+const updateService = new UpdateService(dataRoot)
+const voiceModel = new VoiceModelStore(dataRoot)
+const localAsr = new LocalAsr(voiceModel.modelDir(), resolveSherpaModule(process.resourcesPath, app.isPackaged ? undefined : app.getAppPath()))
 const evolveStore = new EvolveStore(dataRoot)
 // The wizard's saved choice survives a cleared environment variable; an
 // explicit DESKTOP_PET_WORKSPACE still wins so advanced setups keep control.
@@ -119,10 +128,70 @@ function revealPanel(): void {
   if (!panelRevealPending) return
   panelRevealPending = false
   if (!panelOpen || !panelWindow || panelWindow.isDestroyed()) return
-  panelWindow.setOpacity(1)
+  panelWindow.setOpacity(currentWindowOpacity)
   panelWindow.focus()
 }
 let balanceOpen = false
+let lastUserInputAt = Date.now()
+/** 吐槽卡复用余额窗口的位置和样式：窗口开着、最近有操作才轮换。 */
+const roastService = new RoastService({
+  settings: () => {
+    try {
+      const settings = activeController().currentSettings()
+      return {
+        enabled: settings.roastEnabled !== false,
+        intervalMinutes: settings.roastIntervalMinutes ?? 8,
+        idlePauseMinutes: settings.roastIdlePauseMinutes ?? 10,
+        burstLimit: settings.roastBurstLimit ?? 5
+      }
+    } catch {
+      return { enabled: false, intervalMinutes: 8, idlePauseMinutes: 10, burstLimit: 5 }
+    }
+  },
+  visible: () => Boolean(balanceOpen && balanceWindow && !balanceWindow.isDestroyed() && balanceWindow.isVisible()),
+  lastInputAt: () => lastUserInputAt,
+  emit: (text, at) => {
+    if (!balanceOpen) setBalanceOpen(true)
+    // 吐槽卡比余额卡高：内容一换就重算窗口高度。
+    syncBalancePosition()
+    for (const win of [avatarWindow, balanceWindow]) {
+      if (win && !win.isDestroyed()) win.webContents.send('pet:roast-text', { text, at })
+    }
+  }
+})
+function showRoastCard(): void {
+  if (!balanceOpen) setBalanceOpen(true)
+  if (!roastService.current()) roastService.refresh('general')
+}
+/** 眼睛模式：间隔到点、最近有交互、开关打开，才截屏看一眼。 */
+let lastEyeAt = 0
+async function eyeTick(): Promise<void> {
+  let settings
+  try {
+    settings = activeController().currentSettings()
+  } catch {
+    return
+  }
+  if (settings.eyeEnabled !== true) return
+  const now = Date.now()
+  if (now - lastUserInputAt >= (settings.roastIdlePauseMinutes ?? 10) * 60_000) return
+  const interval = (settings.eyeIntervalSeconds ?? 60) * 1_000
+  if (lastEyeAt && now - lastEyeAt < interval) return
+  lastEyeAt = now
+  // 和余额卡同一套取 key 的规则：优先用设置里的官方 DeepSeek 配置，
+  // 环境变量只作兜底，不然只有快捷方式带 env 时偷窥模式才工作。
+  const key = getDeepSeekBalanceKey(settings, deepseekKey)
+  if (!key) return
+  const result = await lookAtScreen(key)
+  if (!result) return
+  if (!balanceOpen) setBalanceOpen(true)
+  roastService.publish(result.text)
+}
+function startEyeLoop(): void {
+  // 偷窥间隔最短 30 秒，轮询用 15 秒，保证 30 秒档不会拖成 45 秒。
+  const timer = setInterval(() => { void eyeTick() }, 15_000)
+  timer.unref?.()
+}
 let bubbleLayout: BubbleLayout = 'empty'
 let compactBubbleHeight: number | undefined
 let bubbleExpanded = false
@@ -260,10 +329,12 @@ function applyPointerShape(): void {
  *  相对头像窗口定位，不再走“舞台”的上下布局。 */
 /** 窗口不透明度：0 视为关闭透明（完全不透明），省掉透明合成的持续开销。 */
 let currentWindowOpacity = 1
+let currentAvatarOpacity = 1
 
 function opacityFor(value?: number): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return 1
   const percent = Math.min(100, Math.max(0, Math.round(value)))
+  // 0 是旧数据的「关闭透明」，按不透明处理；其余按不透明度线性映射。
   return percent <= 0 ? 1 : percent / 100
 }
 function syncPanelBounds(): void {
@@ -531,10 +602,12 @@ type RestartOutcome = 'restarted' | 'waiting' | 'cancelled'
 /** 重启请示一次只开一张卡：重复请求复用同一次答复，避免叠两张勾叉。 */
 let restartApproval: Promise<boolean | null> | undefined
 
-function askRestartApproval(): Promise<boolean | null> {
+function askRestartApproval(conversationId?: string): Promise<boolean | null> {
   restartApproval ??= requestApproval(
     '还有任务在跑，现在就重启吗？',
-    '点勾：立刻退出重启，正在跑的任务会被打断；点叉：这次不重启，等你说下一步。'
+    '点勾：立刻退出重启，正在跑的任务会被打断；点叉：这次不重启，等你说下一步。',
+    5 * 60_000,
+    conversationId
   ).finally(() => { restartApproval = undefined })
   return restartApproval
 }
@@ -544,7 +617,7 @@ function askRestartApproval(): Promise<boolean | null> {
 async function decideRestart(excludeConversationId?: string): Promise<'now' | 'wait' | 'cancel'> {
   const otherBusy = (controller?.hasRunningWorkExcept(excludeConversationId) ?? false) || sideChat.isBusy()
   if (!otherBusy) return 'wait'
-  return (await askRestartApproval()) === true ? 'now' : 'cancel'
+  return (await askRestartApproval(excludeConversationId)) === true ? 'now' : 'cancel'
 }
 
 /** 关闭前给人物一个告别表情：只等一小会儿，绝不拖住退出。 */
@@ -779,17 +852,20 @@ const wpsMcpService = new WpsMcpService(() => {
 })
 const createRuntime = (conversationId: string, onChange: () => void, persistSession = true, enableEvolve = true): AgentRuntime => {
   const key = deepseekKey ?? apiKey ?? ''
+  // 提问和计划必须回到发起它们的会话。以前这里取「当前显示的会话」：用户在 A
+  // 里发任务、切到 B 之后 A 才提问，卡会挂到 B 上，B 的任务点变紫、提问卡在 B
+  // 弹出，而 A 的模型一直等不到回答。owner 在下面构造完运行时填上。
+  let owner: AgentRuntime | undefined
   const dshModel = useDshKernel() && dshBin
     ? (() => {
       const bridge = new PetMcpBridge(key, dataRoot)
       // 打包/重启这类请示走角色旁的小批准卡，绿勾批准、红叉拒绝。
-      bridge.setApprovalBridge({ request: (title, detail) => requestApproval(title, detail) })
+      bridge.setApprovalBridge({ request: (title, detail) => requestApproval(title, detail, 5 * 60_000, conversationId) })
       // 宿主侧提问卡：和内核提问共用面板上的同一张卡片，用来批准计划或选择方案。
       bridge.setAskBridge({
         ask: async (questions) => {
-          const runtime = activeController().displayedRuntime()
-          if (!runtime) throw new Error('当前没有正在显示的对话，无法提问。')
-          return await runtime.askHost(questions)
+          if (!owner) throw new Error('提问通道尚未就绪。')
+          return await owner.askHost(questions)
         }
       })
       // 内置 Windows 工具：宿主转发给 windows-mcp 的 Python 后端，模型侧不再走 MCP。
@@ -797,9 +873,8 @@ const createRuntime = (conversationId: string, onChange: () => void, persistSess
       // 计划模式：模型用 submit_plan 把计划交给面板批准，批准后自动退出计划模式。
       bridge.setPlanBridge({
         submit: async (plan) => {
-          const runtime = activeController().displayedRuntime()
-          if (!runtime) throw new Error('当前没有正在显示的对话，无法提交计划。')
-          return await runtime.askHostPlan(plan)
+          if (!owner) throw new Error('计划通道尚未就绪。')
+          return await owner.askHostPlan(plan)
         }
       })
       // 用 adapter 目录里的模型 id：deepseek-flash 声明了图片输入，deepseek-v4-flash 不在目录里，会被读图工具判定为不支持图片。
@@ -892,7 +967,7 @@ const createRuntime = (conversationId: string, onChange: () => void, persistSess
       })
     })()
     : undefined
-  return new AgentRuntime(
+  const runtime = new AgentRuntime(
     new NoteStore(projectRoot),
     apiKey ? new DeepSeekClient(apiKey) : undefined,
     onChange,
@@ -900,6 +975,8 @@ const createRuntime = (conversationId: string, onChange: () => void, persistSess
     agentWorkspace,
     enableEvolve ? evolveHooksFor(conversationId) : undefined
   )
+  owner = runtime
+  return runtime
 }
 /** 电脑 → 手机 DSH Go。手机连 USB 时优先用 adb 拿地址，否则扫局域网。 */
 const phoneLink = new PhoneLink({
@@ -1056,7 +1133,10 @@ function loadPage(win: BrowserWindow, balance = false): void {
 /** 每个窗口的 preload 都监听 pet:ui-size；页面一加载完就灌当前档位。 */
 function sendUiSizeWhenLoaded(win: BrowserWindow): void {
   win.webContents.once('did-finish-load', () => {
-    if (!win.isDestroyed()) win.webContents.send('pet:ui-size', currentUiSize)
+    if (win.isDestroyed()) return
+    win.webContents.send('pet:ui-size', currentUiSize)
+    win.webContents.send('pet:window-opacity', currentWindowOpacity)
+    win.webContents.send('pet:avatar-opacity', currentAvatarOpacity)
   })
 }
 
@@ -1282,6 +1362,9 @@ function createBalanceWindow(): BrowserWindow {
       syncBalancePosition()
       win.showInactive()
     }
+    // 窗口刚起来时把当前这条吐槽补上，避免先闪一帧空卡。
+    const roast = roastService.current()
+    if (roast && !win.isDestroyed()) win.webContents.send('pet:roast-text', roast)
   })
   win.on('closed', () => {
     if (balanceWindow !== win) return
@@ -1436,9 +1519,14 @@ function showPanel(): void {
       // 亮不亮由第一次布局上报决定：先亮会露出 empty 的小窗，紧接着再
       // 变成完整输入框。兜底 600ms，布局一直不上报也不会永远透明。
       panelRevealPending = true
+      // 页面常驻、bounds 在 show 前已经同步好：show 之后一帧就能画对，不再
+      // 等渲染层的下一次布局上报（布局不变就不会上报，窗口会一直透明到兜底）。
+      setTimeout(revealPanel, 32)
       setTimeout(revealPanel, 600)
     }
     avatarWindow?.webContents.send('pet:panel-open', true)
+    // 面板可能收起了很久：重新打开先推一帧最新快照，别让渲染层停在旧状态。
+    publishSnapshot()
   } else {
     panelWindow?.focus()
   }
@@ -1515,11 +1603,13 @@ const pendingApprovals = new Map<string, PendingApproval>()
 /** 打包/重启这类请示的小卡：只用来批准或拒绝。
  *
  *  卡片按内容取自然宽度，标题和待批准内容完整显示，按钮固定在底部；
- *  位置锚定当前会话标签（例如“开发1”）的正下方，而不是面板窗口最下沿。
+ *  位置锚定“发起请示的那个会话”的标签正下方，而不是当前显示的标签。
  *  标签位置由渲染进程量出来，主进程只负责把它换算成屏幕坐标。 */
-function activeTabRect(win: BrowserWindow): Promise<ApprovalRect | null> {
+function activeTabRect(win: BrowserWindow, conversationId?: string): Promise<ApprovalRect | null> {
   return win.webContents.executeJavaScript(`(() => {
-    const el = document.querySelector('.panel-quick-tab.is-current');
+    const wanted = ${JSON.stringify(conversationId ?? '')};
+    let el = wanted ? document.querySelector('.panel-quick-tab[data-tab-id="' + wanted + '"]') : null;
+    if (!el) el = document.querySelector('.panel-quick-tab.is-current');
     if (!el) return null;
     const r = el.getBoundingClientRect();
     return { x: r.x, y: r.y, width: r.width, height: r.height };
@@ -1549,7 +1639,7 @@ function panelHeaderRect(win: BrowserWindow): Promise<ApprovalRect | null> {
   }).catch(() => null)
 }
 
-function requestApproval(title: string, detail?: string, timeoutMs = 5 * 60_000): Promise<boolean | null> {
+function requestApproval(title: string, detail?: string, timeoutMs = 5 * 60_000, conversationId?: string): Promise<boolean | null> {
   const cardTitle = title.trim() || '需要你的批准'
   const cardDetail = (detail ?? '').trim()
   const cardWidth = approvalCardWidth(cardTitle, cardDetail)
@@ -1598,9 +1688,10 @@ function requestApproval(title: string, detail?: string, timeoutMs = 5 * 60_000)
         const avatar = avatarWindow && !avatarWindow.isDestroyed() ? avatarWindow.getBounds() : null
         const work = screen.getDisplayMatching(panel ?? avatar ?? screen.getPrimaryDisplay().workArea).workArea
         let anchor: ApprovalRect | null = null
-        // 优先挂当前会话标签：多标签时“开发1”的卡就落在“开发1”下面。
+        // 优先挂发起请示的会话标签：多标签时“开发1”的卡落在“开发1”下面，
+        // 即使用户此刻正在看“开发2”。
         if (panel && panelWindow && !panelWindow.isDestroyed()) {
-          const tab = await activeTabRect(panelWindow)
+          const tab = await activeTabRect(panelWindow, conversationId)
           // 标签按钮暂时测不到时贴面板头部下沿；不能用 panel.height 退到窗口底边。
           const header = tab ? null : await panelHeaderRect(panelWindow)
           anchor = approvalAnchor(panel, tab, header)
@@ -1696,9 +1787,7 @@ function createTray(): void {
   contextMenu = Menu.buildFromTemplate([
     { label: '配置向导', click: openOnboarding },
     { label: '选项', click: () => { openSettings() } },
-    { type: 'separator' },
     { label: '隐藏', click: hideAvatar },
-    { type: 'separator' },
     { label: '退出', click: () => app.quit() }
   ])
   tray = new Tray(icon)
@@ -1766,7 +1855,7 @@ function isScreenPoint(value: unknown): value is Electron.Point {
 function conversationSettingsPatch(value: unknown): Partial<ConversationSettings> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('会话设置无效。')
   const input = value as Record<string, unknown>
-  const editable = ['visibleConversationTabs', 'autoArchiveAfterDays', 'effort', 'goalMaxIterations', 'goalMaxMinutes', 'memoryEnabled', 'uiSize', 'avatarSize', 'avatarRenderer', 'toolRowDetail', 'webSearchEnabled', 'personaId', 'agentKernel', 'autoCompactPercent', 'assistantAvatar', 'enableAutoTitleGeneration', 'showMessageTimestamps', 'showSenderBadges', 'senderRouteStyle', 'compactTimeline', 'userName', 'assistantName', 'panelPlacement', 'panelTheme',
+  const editable = ['visibleConversationTabs', 'autoArchiveAfterDays', 'effort', 'goalMaxIterations', 'goalMaxMinutes', 'memoryEnabled', 'uiSize', 'avatarSize', 'avatarRenderer', 'toolRowDetail', 'webSearchEnabled', 'personaId', 'agentKernel', 'autoCompactPercent', 'panelAutoCollapseMinutes', 'roastEnabled', 'roastIntervalMinutes', 'roastIdlePauseMinutes', 'roastBurstLimit', 'eyeEnabled', 'eyeIntervalSeconds', 'assistantAvatar', 'enableAutoTitleGeneration', 'showMessageTimestamps', 'showSenderBadges', 'senderRouteStyle', 'compactTimeline', 'userName', 'assistantName', 'panelPlacement', 'panelTheme',
     'outputStyle', 'appendSystemPrompt', 'autoScroll', 'expandFileEditsByDefault', 'sessionSort', 'titleLocale', 'titleModel', 'loadUserSettings']
   if (Object.keys(input).some((key) => !editable.includes(key))) throw new Error('会话设置无效。')
   const patch: Partial<ConversationSettings> = {}
@@ -1843,6 +1932,31 @@ function conversationSettingsPatch(value: unknown): Partial<ConversationSettings
   if (input.autoCompactPercent !== undefined) {
     if (!isAutoCompactPercent(input.autoCompactPercent)) throw new Error('自动压缩阈值应为 50–90 之间的整数。')
     patch.autoCompactPercent = input.autoCompactPercent
+  }
+  if (input.panelAutoCollapseMinutes !== undefined) {
+    if (!isPanelAutoCollapseMinutes(input.panelAutoCollapseMinutes)) throw new Error('面板闲置收起时间无效。')
+    patch.panelAutoCollapseMinutes = input.panelAutoCollapseMinutes
+  }
+  if (input.roastIntervalMinutes !== undefined) {
+    if (!isRoastInterval(input.roastIntervalMinutes)) throw new Error('吐槽轮换间隔无效。')
+    patch.roastIntervalMinutes = input.roastIntervalMinutes
+  }
+  if (input.roastIdlePauseMinutes !== undefined) {
+    if (!isRoastIdlePause(input.roastIdlePauseMinutes)) throw new Error('吐槽空闲暂停时间无效。')
+    patch.roastIdlePauseMinutes = input.roastIdlePauseMinutes
+  }
+  if (input.roastBurstLimit !== undefined) {
+    if (!isRoastBurstLimit(input.roastBurstLimit)) throw new Error('吐槽连续次数无效。')
+    patch.roastBurstLimit = input.roastBurstLimit
+  }
+  for (const key of ['roastEnabled', 'eyeEnabled'] as const) {
+    if (input[key] === undefined) continue
+    if (typeof input[key] !== 'boolean') throw new Error('吐槽开关无效。')
+    patch[key] = input[key]
+  }
+  if (input.eyeIntervalSeconds !== undefined) {
+    if (!isPeekInterval(input.eyeIntervalSeconds)) throw new Error('偷窥模式读屏间隔无效。')
+    patch.eyeIntervalSeconds = input.eyeIntervalSeconds
   }
   // 切换人设时清掉自定义头像，让预设头像生效；上传仍走单独的字节通道。
   if (input.assistantAvatar !== undefined) {
@@ -2054,12 +2168,15 @@ function buildSettingsIpcDeps() {
     settingsTrusted,
     activeController,
     memory,
+    updateService,
     conversationSettingsPatch,
     discardSidesWithoutLiveParents,
     broadcastUiSize,
     opacityFor,
     get currentWindowOpacity() { return currentWindowOpacity },
     set currentWindowOpacity(value: typeof currentWindowOpacity) { currentWindowOpacity = value },
+    get currentAvatarOpacity() { return currentAvatarOpacity },
+    set currentAvatarOpacity(value: typeof currentAvatarOpacity) { currentAvatarOpacity = value },
     get panelWindow() { return panelWindow },
     get avatarWindow() { return avatarWindow },
     get currentAvatarSize() { return currentAvatarSize },
@@ -2076,6 +2193,10 @@ function buildSettingsIpcDeps() {
     syncBalancePosition,
     publishSnapshot,
     requestRestart,
+    onRoastToggle: (enabled: boolean) => {
+      if (enabled) showRoastCard()
+      else if (balanceOpen && roastService.current()) setBalanceOpen(false)
+    },
   }
 }
 export type SettingsIpcDeps = ReturnType<typeof buildSettingsIpcDeps>
@@ -2144,6 +2265,7 @@ function buildBalanceIpcDeps() {
     get balanceOpen() { return balanceOpen },
     activeController,
     deepseekKey,
+    roastRefresh: () => roastService.refresh('general'),
   }
 }
 export type BalanceIpcDeps = ReturnType<typeof buildBalanceIpcDeps>
@@ -2208,6 +2330,7 @@ function buildMiscIpcDeps() {
     snapshotWithSideStatuses,
     activeController,
     publishSnapshot,
+    updateService,
     get rendererAvatarState() { return rendererAvatarState },
     set rendererAvatarState(value: typeof rendererAvatarState) { rendererAvatarState = value },
   }
@@ -2269,6 +2392,7 @@ function registerIpc(): void {
   registerSideIpc({ trusted, sideChat, activeController, validAttachmentList, resolveAttachments, get avatarWindow() { return avatarWindow } })
   registerConversationsIpc({ trusted, activeController, sideChat, get panelWindow() { return panelWindow } })
   registerPhoneIpc({ trusted, settingsTrusted, phoneLink })
+  registerLocalAsrIpc({ trusted, settingsTrusted, voiceModel, localAsr })
   registerConversationControlIpc({ trusted, activeController, sideChat, get agentWorkspace() { return agentWorkspace } })
   registerModelsIpc(buildModelsIpcDeps())
   registerShellIpc(buildShellIpcDeps())
@@ -2411,6 +2535,8 @@ if (ownsSingleInstance) void app.whenReady().then(async () => {
   memory.setEnabled(initialSettings.memoryEnabled)
   currentUiSize = initialSettings.uiSize
   currentAvatarSize = initialSettings.avatarSize
+  currentWindowOpacity = opacityFor(initialSettings.windowOpacity)
+  currentAvatarOpacity = opacityFor(initialSettings.avatarOpacity)
   panelPlacement = initialSettings.panelPlacement ?? 'top'
   panelDirection = panelPlacement === 'bottom' ? 'down' : 'up'
   const savedPanelSize = initialSettings.panelSize
@@ -2432,8 +2558,24 @@ if (ownsSingleInstance) void app.whenReady().then(async () => {
     else openPreviewPanel()
   }
   createTray()
+  roastService.start()
+  startEyeLoop()
+  // 吐槽模式默认开启：启动后放一张卡，窗口就绪会补发当前这条。
+  if ((await activeController().getLibraryState()).settings.roastEnabled !== false) {
+    setTimeout(() => { showRoastCard() }, 1_200)
+  }
+  // 启动后自动检查一次更新；关掉自动检查就跳过。结果缓存在 UpdateService 里，
+  // 面板和设置页直接读，检查失败不打扰。
+  if (!process.argv.includes('--self-test')) {
+    setTimeout(() => {
+      if (!updateService.autoEnabled()) return
+      void updateService.check()
+    }, 15_000).unref?.()
+  }
   // 全局键鼠活动：面板提示框里实时显示按键与鼠标三键。
   startInputActivity((activity) => {
+    lastUserInputAt = Date.now()
+    roastService.touch()
     for (const win of [panelWindow, avatarWindow]) {
       if (win && !win.isDestroyed()) win.webContents.send('pet:input-activity', activity)
     }

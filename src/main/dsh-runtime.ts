@@ -81,7 +81,7 @@ export function writeDshProfile(home: string, bridge?: DshRuntimeSettings['mcpBr
       `          PET_BRIDGE_URL: ${yamlQuote(endpoint.url)}`,
       `          PET_BRIDGE_TOKEN: ${yamlQuote(endpoint.token)}`,
       '        failOnStartupError: true',
-      '        toolCallTimeoutMs: 300000'
+      '        toolCallTimeoutMs: 1800000'
     )
   }
   writeFileSync(path.join(profile, 'cordis.patch.yml'), `${lines.join('\n')}\n`, 'utf8')

@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { AgentCapabilities, ConversationSettings, ModelProfile, PhoneCandidate, PhoneLinkStatus, PhoneSession, VoiceJobProgress, VoiceSettingsPatch, VoiceSettingsPublic } from '../shared/contracts'
+import type { AgentCapabilities, ConversationSettings, ModelProfile, PhoneCandidate, PhoneLinkStatus, PhoneSession, UpdateStatus, VoiceJobProgress, VoiceModelStatus, VoiceSettingsPatch, VoiceSettingsPublic } from '../shared/contracts'
 import type { LibraryItem, LibraryKind, LibrarySnapshot } from '../shared/libraries'
 import type { MemoryItem } from '../main/memory-service'
 
@@ -44,6 +44,16 @@ export interface SettingsAPI {
   voiceOpenOutput(jobId: string): Promise<void>
   voiceOpenAudioRoot(): Promise<void>
   voiceOpenKeyPage(): Promise<void>
+  /** 本地语音模型：状态、按需下载、取消。 */
+  voiceModelStatus?(): Promise<VoiceModelStatus>
+  voiceModelDownload?(): Promise<VoiceModelStatus>
+  voiceModelCancel?(): Promise<void>
+  /** 拖动时实时预览不透明度，不写配置；松手才保存。 */
+  previewOpacity?(request: { target: 'panel' | 'avatar'; value: number }): Promise<void>
+  /** 更新：检查 GitHub 最新版本、自动检查开关。 */
+  checkUpdates?(): Promise<UpdateStatus>
+  setAutoUpdate?(enabled: boolean): Promise<boolean>
+  autoUpdateEnabled?(): Promise<boolean>
   onVoiceJobProgress(callback: (progress: VoiceJobProgress) => void): () => void
   /** Installed entries across the MCP, skill, and plugin libraries. */
   libraries(): Promise<LibrarySnapshot>
@@ -98,6 +108,13 @@ const api: SettingsAPI = {
   voiceOpenOutput: (jobId) => ipcRenderer.invoke('pet:settings:voice:open-output', jobId),
   voiceOpenAudioRoot: () => ipcRenderer.invoke('pet:settings:voice:open-audio-root'),
   voiceOpenKeyPage: () => ipcRenderer.invoke('pet:settings:voice:open-key-page'),
+  voiceModelStatus: () => ipcRenderer.invoke('pet:voice-model-status'),
+  voiceModelDownload: () => ipcRenderer.invoke('pet:voice-model-download'),
+  voiceModelCancel: () => ipcRenderer.invoke('pet:voice-model-cancel'),
+  previewOpacity: (request) => ipcRenderer.invoke('pet:settings:preview-opacity', request),
+  checkUpdates: () => ipcRenderer.invoke('pet:settings:check-updates'),
+  setAutoUpdate: (enabled) => ipcRenderer.invoke('pet:settings:auto-update', enabled),
+  autoUpdateEnabled: () => ipcRenderer.invoke('pet:settings:auto-update-state'),
   onVoiceJobProgress: (callback) => {
     const listener = (_event: Electron.IpcRendererEvent, progress: VoiceJobProgress): void => callback(progress)
     ipcRenderer.on('pet:voice:job-progress', listener)

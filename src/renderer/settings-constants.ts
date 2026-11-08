@@ -25,20 +25,68 @@ export interface ModelFormState {
 }
 
 const BASE_SETTINGS_TABS = [
-  { id: 'conversation', label: '对话' },
-  { id: 'phone', label: '手机' },
-  { id: 'appearance', label: '外观' },
-  { id: 'libraries', label: '库' },
+  { id: 'conversation', label: '常规' },
+  { id: 'roast', label: '吐槽' },
   { id: 'models', label: '模型' },
+  { id: 'persona', label: '形象' },
   { id: 'voice', label: '语音' },
-  { id: 'memory', label: '记忆' },
-  { id: 'identity', label: '称呼' },
-  { id: 'avatar', label: '人设' }
+  { id: 'appearance', label: '界面' },
+  { id: 'libraries', label: '插件库' },
+  { id: 'phone', label: 'DSH Go 连接' },
+  { id: 'about', label: '关于' }
 ] as const
 
 export type SettingsTab = typeof BASE_SETTINGS_TABS[number]['id']
 
 export const SETTINGS_TABS: ReadonlyArray<{ id: SettingsTab; label: string }> = [...BASE_SETTINGS_TABS]
+
+/** 设置页的两级导航：左栏是带图标的大标题，顶部是当前大标题下的小标题。
+ *  两组图标分开定义，同一个图标不会同时出现在左右两处。 */
+export type SettingsGroupId = 'chat' | 'model' | 'persona' | 'appearance' | 'system'
+
+export interface SettingsGroup {
+  id: SettingsGroupId
+  label: string
+  icon: string
+  items: ReadonlyArray<{ id: SettingsTab; label: string; icon: string }>
+}
+
+export const SETTINGS_GROUPS: ReadonlyArray<SettingsGroup> = [
+  {
+    id: 'chat', label: '对话', icon: 'bubble',
+    items: [
+      { id: 'conversation', label: '常规', icon: 'sliders' },
+      { id: 'roast', label: '吐槽', icon: 'quote' }
+    ]
+  },
+  {
+    id: 'model', label: '模型', icon: 'chip',
+    items: [{ id: 'models', label: '模型', icon: 'cube' }]
+  },
+  {
+    id: 'persona', label: '人物', icon: 'person',
+    items: [
+      { id: 'persona', label: '形象', icon: 'frame' },
+      { id: 'voice', label: '语音', icon: 'mic' }
+    ]
+  },
+  {
+    id: 'appearance', label: '外观', icon: 'palette',
+    items: [{ id: 'appearance', label: '界面', icon: 'layout' }]
+  },
+  {
+    id: 'system', label: '系统', icon: 'gear',
+    items: [
+      { id: 'libraries', label: '插件库', icon: 'puzzle' },
+      { id: 'phone', label: 'DSH Go 连接', icon: 'phone' },
+      { id: 'about', label: '关于', icon: 'info' }
+    ]
+  }
+]
+
+export function groupOfTab(tab: SettingsTab): SettingsGroup {
+  return SETTINGS_GROUPS.find((group) => group.items.some((item) => item.id === tab)) ?? SETTINGS_GROUPS[0]
+}
 
 /** 左栏「浏览市场」用 ?tab=libraries 打开本页；只接受已知页签。SSR 下没有 window。 */
 export function initialSettingsTab(): SettingsTab {

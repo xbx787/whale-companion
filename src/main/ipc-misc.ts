@@ -26,6 +26,10 @@ export function registerMiscIpc(deps: MiscIpcDeps): void {
     if (!deps.trusted(event)) throw new Error('无效的界面请求。')
     return deps.snapshotWithSideStatuses()
   })
+  ipcMain.handle('pet:update-status', (event) => {
+    if (!deps.trusted(event)) return null
+    return deps.updateService.lastStatus()
+  })
   ipcMain.handle('pet:set-avatar-state', (event, state: unknown) => {
     if (!deps.trusted(event)) return
     if (state !== 'idle' && state !== 'thinking' && state !== 'listening' && state !== 'speaking' && state !== 'acting' && state !== 'success' && state !== 'error') {

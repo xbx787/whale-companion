@@ -73,7 +73,7 @@ async function mount(api: SettingsAPI): Promise<void> {
   document.body.appendChild(container)
   root = createRoot(container)
   await act(async () => root!.render(<SettingsPage />))
-  await act(async () => click('库'))
+  await act(async () => click('系统'))
   await act(async () => { await Promise.resolve() })
 }
 
@@ -112,6 +112,7 @@ describe('settings libraries page', () => {
     const setEnabled = vi.fn(async () => ({ items: [{ ...installed, disabled: true }], busy: false }))
     const probe = vi.fn(async () => ({ ok: false, message: '找不到命令：npx' }))
     await mount(bridge({ setLibraryEnabled: setEnabled, probeLibrary: probe }))
+    await act(async () => { await Promise.resolve() })
     await act(async () => click('停用'))
     expect(setEnabled).toHaveBeenCalledWith(installed.id, false)
     await act(async () => click('检测'))

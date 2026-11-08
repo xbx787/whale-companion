@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import type { PluginSummary, AgentCapabilities, ConversationSettings, ModelProfile } from '../shared/contracts'
+import type { PluginSummary, AgentCapabilities, ConversationSettings, ModelProfile, UpdateStatus } from '../shared/contracts'
+import { PANEL_AUTO_COLLAPSE_CHOICES, PANEL_AUTO_COLLAPSE_DEFAULT_MINUTES, PEEK_INTERVAL_CHOICES, ROAST_BURST_CHOICES, ROAST_IDLE_CHOICES, ROAST_INTERVAL_CHOICES } from '../shared/contracts'
 import { LIBRARY_KINDS, LIBRARY_LABELS, LIBRARY_MARKET_LABELS, type LibraryItem, type LibraryKind, type LibrarySnapshot } from '../shared/libraries'
 import { PERSONA_PRESETS } from '../shared/personas'
 import { personaAvatarUrl } from './avatar-art'
@@ -11,7 +12,8 @@ import type { SettingsAPI } from '../preload/settings'
 import type { MemoryItem } from '../main/memory-service'
 import { SettingsVoiceSection } from './settings-voice'
 import { SettingsPhoneSection } from './settings-phone'
-import { AVATAR_SIZE_OPTIONS, dateLabel, errorMessage, initialSettingsTab, marketLink, SETTINGS_TABS, UI_SIZE_OPTIONS, type ModelFormState, type SettingsTab } from './settings-constants'
+import { AVATAR_SIZE_OPTIONS, dateLabel, errorMessage, groupOfTab, initialSettingsTab, marketLink, SETTINGS_GROUPS, SETTINGS_TABS, UI_SIZE_OPTIONS, type ModelFormState, type SettingsTab } from './settings-constants'
+import { SettingsIcon } from './settings-icons'
 import './settings.css'
 import './voice.css'
 
@@ -57,7 +59,11 @@ export function SettingsPage() {
   const [workspace, setWorkspace] = useState<{ path: string; saved: boolean } | null>(null)
   const [workspacePending, setWorkspacePending] = useState<string | null>(null)
   const [workspaceBusy, setWorkspaceBusy] = useState(false)
-  const [quitAction, setQuitAction] = useState<'quit' | 'restart' | null>(null)
+  const [updateInfo, setUpdateInfo] = useState<UpdateStatus | null>(null)
+  const [checkingUpdate, setCheckingUpdate] = useState(false)
+  const [autoUpdate, setAutoUpdate] = useState(true)
+  const [eyeConfirm, setEyeConfirm] = useState(false)
+  const [quitAction, setQuitAction] = useState<'restart' | 'quit' | null>(null)
   const [libraries, setLibraries] = useState<LibrarySnapshot>({ items: [], busy: false })
   const [libraryKind, setLibraryKind] = useState<LibraryKind>('mcp')
   const [libraryQuery, setLibraryQuery] = useState('')
@@ -78,6 +84,20 @@ export function SettingsPage() {
       if (SETTINGS_TABS.some((entry) => entry.id === next)) setTab(next as SettingsTab)
     })
   }, [])
+
+  useEffect(() => {
+    void window.whaleSettings.autoUpdateEnabled?.().then(setAutoUpdate).catch(() => undefined)
+  }, [])
+
+  // 打开「关于」就显示上次检查结果，不用再手动点一次。
+  useEffect(() => {
+    if (tab !== 'about' || updateInfo || checkingUpdate) return
+    setCheckingUpdate(true)
+    void (window.whaleSettings.checkUpdates?.() ?? Promise.resolve(null))
+      .then(setUpdateInfo)
+      .catch(() => undefined)
+      .finally(() => setCheckingUpdate(false))
+  }, [tab, updateInfo, checkingUpdate])
 
   useEffect(() => {
     let active = true
@@ -114,7 +134,7 @@ export function SettingsPage() {
   }, [])
 
   useEffect(() => {
-    if (tab !== 'memory') return
+    if (tab !== 'persona') return
     let active = true
     setMemoryLoading(true)
     void window.whaleSettings.memoryList().then((items) => {
@@ -555,28 +575,47 @@ export function SettingsPage() {
     }
   }
 
+  const currentGroup = groupOfTab(tab)
   return <div className="settings-window">
     <header className="settings-header">
-      <span className="settings-mark" aria-hidden="true">鲸</span>
-      <div><p>{settings?.assistantName ?? '小鲸'}</p><h1>设置</h1></div>
-      {version && <span className="settings-version">v{version}</span>}
+      <h1>选项</h1>
       <button type="button" className="settings-close" aria-label="关闭设置" title="关闭" onClick={() => { void window.whaleSettings.close(); }}>×</button>
     </header>
-    <nav className="settings-tabs" role="tablist" aria-label="设置栏目" onKeyDown={(event) => {
-      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
-      event.preventDefault()
-      const index = SETTINGS_TABS.findIndex((item) => item.id === tab)
-      const next = SETTINGS_TABS[(index + (event.key === 'ArrowRight' ? 1 : SETTINGS_TABS.length - 1)) % SETTINGS_TABS.length]
-      setTab(next.id)
-      document.getElementById(`settings-tab-${next.id}`)?.focus()
-    }}>
-      {SETTINGS_TABS.map((item) => <button key={item.id} type="button" role="tab" id={`settings-tab-${item.id}`}
-        aria-selected={tab === item.id} aria-controls={`settings-panel-${item.id}`}
-        tabIndex={tab === item.id ? 0 : -1}
-        className={`settings-tab${tab === item.id ? ' is-active' : ''}`}
-        onClick={() => setTab(item.id)}>{item.label}</button>)}
-    </nav>
-    <main>
+    <div className="settings-body">
+      <div className="settings-sidebar">
+        <nav className="settings-sidebar-list" role="tablist" aria-label="设置分类" onKeyDown={(event) => {
+          if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
+          event.preventDefault()
+          const index = SETTINGS_GROUPS.findIndex((entry) => entry.id === currentGroup.id)
+          const next = SETTINGS_GROUPS[(index + (event.key === 'ArrowDown' ? 1 : SETTINGS_GROUPS.length - 1)) % SETTINGS_GROUPS.length]
+          setTab(next.items[0].id)
+          document.getElementById(`settings-group-${next.id}`)?.focus()
+        }}>
+          {SETTINGS_GROUPS.map((group) => <button key={group.id} type="button" role="tab" id={`settings-group-${group.id}`}
+            aria-selected={currentGroup.id === group.id} tabIndex={currentGroup.id === group.id ? 0 : -1}
+            className={`settings-group${currentGroup.id === group.id ? ' is-active' : ''}`}
+            onClick={() => { if (currentGroup.id !== group.id) setTab(group.items[0].id) }}>
+            <SettingsIcon name={group.icon} /><span>{group.label}</span>
+          </button>)}
+        </nav>
+        {!notice?.error && notice?.text && <div className="settings-sidebar-notice" role="status">{notice.text}</div>}
+      </div>
+      <div className="settings-main">
+        <nav className="settings-subtabs" role="tablist" aria-label={`${currentGroup.label}下的栏目`} onKeyDown={(event) => {
+          if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+          event.preventDefault()
+          const index = currentGroup.items.findIndex((item) => item.id === tab)
+          const next = currentGroup.items[(index + (event.key === 'ArrowRight' ? 1 : currentGroup.items.length - 1)) % currentGroup.items.length]
+          setTab(next.id)
+          document.getElementById(`settings-tab-${next.id}`)?.focus()
+        }}>
+          {currentGroup.items.map((item) => <button key={item.id} type="button" role="tab" id={`settings-tab-${item.id}`}
+            aria-selected={tab === item.id} aria-controls={`settings-panel-${item.id}`}
+            tabIndex={tab === item.id ? 0 : -1}
+            className={`settings-subtab${tab === item.id ? ' is-active' : ''}`}
+            onClick={() => setTab(item.id)}><SettingsIcon name={item.icon} /><span>{item.label}</span></button>)}
+        </nav>
+        <main>
       {tab === 'conversation' && <section className="settings-section" role="tabpanel" id="settings-panel-conversation" aria-labelledby="settings-tab-conversation">
         <div className="settings-row">
           <div className="settings-copy"><label>始终允许的工具</label><p>在这些工具上选过「始终允许」，之后同类调用不再询问。可以单独撤销或全部清空。</p></div>
@@ -628,6 +667,12 @@ export function SettingsPage() {
           <div className="settings-copy"><label htmlFor="auto-archive-days">闲置会话自动归档</label><p>归档保留完整记录，可在会话列表恢复。</p></div>
           <select id="auto-archive-days" value={settings?.autoArchiveAfterDays ?? 0} disabled={!settings || busy} onChange={(event) => { void update({ autoArchiveAfterDays: Number(event.target.value) as ConversationSettings['autoArchiveAfterDays'] }) }}>
             <option value={0}>关闭</option><option value={7}>7 天</option><option value={14}>14 天</option><option value={30}>30 天</option>
+          </select>
+        </div>
+        <div className="settings-row">
+          <div className="settings-copy"><label htmlFor="panel-auto-collapse">闲置收起面板</label><p>这么久没有操作面板、也没有任务在运行时，自动收起对话框。点角色可以重新打开，记录和上下文都还在。</p></div>
+          <select id="panel-auto-collapse" value={settings?.panelAutoCollapseMinutes ?? PANEL_AUTO_COLLAPSE_DEFAULT_MINUTES} disabled={!settings || busy} onChange={(event) => { void update({ panelAutoCollapseMinutes: Number(event.target.value) }) }}>
+            {PANEL_AUTO_COLLAPSE_CHOICES.map((minutes) => <option key={minutes} value={minutes}>{minutes === 60 ? '1 小时' : `${minutes} 分钟`}</option>)}
           </select>
         </div>
         <div className="settings-row">
@@ -757,12 +802,33 @@ export function SettingsPage() {
           </div>
         </div>
         <div className="settings-row">
-          <div className="settings-copy"><label>窗口透明度</label><p>0 表示关闭透明效果，窗口完全不透明，能减少透明合成的开销。</p></div>
+          <div className="settings-copy"><label>窗口不透明度</label><p>控制聊天面板本身，100 完全不透明，往左越透。</p></div>
           <div className="settings-opacity">
-            <input type="range" min={0} max={100} step={5} aria-label="窗口透明度"
-              value={settings?.windowOpacity ?? 100} disabled={!settings || busy}
-              onChange={(event) => { void update({ windowOpacity: Number(event.target.value) }) }} />
+            <input type="range" className="settings-opacity-range" min={30} max={100} step={1}
+              aria-label="窗口不透明度" value={settings?.windowOpacity ?? 100}
+              onChange={(event) => {
+                const value = Number(event.target.value)
+                setSettings((current) => current ? { ...current, windowOpacity: value } : current)
+                void window.whaleSettings.previewOpacity?.({ target: 'panel', value })?.catch(() => undefined)
+              }}
+              onPointerUp={(event) => { void update({ windowOpacity: Number(event.currentTarget.value) }) }}
+              onKeyUp={(event) => { void update({ windowOpacity: Number(event.currentTarget.value) }) }} />
             <span>{settings?.windowOpacity ?? 100}%</span>
+          </div>
+        </div>
+        <div className="settings-row">
+          <div className="settings-copy"><label>人物不透明度</label><p>只控制桌面上的角色，不动聊天面板。100 完全不透明。</p></div>
+          <div className="settings-opacity">
+            <input type="range" className="settings-opacity-range" min={30} max={100} step={1}
+              aria-label="人物不透明度" value={settings?.avatarOpacity ?? 100}
+              onChange={(event) => {
+                const value = Number(event.target.value)
+                setSettings((current) => current ? { ...current, avatarOpacity: value } : current)
+                void window.whaleSettings.previewOpacity?.({ target: 'avatar', value })?.catch(() => undefined)
+              }}
+              onPointerUp={(event) => { void update({ avatarOpacity: Number(event.currentTarget.value) }) }}
+              onKeyUp={(event) => { void update({ avatarOpacity: Number(event.currentTarget.value) }) }} />
+            <span>{settings?.avatarOpacity ?? 100}%</span>
           </div>
         </div>
         <div className="settings-row">
@@ -847,7 +913,7 @@ export function SettingsPage() {
                   return (
                   <div className="settings-library-item" key={item.id}>
                     <div className="settings-library-copy">
-                      <label>{item.name}{item.version && <span className="settings-library-version">v{item.version}</span>}{item.external && <span className="settings-library-version">本地已有</span>}{item.disabled && <span className="settings-library-version">已停用</span>}</label>
+                      <label>{item.name}{item.version && <span className="settings-library-version">v{item.version}</span>}{item.external && <span className="settings-library-version">本地已有</span>}</label>
                       {item.description && <p title={item.description}>{item.description}</p>}
                       {item.license && <small>许可证：{item.license}</small>}
                       {link && <button type="button" className="settings-library-link" onClick={() => { void window.whaleSettings.openExternal?.(link.url) }}>{link.label}</button>}
@@ -916,6 +982,48 @@ export function SettingsPage() {
               })}
             </div>
           </div>}
+        </div>
+      </section>}
+      {tab === 'roast' && <section className="settings-section" role="tabpanel" id="settings-panel-roast" aria-labelledby="settings-tab-roast">
+        <div className="settings-row">
+          <div className="settings-copy"><label id="roast-enabled-label">吐槽模式</label><p>在余额的位置常驻一张吐槽卡，按节奏换新。</p></div>
+          <button type="button" role="switch" aria-labelledby="roast-enabled-label" aria-checked={settings?.roastEnabled === true}
+            className={`settings-switch${settings?.roastEnabled === true ? ' is-on' : ''}`} disabled={!settings || busy}
+            onClick={() => { void update({ roastEnabled: !(settings?.roastEnabled === true) }) }} />
+        </div>
+        <div className="settings-row">
+          <div className="settings-copy"><label htmlFor="roast-interval">轮换间隔</label><p>卡片开着、手上有动作时，隔这么久换一条。</p></div>
+          <select id="roast-interval" value={settings?.roastIntervalMinutes ?? 8} disabled={!settings || busy}
+            onChange={(event) => { void update({ roastIntervalMinutes: Number(event.target.value) }) }}>
+            {ROAST_INTERVAL_CHOICES.map((minutes) => <option key={minutes} value={minutes}>{minutes} 分钟</option>)}
+          </select>
+        </div>
+        <div className="settings-row">
+          <div className="settings-copy"><label htmlFor="roast-idle">空闲暂停</label><p>这么久没操作就停换，回来重新计时。</p></div>
+          <select id="roast-idle" value={settings?.roastIdlePauseMinutes ?? 10} disabled={!settings || busy}
+            onChange={(event) => { void update({ roastIdlePauseMinutes: Number(event.target.value) }) }}>
+            {ROAST_IDLE_CHOICES.map((minutes) => <option key={minutes} value={minutes}>{minutes} 分钟</option>)}
+          </select>
+        </div>
+        <div className="settings-row">
+          <div className="settings-copy"><label htmlFor="roast-burst">连续换新</label><p>连续自动换 {settings?.roastBurstLimit ?? 5} 次后间隔翻倍，动一下恢复。</p></div>
+          <select id="roast-burst" value={settings?.roastBurstLimit ?? 5} disabled={!settings || busy}
+            onChange={(event) => { void update({ roastBurstLimit: Number(event.target.value) }) }}>
+            {ROAST_BURST_CHOICES.map((count) => <option key={count} value={count}>{count} 次</option>)}
+          </select>
+        </div>
+        <div className="settings-row">
+          <div className="settings-copy"><label id="eye-enabled-label">偷窥模式</label><p>隔一阵看一眼屏幕，给一句吐槽或建议。截图只发给模型做完这次分析，不会存成文件。默认关闭。</p></div>
+          <button type="button" role="switch" aria-labelledby="eye-enabled-label" aria-checked={settings?.eyeEnabled === true}
+            className={`settings-switch${settings?.eyeEnabled === true ? ' is-on' : ''}`} disabled={!settings || busy}
+            onClick={() => { if (settings?.eyeEnabled === true) void update({ eyeEnabled: false }); else setEyeConfirm(true) }} />
+        </div>
+        <div className="settings-row">
+          <div className="settings-copy"><label htmlFor="peek-interval">读屏间隔</label><p>偷窥模式多久看一次屏幕。</p></div>
+          <select id="peek-interval" value={settings?.eyeIntervalSeconds ?? 60} disabled={!settings || busy}
+            onChange={(event) => { void update({ eyeIntervalSeconds: Number(event.target.value) }) }}>
+            {PEEK_INTERVAL_CHOICES.map((seconds) => <option key={seconds} value={seconds}>{seconds % 60 === 0 ? `${seconds / 60} 分钟` : `${seconds} 秒`}</option>)}
+          </select>
         </div>
       </section>}
       {tab === 'models' && <section className="settings-section" role="tabpanel" id="settings-panel-models" aria-labelledby="settings-tab-models">
@@ -989,9 +1097,10 @@ export function SettingsPage() {
         </div>}
       </section>}
       {tab === 'voice' && <SettingsVoiceSection api={window.whaleSettings} />}
-      {tab === 'memory' && <section className="settings-section" role="tabpanel" id="settings-panel-memory" aria-labelledby="settings-tab-memory">
+      {tab === 'persona' && <section className="settings-section" role="tabpanel" id="settings-panel-persona" aria-labelledby="settings-tab-persona">
+        <h2 className="settings-group-heading">长期记忆</h2>
         <div className="settings-row">
-          <div className="settings-copy"><label id="memory-switch-label">长期记忆</label><p>从完成的对话提取少量稳定事实；关闭后保留现有条目，但不会用于新对话。</p></div>
+          <div className="settings-copy"><label id="memory-switch-label">启用长期记忆</label><p>从完成的对话提取少量稳定事实；关闭后保留现有条目，但不会用于新对话。</p></div>
           <button type="button" role="switch" aria-labelledby="memory-switch-label" aria-checked={settings?.memoryEnabled ?? true}
             className={`settings-switch${settings?.memoryEnabled ?? true ? ' is-on' : ''}`} disabled={!settings || busy}
             onClick={() => { void setMemoryEnabled(!(settings?.memoryEnabled ?? true)) }} />
@@ -1015,8 +1124,7 @@ export function SettingsPage() {
             </div>
           </>}
         </article>)}
-      </section>}
-      {tab === 'identity' && <section className="settings-section" role="tabpanel" id="settings-panel-identity" aria-labelledby="settings-tab-identity">
+        <h2 className="settings-group-heading">称呼</h2>
         <div className="settings-row">
           <div className="settings-copy"><label htmlFor="user-name">你的称呼</label><p>它在对话里这样称呼你。</p></div>
           <form onSubmit={(event) => { event.preventDefault(); saveNames() }}>
@@ -1033,9 +1141,8 @@ export function SettingsPage() {
             <button type="submit" disabled={!settings || busy || assistantNameDraft.trim() === settings.assistantName}>保存</button>
           </form>
         </div>
-      </section>}
-      {tab === 'avatar' && <section className="settings-section" role="tabpanel" id="settings-panel-avatar" aria-labelledby="settings-tab-avatar">
-        <div className="settings-copy"><label>人设预设</label><p>切换时同时更新人设文字、对话头像和桌面形象。</p></div>
+        <h2 className="settings-group-heading">人设预设</h2>
+        <p className="settings-group-hint">切换时同时更新人设文字、对话头像和桌面形象。</p>
         <div className="settings-personas" role="radiogroup" aria-label="人设预设">
           {PERSONA_PRESETS.map((preset) => {
             const active = (settings?.personaId ?? 'xiaojing') === preset.id
@@ -1067,7 +1174,45 @@ export function SettingsPage() {
           </label>
         </div>
       </section>}
-    </main>
+      {tab === 'about' && <section className="settings-section" role="tabpanel" id="settings-panel-about" aria-labelledby="settings-tab-about">
+        <div className="settings-row">
+          <div className="settings-copy"><label>当前版本</label><p>小鲸 {version ? `v${version}` : '…'}。发布产物是便携目录包，更新时下载新版安装包覆盖旧目录即可，数据目录不受影响。</p></div>
+        </div>
+        <div className="settings-row">
+          <div className="settings-copy"><label id="auto-update-label">自动检查更新</label><p>启动后自动查询一次新版本；发现后在这里和聊天面板提示，不会自动下载或替换文件。</p></div>
+          <button type="button" role="switch" aria-labelledby="auto-update-label" aria-checked={autoUpdate}
+            className={`settings-switch${autoUpdate ? ' is-on' : ''}`}
+            onClick={() => { void window.whaleSettings.setAutoUpdate?.(!autoUpdate).then(setAutoUpdate).catch(() => undefined) }} />
+        </div>
+        <div className="settings-row">
+          <div className="settings-copy">
+            <label>检查更新</label>
+            <p>{updateInfo?.message || '查询 GitHub 仓库的最新发布版本。'}</p>
+          </div>
+          <div className="settings-voice-actions">
+            <button type="button" disabled={checkingUpdate} onClick={() => {
+              setCheckingUpdate(true)
+              setUpdateInfo(null)
+              void (window.whaleSettings.checkUpdates?.() ?? Promise.resolve(null))
+                .then(setUpdateInfo)
+                .catch((cause) => setNotice({ text: errorMessage(cause), error: true }))
+                .finally(() => setCheckingUpdate(false))
+            }}>{checkingUpdate ? '检查中…' : '检查更新'}</button>
+            <button type="button" onClick={() => {
+              const target = updateInfo?.updateAvailable && updateInfo.url
+                ? updateInfo.url
+                : 'https://github.com/xbx787/whale-companion/releases'
+              void window.whaleSettings.openExternal?.(target)
+            }}>访问 Release</button>
+          </div>
+        </div>
+        {updateInfo && !updateInfo.updateAvailable && updateInfo.latest && <div className="settings-row">
+          <div className="settings-copy"><label>版本信息</label><p>当前 {updateInfo.current}，最新 {updateInfo.latest}。</p></div>
+        </div>}
+      </section>}
+        </main>
+      </div>
+    </div>
     <div className="settings-quit">
       {quitAction
         ? <div className="settings-quit-confirm" role="alertdialog" aria-label={quitAction === 'restart' ? '确认重启小鲸' : '确认退出小鲸'}>
@@ -1091,7 +1236,18 @@ export function SettingsPage() {
             <button type="button" className="settings-quit-button" onClick={() => setQuitAction('quit')}>退出小鲸</button>
           </div>}
     </div>
-    <div className={`settings-notice${notice?.error ? ' is-error' : ''}`} role={notice?.error ? 'alert' : 'status'}>{notice?.text}</div>
+    {notice?.error && <div className="settings-notice is-error" role="alert">{notice.text}</div>}
+    {eyeConfirm && <div className="settings-confirm-overlay" role="alertdialog" aria-modal="true" aria-label="确认开启偷窥模式">
+      <div className="settings-confirm-card">
+        <h2>开启偷窥模式？</h2>
+        <p>开启后小鲸会定时截屏，发给模型分析。私人窗口请先关掉。</p>
+        <p>截图只用于当次分析，不会存成文件，可以随时关闭。</p>
+        <div className="settings-workspace-confirm-actions">
+          <button type="button" onClick={() => setEyeConfirm(false)}>取消</button>
+          <button type="button" className="is-danger" onClick={() => { setEyeConfirm(false); void update({ eyeEnabled: true }) }}>确认开启</button>
+        </div>
+      </div>
+    </div>}
   </div>
 }
 
@@ -1099,3 +1255,4 @@ if (typeof document !== 'undefined') {
   const mount = document.getElementById('root')
   if (mount) createRoot(mount).render(<SettingsPage />)
 }
+

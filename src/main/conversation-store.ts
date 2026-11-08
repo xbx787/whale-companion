@@ -7,7 +7,7 @@ import { isEffortLevel } from '../shared/effort'
 import { containsSensitiveData } from './memory-service'
 import { protectProfiles, restoreProfiles, type SecretCodec } from './secret-storage'
 import type { AgentGoal, ApprovalMode, AvatarSize, ConversationBatchAction, ConversationBatchResult, ConversationLibraryState, ConversationSummary, ContextUsageSnapshot, EffortLevel, ModelMode, ModelProfile, PanelPlacement, PanelTheme, SubagentTask, TaskStatus, TimelineEntry, UserAttachment, ConversationSettings, UiSize } from '../shared/contracts'
-import { AUTO_COMPACT_DEFAULT_PERCENT, PANEL_MIN_HEIGHT, PANEL_MIN_WIDTH, normalizeAgentKernelKind, normalizeModelMode, isAutoCompactPercent, isAvatarRenderer } from '../shared/contracts'
+import { AUTO_COMPACT_DEFAULT_PERCENT, PANEL_AUTO_COLLAPSE_DEFAULT_MINUTES, PANEL_MIN_HEIGHT, PANEL_MIN_WIDTH, normalizeAgentKernelKind, normalizeModelMode, isAutoCompactPercent, isAvatarRenderer, isPanelAutoCollapseMinutes, isPeekInterval, isRoastBurstLimit, isRoastIdlePause, isRoastInterval } from '../shared/contracts'
 import { isPersonaId } from '../shared/personas'
 import { DEFAULT_SKILL_MARKET_SOURCES, isSkillMarketSourceId } from '../shared/skill-market'
 
@@ -289,9 +289,11 @@ function readExtendedSettings(settings: Record<string, unknown>): Pick<Conversat
   'showSenderBadges' | 'senderRouteStyle' | 'compactTimeline' |
   'userName' | 'assistantName' | 'userAvatar' | 'assistantAvatar' | 'tabOrder' |
   'goalMaxIterations' | 'goalMaxMinutes' | 'memoryEnabled' | 'panelSize' | 'panelPlacement' | 'panelTheme' | 'uiSize' | 'avatarSize' | 'avatarRenderer' | 'webSearchEnabled' | 'personaId' | 'agentKernel' | 'autoCompactPercent' |
+  'panelAutoCollapseMinutes' |
+  'roastEnabled' | 'roastIntervalMinutes' | 'roastIdlePauseMinutes' | 'roastBurstLimit' | 'eyeEnabled' | 'eyeIntervalSeconds' |
   'toolRowDetail' |
   'outputStyle' | 'appendSystemPrompt' | 'autoScroll' | 'expandFileEditsByDefault' | 'sessionSort' | 'titleLocale' |
-  'titleModel' | 'loadUserSettings' | 'skillMarketSources' | 'hiddenTabIds' | 'windowOpacity'> {
+  'titleModel' | 'loadUserSettings' | 'skillMarketSources' | 'hiddenTabIds' | 'windowOpacity' | 'avatarOpacity'> {
   const profiles = Array.isArray(settings.modelProfiles)
     ? (settings.modelProfiles.filter(isModelProfile) as ModelProfile[]).map((profile) => structuredClone(profile))
     : []
@@ -322,6 +324,8 @@ function readExtendedSettings(settings: Record<string, unknown>): Pick<Conversat
     avatarSize: isAvatarSize(settings.avatarSize) ? settings.avatarSize : 'small',
     windowOpacity: typeof settings.windowOpacity === 'number' && Number.isFinite(settings.windowOpacity)
       ? Math.min(100, Math.max(0, Math.round(settings.windowOpacity))) : 100,
+    avatarOpacity: typeof settings.avatarOpacity === 'number' && Number.isFinite(settings.avatarOpacity)
+      ? Math.min(100, Math.max(0, Math.round(settings.avatarOpacity))) : 100,
     avatarRenderer: isAvatarRenderer(settings.avatarRenderer) ? settings.avatarRenderer : 'sprite',
     toolRowDetail: settings.toolRowDetail === 'full' || settings.toolRowDetail === 'name'
       ? settings.toolRowDetail : 'brief',
@@ -333,6 +337,14 @@ function readExtendedSettings(settings: Record<string, unknown>): Pick<Conversat
     agentKernel: normalizeAgentKernelKind(settings.agentKernel) ?? 'dsh',
     autoCompactPercent: isAutoCompactPercent(settings.autoCompactPercent)
       ? settings.autoCompactPercent : AUTO_COMPACT_DEFAULT_PERCENT,
+    panelAutoCollapseMinutes: isPanelAutoCollapseMinutes(settings.panelAutoCollapseMinutes)
+      ? settings.panelAutoCollapseMinutes : PANEL_AUTO_COLLAPSE_DEFAULT_MINUTES,
+    roastEnabled: settings.roastEnabled !== false,
+    roastIntervalMinutes: isRoastInterval(settings.roastIntervalMinutes) ? settings.roastIntervalMinutes : 8,
+    roastIdlePauseMinutes: isRoastIdlePause(settings.roastIdlePauseMinutes) ? settings.roastIdlePauseMinutes : 10,
+    roastBurstLimit: isRoastBurstLimit(settings.roastBurstLimit) ? settings.roastBurstLimit : 5,
+    eyeEnabled: settings.eyeEnabled === true,
+    eyeIntervalSeconds: isPeekInterval(settings.eyeIntervalSeconds) ? settings.eyeIntervalSeconds : 60,
     ...(typeof settings.outputStyle === 'string' && settings.outputStyle.trim()
       ? { outputStyle: settings.outputStyle.trim().slice(0, 64) } : {}),
     ...(typeof settings.appendSystemPrompt === 'string' && settings.appendSystemPrompt.trim()
@@ -578,7 +590,7 @@ function stateOf(library: PersistedLibrary): ConversationLibraryState {
 
 function findRecord(library: PersistedLibrary, id: string): ConversationRecord {
   const record = library.conversations.find((candidate) => candidate.id === id)
-  if (!record) throw new ConversationStoreError('NOT_FOUND', '找不到这个会话。')
+  if (!record) throw new ConversationStoreError('NOT_FOUND', '这个对话可能已被删除或归档。回会话库看看，或新建一个。')
   return record
 }
 
@@ -709,7 +721,8 @@ export class ConversationStore {
         goalMaxIterations: 30, goalMaxMinutes: 0, memoryEnabled: true, uiSize: 'small', avatarSize: 'small', avatarRenderer: 'sprite', agentKernel: 'dsh',
         panelPlacement: 'top', panelTheme: 'dark',
         toolRowDetail: 'brief',
-        autoCompactPercent: AUTO_COMPACT_DEFAULT_PERCENT, autoScroll: true, expandFileEditsByDefault: false,
+        autoCompactPercent: AUTO_COMPACT_DEFAULT_PERCENT, panelAutoCollapseMinutes: PANEL_AUTO_COLLAPSE_DEFAULT_MINUTES, autoScroll: true, expandFileEditsByDefault: false,
+        roastEnabled: true, roastIntervalMinutes: 8, roastIdlePauseMinutes: 10, roastBurstLimit: 5, eyeEnabled: false, eyeIntervalSeconds: 60,
         sessionSort: 'updated', titleLocale: 'auto', titleModel: 'deepseek-flash', loadUserSettings: true }
       migrating = true
     }
@@ -1023,6 +1036,7 @@ export class ConversationStore {
     const activeModelProfileId = patch.activeModelProfileId
     const { goalMaxIterations, goalMaxMinutes, memoryEnabled } = patch
     const { enableAutoTitleGeneration, showMessageTimestamps, userName, assistantName, userAvatar, assistantAvatar, panelSize, panelPlacement, panelTheme, uiSize, avatarSize, avatarRenderer, toolRowDetail, personaId, agentKernel, autoCompactPercent,
+      panelAutoCollapseMinutes, roastEnabled, roastIntervalMinutes, roastIdlePauseMinutes, roastBurstLimit, eyeEnabled, eyeIntervalSeconds,
       outputStyle, appendSystemPrompt, autoScroll, expandFileEditsByDefault, sessionSort, titleLocale,
       titleModel, loadUserSettings, hiddenTabIds } = patch
     if (tabs !== undefined && (!Number.isInteger(tabs) || tabs < 1 || tabs > MAX_VISIBLE_TABS)) {
@@ -1084,6 +1098,24 @@ export class ConversationStore {
     }
     if (autoCompactPercent !== undefined && !isAutoCompactPercent(autoCompactPercent)) {
       throw new ConversationStoreError('INVALID_INPUT', '自动压缩阈值应为 50–90 之间的整数。')
+    }
+    if (panelAutoCollapseMinutes !== undefined && !isPanelAutoCollapseMinutes(panelAutoCollapseMinutes)) {
+      throw new ConversationStoreError('INVALID_INPUT', '面板闲置收起时间无效。')
+    }
+    if (roastIntervalMinutes !== undefined && !isRoastInterval(roastIntervalMinutes)) {
+      throw new ConversationStoreError('INVALID_INPUT', '吐槽轮换间隔无效。')
+    }
+    if (roastIdlePauseMinutes !== undefined && !isRoastIdlePause(roastIdlePauseMinutes)) {
+      throw new ConversationStoreError('INVALID_INPUT', '吐槽空闲暂停时间无效。')
+    }
+    if (roastBurstLimit !== undefined && !isRoastBurstLimit(roastBurstLimit)) {
+      throw new ConversationStoreError('INVALID_INPUT', '吐槽连续次数无效。')
+    }
+    for (const [value, label] of [[roastEnabled, '吐槽模式'], [eyeEnabled, '偷窥模式']] as const) {
+      if (value !== undefined && typeof value !== 'boolean') throw new ConversationStoreError('INVALID_INPUT', `${label}开关无效。`)
+    }
+    if (eyeIntervalSeconds !== undefined && !isPeekInterval(eyeIntervalSeconds)) {
+      throw new ConversationStoreError('INVALID_INPUT', '偷窥模式读屏间隔无效。')
     }
     if (outputStyle !== undefined && (typeof outputStyle !== 'string' || outputStyle.length > 64)) {
       throw new ConversationStoreError('INVALID_INPUT', '回答风格无效。')
@@ -1152,6 +1184,13 @@ export class ConversationStore {
       if (toolRowDetail !== undefined) draft.settings.toolRowDetail = toolRowDetail
       if (personaId !== undefined) draft.settings.personaId = personaId
       if (autoCompactPercent !== undefined) draft.settings.autoCompactPercent = autoCompactPercent
+      if (panelAutoCollapseMinutes !== undefined) draft.settings.panelAutoCollapseMinutes = panelAutoCollapseMinutes
+      if (roastEnabled !== undefined) draft.settings.roastEnabled = roastEnabled
+      if (roastIntervalMinutes !== undefined) draft.settings.roastIntervalMinutes = roastIntervalMinutes
+      if (roastIdlePauseMinutes !== undefined) draft.settings.roastIdlePauseMinutes = roastIdlePauseMinutes
+      if (roastBurstLimit !== undefined) draft.settings.roastBurstLimit = roastBurstLimit
+      if (eyeEnabled !== undefined) draft.settings.eyeEnabled = eyeEnabled
+      if (eyeIntervalSeconds !== undefined) draft.settings.eyeIntervalSeconds = eyeIntervalSeconds
       if (outputStyle !== undefined) {
         const trimmed = outputStyle.trim()
         if (trimmed) draft.settings.outputStyle = trimmed

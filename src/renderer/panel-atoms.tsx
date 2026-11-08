@@ -85,8 +85,8 @@ export function ApprovalCard({ proposal, busy, onApprove, onReject }: {
       <div className="panel-preview-label">{note ? '将写入的内容' : '完整参数'}</div>
       <pre className="panel-preview">{proposal.content}</pre>
       <div className="panel-approval-actions">
-        <button type="button" className="panel-button panel-button-quiet" onClick={onReject} disabled={busy}>拒绝</button>
-        <button type="button" className="panel-button panel-button-primary" onClick={onApprove} disabled={busy}>{busy ? '处理中…' : note ? '批准写入' : '允许一次'}</button>
+        <button type="button" className="panel-button panel-button-quiet" onClick={onReject} disabled={busy} title="不执行这一步，并把结果告诉小鲸，让它换个办法。">拒绝</button>
+        <button type="button" className="panel-button panel-button-primary" onClick={onApprove} disabled={busy} title="只放行这一步。同类操作之后还会再问。">{busy ? '处理中…' : note ? '批准写入' : '允许一次'}</button>
       </div>
     </section>
   );

@@ -59,6 +59,7 @@ async function mount(api: SettingsAPI): Promise<void> {
   document.body.appendChild(container)
   root = createRoot(container)
   await act(async () => root!.render(<SettingsPage />))
+  await act(async () => click('人物'))
   await act(async () => click('语音'))
   await act(async () => { await Promise.resolve() })
 }

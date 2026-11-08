@@ -39,7 +39,8 @@ const PATCH_INDEX = [
   { id: 'session/answer', marker: 'this.ctx.get("userQuestions")', description: '提问作答，把答案批次交给 user-questions 服务' },
   { id: 'session/plan', marker: 'async setPlan(params)', description: '计划模式开关，交给 DSH 的 planMode 服务' },
   { id: 'user-questions-answerer', marker: 'async askHost(request)', description: '服务级提问转给宿主面板（退出计划模式等）' },
-  { id: 'subagent-bridge', marker: 'subagentCalls', description: '把子会话的工具事件转发给父会话，带 parentCallId' }
+  { id: 'subagent-bridge', marker: 'subagentCalls', description: '把子会话的工具事件转发给父会话，带 parentCallId' },
+  { id: 'mcp-tool-timeout', marker: 'DEFAULT_TOOL_CALL_TIMEOUT_MS = 18e5', description: 'MCP 工具调用超时从 60 秒改成 30 分钟，够提问卡等用户作答' }
 ]
 
 if (process.argv.includes('--list')) {
@@ -576,6 +577,34 @@ if (!source.includes('if (block.type === "text") continue;')) {
     process.exit(1)
   }
   changes.push('dsh-tool-fs 读图能力防护: 完好')
+}
+
+// ---- MCP 工具调用超时：默认 60 秒不够提问卡等用户作答 ----
+{
+  const from = 'const DEFAULT_TOOL_CALL_TIMEOUT_MS = 6e4;'
+  const to = 'const DEFAULT_TOOL_CALL_TIMEOUT_MS = 18e5;'
+  let applied = 0
+  let already = 0
+  let seen = 0
+  for (const dir of fs.readdirSync(pnpmRoot)) {
+    const mcpFile = path.join(pnpmRoot, dir, 'node_modules', '@deepseek-ai', 'dsh-mcp-client', 'lib', 'index.js')
+    if (!fs.existsSync(mcpFile)) continue
+    seen += 1
+    let mcpSource = fs.readFileSync(mcpFile, 'utf8')
+    if (mcpSource.includes(to)) { already += 1; continue }
+    if (!mcpSource.includes(from)) {
+      console.error(`补丁锚点不存在（MCP 工具超时，${dir}），DSH 版本可能变了。`)
+      process.exit(1)
+    }
+    mcpSource = mcpSource.replace(from, to)
+    fs.writeFileSync(mcpFile, mcpSource, 'utf8')
+    applied += 1
+  }
+  if (!seen) {
+    console.error('找不到 dsh-mcp-client，MCP 工具超时补丁无法应用。')
+    process.exit(1)
+  }
+  changes.push(`MCP 工具超时 30 分钟: 已应用 ${applied} 处，已存在 ${already} 处`)
 }
 
 fs.writeFileSync(file, source, 'utf8')

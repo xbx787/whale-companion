@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { VoiceJobProgress, VoiceSettingsPublic } from '../shared/contracts'
+import type { VoiceJobProgress, VoiceModelStatus, VoiceSettingsPublic } from '../shared/contracts'
 import { SILICONFLOW_KEY_PAGES, VOICE_PRESETS } from '../shared/voice'
 import { publicErrorText } from '../shared/error-copy'
 import type { SettingsAPI } from '../preload/settings'
@@ -26,6 +26,8 @@ export function SettingsVoiceSection({ api }: { api: SettingsAPI }) {
   const [document, setDocument] = useState<{ path: string; name: string; size: number } | null>(null)
   const [progress, setProgress] = useState<VoiceJobProgress | null>(null)
   const [jobId, setJobId] = useState<string | null>(null)
+  const [model, setModel] = useState<VoiceModelStatus | null>(null)
+  const [modelBusy, setModelBusy] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -40,6 +42,7 @@ export function SettingsVoiceSection({ api }: { api: SettingsAPI }) {
     }).catch((cause: unknown) => {
       if (active) setNotice({ text: errorText(cause), error: true })
     })
+    void api.voiceModelStatus?.().then((next) => { if (active) setModel(next) }).catch(() => undefined)
     let unsubscribe: () => void = () => undefined
     try {
       unsubscribe = api.onVoiceJobProgress((next) => {
@@ -120,6 +123,32 @@ export function SettingsVoiceSection({ api }: { api: SettingsAPI }) {
     }
   }
 
+  async function cancelModel(): Promise<void> {
+    try {
+      await api.voiceModelCancel?.()
+    } catch (cause) {
+      setNotice({ text: errorText(cause), error: true })
+    }
+  }
+
+  async function downloadModel(): Promise<void> {
+    if (modelBusy || !api.voiceModelDownload) return
+    setModelBusy(true)
+    setNotice(null)
+    const timer = window.setInterval(() => {
+      void api.voiceModelStatus?.().then(setModel).catch(() => undefined)
+    }, 900)
+    try {
+      setModel(await api.voiceModelDownload())
+    } catch (cause) {
+      setNotice({ text: errorText(cause), error: true })
+    } finally {
+      window.clearInterval(timer)
+      setModelBusy(false)
+      void api.voiceModelStatus?.().then(setModel).catch(() => undefined)
+    }
+  }
+
   const percent = progress && progress.total > 0
     ? Math.round((progress.completed / progress.total) * 100)
     : 0
@@ -174,6 +203,23 @@ export function SettingsVoiceSection({ api }: { api: SettingsAPI }) {
       </button>
     </div>
 
+    <div className="settings-row">
+      <div className="settings-copy">
+        <label>本地语音识别</label>
+        <p>模型不随安装包提供。首次使用需下载约 229MB 的 SenseVoice 模型，下载后离线可用，不需要 API Key。</p>
+      </div>
+      <span className={`settings-voice-state${model?.state === 'ready' ? ' is-on' : ''}`}>{modelLabel(model)}</span>
+    </div>
+    <div className="settings-voice-actions">
+      {(!model || model.state === 'missing' || model.state === 'error') && <button type="button" disabled={modelBusy} onClick={() => { void downloadModel() }}>{model?.state === 'error' ? '重试下载' : '下载模型'}</button>}
+      {model?.state === 'downloading' && <button type="button" onClick={() => { void cancelModel() }}>取消下载</button>}
+    </div>
+    {model?.state === 'downloading' && <div className="settings-voice-progress" role="status">
+      <p>正在下载 {model.file || '模型'}，{formatBytes(model.receivedBytes)} / {formatBytes(model.totalBytes)}</p>
+      <div className="settings-voice-bar" aria-hidden="true"><i style={{ transform: `scaleX(${Math.max(0.02, model.totalBytes ? model.receivedBytes / model.totalBytes : 0)})` }} /></div>
+    </div>}
+    {model?.state === 'error' && <p className="settings-voice-warning" role="alert">{model.error || '下载失败，请重试。'}</p>}
+
     <div className="settings-row settings-voice-document-head">
       <div className="settings-copy">
         <label>文档转音频</label>
@@ -196,4 +242,17 @@ export function SettingsVoiceSection({ api }: { api: SettingsAPI }) {
     </div>}
     {notice && <p className={`settings-voice-notice${notice.error ? ' is-error' : ''}`} role={notice.error ? 'alert' : 'status'}>{notice.text}</p>}
   </section>
+}
+
+function modelLabel(model: VoiceModelStatus | null): string {
+  if (!model) return '检查中…'
+  if (model.state === 'ready') return '已就绪'
+  if (model.state === 'downloading') return '下载中'
+  if (model.state === 'error') return '下载失败'
+  return '未下载'
+}
+
+function formatBytes(value: number): string {
+  if (!value) return '0 MB'
+  return `${Math.round(value / 1024 / 1024)} MB`
 }

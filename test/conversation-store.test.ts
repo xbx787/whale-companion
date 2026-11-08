@@ -26,6 +26,16 @@ function recordFile(root: string, id: string): string {
 }
 
 describe('persistent conversation library', () => {
+  it('persists the panel auto-collapse minutes and rejects values outside the choices', async () => {
+    const store = new ConversationStore(testRoot)
+    expect((await store.getState()).settings.panelAutoCollapseMinutes).toBe(10)
+    await store.updateSettings({ panelAutoCollapseMinutes: 5 })
+    expect((await store.getState()).settings.panelAutoCollapseMinutes).toBe(5)
+    expect((await new ConversationStore(testRoot).getState()).settings.panelAutoCollapseMinutes).toBe(5)
+    await expect(store.updateSettings({ panelAutoCollapseMinutes: 7 })).rejects.toThrow('面板闲置收起时间无效')
+    expect((await store.getState()).settings.panelAutoCollapseMinutes).toBe(5)
+  })
+
   it('applies a mixed batch in one write and reports every distinct skipped ID', async () => {
     const store = new ConversationStore(testRoot)
     const first = await store.createConversation('第一段')
@@ -291,10 +301,14 @@ describe('persistent conversation library', () => {
       userAvatar: null, assistantAvatar: null, tabOrder: [],
       goalMaxIterations: 30, goalMaxMinutes: 0, memoryEnabled: true, uiSize: 'small', avatarSize: 'small', avatarRenderer: 'sprite', panelPlacement: 'top', panelTheme: 'dark',
       webSearchEnabled: true, personaId: 'xiaojing', agentKernel: 'dsh', autoCompactPercent: 80,
+      panelAutoCollapseMinutes: 10,
+      roastEnabled: true, roastIntervalMinutes: 8, roastIdlePauseMinutes: 10, roastBurstLimit: 5,
+      eyeEnabled: false, eyeIntervalSeconds: 60,
       toolRowDetail: 'brief',
       autoScroll: true, expandFileEditsByDefault: false, sessionSort: 'updated', titleLocale: 'auto',
       titleModel: 'deepseek-flash', loadUserSettings: true,
-      skillMarketSources: ['anthropic', 'superpowers', 'awesome'], hiddenTabIds: [], windowOpacity: 100
+      skillMarketSources: ['anthropic', 'superpowers', 'awesome'], hiddenTabIds: [], windowOpacity: 100,
+      avatarOpacity: 100
     })
     expect((await migrated.listConversations()).length).toBe(8)
     expect((await migrated.getConversation(created[0].id))?.pendingMessages[0].text).toBe('继续执行')

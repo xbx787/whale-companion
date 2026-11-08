@@ -117,6 +117,7 @@ describe('BrowserVoiceEngine', () => {
     await Promise.resolve()
 
     emitError(lastInstance!, 'not-allowed')
-    expect(onError).toHaveBeenCalledWith('麦克风权限被拒绝。')
+    expect(onError).toHaveBeenCalledWith(expect.stringContaining('隐私和安全性'))
+    expect(onError).toHaveBeenCalledWith(expect.stringContaining('允许桌面应用访问麦克风'))
   })
 })

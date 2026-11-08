@@ -32,6 +32,11 @@ export function registerBalanceIpc(deps: BalanceIpcDeps): void {
     if (!['http:', 'https:', 'mailto:'].includes(url.protocol)) throw new Error('不支持的链接。')
     await shell.openExternal(url.href)
   })
+  ipcMain.handle('pet:roast-refresh', (event) => {
+    // 吐槽卡复用余额窗口，所以余额窗口和主窗口都要能换。
+    if (!deps.trusted(event) && !deps.balanceTrusted(event)) return null
+    return deps.roastRefresh()
+  })
   ipcMain.handle('pet:preview-file', async (event, value: unknown) => {
     if (!deps.trusted(event) || typeof value !== 'string' || !value.trim()) throw new Error('文件路径无效。')
     if (!path.isAbsolute(value)) throw new Error('需要绝对路径。')

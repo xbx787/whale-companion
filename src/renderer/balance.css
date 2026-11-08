@@ -97,3 +97,8 @@
 
 .balance-foot { min-width: 0; color: #e2a6ad; font-size: var(--text-balance-detail); white-space: nowrap; }
 .balance-foot span { display: block; overflow: hidden; text-overflow: ellipsis; }
+
+/* 吐槽卡：同一张卡换内容，顶部保留标签与刷新，正文占满剩余高度。 */
+.balance-peek.is-roast { grid-template-rows: 22px minmax(0, 1fr); }
+.balance-roast-text { align-self: center; margin: 0; max-height: 100%; overflow-y: auto; color: #eaf2ff; font-size: var(--text-md); line-height: 1.6; text-align: center; scrollbar-width: none; }
+.balance-roast-text::-webkit-scrollbar { display: none; }

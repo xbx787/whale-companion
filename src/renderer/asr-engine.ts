@@ -5,6 +5,9 @@ export interface AsrEvents {
   onError?: (message: string) => void
 }
 
+/** 权限被拒时给出能直接照做的路径，而不是只说一句“被拒绝”。 */
+const MIC_DENIED = '麦克风权限被拒绝。请打开 Windows 设置 → 隐私和安全性 → 麦克风，允许桌面应用访问麦克风，然后重新点一次麦克风。'
+
 export interface AsrEngine {
   readonly available: boolean
   readonly listening: boolean
@@ -115,7 +118,7 @@ export class WebSpeechAsrEngine implements AsrEngine {
         this._listening = false
         const message =
           reason === 'not-allowed'
-            ? '麦克风权限被拒绝。'
+            ? MIC_DENIED
             : reason === 'service-not-allowed'
               ? '语音识别服务不可用。'
               : reason === 'network'
@@ -180,6 +183,8 @@ export interface SiliconFlowAsrConfig {
 
 export interface TranscribeBridge {
   transcribeAudio(request: { bytes: number[]; mimeType: string }): Promise<{ text: string }>
+  /** 本地 SenseVoice：模型未下载时返回 available=false，由调用方回退云端。 */
+  transcribeLocalAudio?(samples: Float32Array, sampleRate: number): Promise<{ available: boolean; text: string }>
   voiceLog(level: 'info' | 'error', message: string, data?: unknown): Promise<void>
 }
 
@@ -255,7 +260,7 @@ export class SiliconFlowAsrEngine implements AsrEngine {
         this.events.onPartial('正在录音…')
       })
       .catch((error: Error) => {
-        const message = error.name === 'NotAllowedError' ? '麦克风权限被拒绝。' : `无法访问麦克风：${error.message}`
+        const message = error.name === 'NotAllowedError' ? MIC_DENIED : `无法访问麦克风：${error.message}`
         this.events.onError(message)
         this.events.onStateChange(false)
       })
@@ -306,6 +311,14 @@ export class SiliconFlowAsrEngine implements AsrEngine {
 
     try {
       const buffer = await blob.arrayBuffer()
+      // 本地模型就绪时优先离线识别； unavailable 才回退云端。
+      const local = await this.transcribeLocal(buffer)
+      if (local !== undefined) {
+        await this.bridge.voiceLog('info', '[asr] transcribe result', { textLength: local.length })
+        if (local) this.events.onFinal(local)
+        else this.events.onError('转写结果为空。')
+        return
+      }
       const bytes = new Uint8Array(buffer)
       await this.bridge.voiceLog('info', '[asr] transcribe start', { bytes: bytes.length, mimeType })
       const result = await this.bridge.transcribeAudio({
@@ -328,5 +341,40 @@ export class SiliconFlowAsrEngine implements AsrEngine {
     } finally {
       this.events.onStateChange(false)
     }
+  }
+
+  /** undefined = 本地不可用，继续走云端；字符串 = 本地识别结果（可能为空）。 */
+  private async transcribeLocal(buffer: ArrayBuffer): Promise<string | undefined> {
+    const local = this.bridge.transcribeLocalAudio
+    if (!local) return undefined
+    try {
+      const samples = await decodeToMono16k(buffer)
+      if (!samples) return undefined
+      const result = await local.call(this.bridge, samples, 16_000)
+      if (!result.available) return undefined
+      return result.text.trim()
+    } catch (error) {
+      void this.bridge.voiceLog('error', '[asr] transcribe error', { name: error instanceof Error ? error.name : 'UnknownError' })
+      return undefined
+    }
+  }
+}
+
+/** 把 webm/opus 录音解码成 16k 单声道 PCM，喂给 SenseVoice。 */
+async function decodeToMono16k(buffer: ArrayBuffer): Promise<Float32Array | null> {
+  if (typeof OfflineAudioContext === 'undefined') return null
+  try {
+    const probe = new OfflineAudioContext(1, 1, 16_000)
+    const decoded = await probe.decodeAudioData(buffer.slice(0))
+    const frames = Math.max(1, Math.ceil(decoded.duration * 16_000))
+    const offline = new OfflineAudioContext(1, frames, 16_000)
+    const source = offline.createBufferSource()
+    source.buffer = decoded
+    source.connect(offline.destination)
+    source.start()
+    const rendered = await offline.startRendering()
+    return rendered.getChannelData(0)
+  } catch {
+    return null
   }
 }

@@ -98,3 +98,17 @@ export function mergeComposerAttachments(submitted: DroppedAttachment[], current
 /** 会话的任务状态；标签圆点、快捷标签和右栏都用它。 */
 export const conversationStatus = (item: ConversationSummary): TaskStatus => item.taskStatus;
 export const statusRunning = (item: ConversationSummary): boolean => ['planning', 'awaiting_approval', 'executing', 'verifying'].includes(conversationStatus(item));
+
+/** 面板闲置到点：可见、没有任务在跑、距最后一次操作达到设定分钟数。
+ *  时间比较放在纯函数里，方便单测和盯着“到底哪天才会收”。 */
+export function panelAutoCollapseDue(input: {
+  visible: boolean
+  busy: boolean
+  lastActivity: number
+  now: number
+  minutes: number
+}): boolean {
+  if (!input.visible || input.busy) return false
+  if (!Number.isFinite(input.minutes) || input.minutes <= 0) return false
+  return input.now - input.lastActivity >= input.minutes * 60_000
+}

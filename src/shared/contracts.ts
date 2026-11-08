@@ -221,6 +221,38 @@ export function isAutoCompactPercent(value: unknown): value is number {
     value >= AUTO_COMPACT_MIN_PERCENT && value <= AUTO_COMPACT_MAX_PERCENT
 }
 
+/** 面板闲置多久后自动收起，单位分钟。只允许这几档，默认 10 分钟。 */
+export const PANEL_AUTO_COLLAPSE_CHOICES = [1, 5, 10, 20, 30, 60] as const
+export const PANEL_AUTO_COLLAPSE_DEFAULT_MINUTES = 10
+
+export function isPanelAutoCollapseMinutes(value: unknown): value is number {
+  return typeof value === 'number' && (PANEL_AUTO_COLLAPSE_CHOICES as readonly number[]).includes(value)
+}
+
+/** 吐槽模式的几档参数。 */
+export const ROAST_INTERVAL_CHOICES = [1, 3, 5, 8, 10, 15] as const
+export const ROAST_IDLE_CHOICES = [5, 10, 15, 30] as const
+export const ROAST_BURST_CHOICES = [3, 5, 8] as const
+
+export function isRoastInterval(value: unknown): value is number {
+  return typeof value === 'number' && (ROAST_INTERVAL_CHOICES as readonly number[]).includes(value)
+}
+
+export function isRoastIdlePause(value: unknown): value is number {
+  return typeof value === 'number' && (ROAST_IDLE_CHOICES as readonly number[]).includes(value)
+}
+
+export function isRoastBurstLimit(value: unknown): value is number {
+  return typeof value === 'number' && (ROAST_BURST_CHOICES as readonly number[]).includes(value)
+}
+
+/** 偷窥模式的读屏间隔，单位秒：30 秒到 5 分钟。 */
+export const PEEK_INTERVAL_CHOICES = [30, 60, 90, 120, 180, 240, 300] as const
+
+export function isPeekInterval(value: unknown): value is number {
+  return typeof value === 'number' && (PEEK_INTERVAL_CHOICES as readonly number[]).includes(value)
+}
+
 export interface ConversationSettings {
   visibleConversationTabs: number
   /** 手动关掉的顶部标签：会话仍在未归档列表，只是不占顶部槽位。 */
@@ -268,8 +300,10 @@ export interface ConversationSettings {
   uiSize: UiSize
   /** 桌面人物的显示大小；命中区和窗口都跟着它走。 */
   avatarSize: AvatarSize
-  /** 窗口整体不透明度 0-100；0 表示关闭透明效果（等效完全不透明，省合成开销）。 */
+  /** 聊天面板的不透明度 0-100；100 完全不透明。 */
   windowOpacity?: number
+  /** 桌面人物本体的不透明度 0-100；100 完全不透明，与面板分开控制。 */
+  avatarOpacity?: number
   /** 工具行显示多少细节。缺省按 brief 处理。 */
   toolRowDetail?: ToolRowDetail
   /** 桌面人物的渲染实现。缺失或无效的旧数据回退到标准插画。 */
@@ -286,6 +320,20 @@ export interface ConversationSettings {
   agentKernel?: AgentKernelKind
   /** 上下文用到多少百分比时自动压缩，50–90，默认 80。 */
   autoCompactPercent?: number
+  /** 面板闲置多少分钟且没有任务运行时自动收起；缺省 10，只允许指定几档。 */
+  panelAutoCollapseMinutes?: number
+  /** 吐槽模式：开启后在余额位置常驻轮换吐槽卡。 */
+  roastEnabled?: boolean
+  /** 自动轮换间隔，分钟；缺省 8，只允许指定几档。 */
+  roastIntervalMinutes?: number
+  /** 超过这么多分钟没有交互就暂停自动轮换；缺省 10。 */
+  roastIdlePauseMinutes?: number
+  /** 连续自动轮换多少次后间隔翻倍；缺省 5。 */
+  roastBurstLimit?: number
+  /** 眼睛模式：定时截屏交给模型分析，默认关。 */
+  eyeEnabled?: boolean
+  /** 偷窥模式多久看一次屏幕，秒；缺省 60，30 秒到 5 分钟。 */
+  eyeIntervalSeconds?: number
   /** Claude Code 的回答风格；空值表示跟随 CLI 默认。 */
   outputStyle?: string
   /** 追加在人设之后的额外指令，留空表示不加。 */
@@ -518,6 +566,25 @@ export interface PhoneCandidate {
   source: 'adb' | 'scan'
 }
 
+/** 更新检查结果：当前版本、最新版本与下载入口。 */
+export interface UpdateStatus {
+  current: string
+  latest: string
+  url: string
+  updateAvailable: boolean
+  checkedAt: string
+  message: string
+}
+
+/** 本地语音模型：包内只带引擎，模型按需下载。 */
+export interface VoiceModelStatus {
+  state: 'missing' | 'downloading' | 'ready' | 'error'
+  receivedBytes: number
+  totalBytes: number
+  file: string
+  error?: string
+}
+
 export interface PhoneLinkStatus {
   state: 'idle' | 'scanning' | 'connecting' | 'connected' | 'error'
   host?: string
@@ -723,6 +790,11 @@ export interface PetAPI {
   compactConversation(conversationId?: string): Promise<void>
   /** 把当前对话的摘要和最近几轮带进一个新会话，原对话保留。 */
   carryConversation(conversationId?: string): Promise<void>
+  /** 本地语音识别：模型状态、按需下载、PCM 识别。 */
+  voiceModelStatus(): Promise<VoiceModelStatus>
+  downloadVoiceModel(): Promise<VoiceModelStatus>
+  cancelVoiceModelDownload(): Promise<void>
+  transcribeLocalAudio(samples: Float32Array, sampleRate: number): Promise<{ available: boolean; text: string }>
   /** 手机 DSH Go：状态、局域网扫描、连接、断开、会话列表、读记录、发消息。 */
   phoneStatus(): Promise<PhoneLinkStatus>
   phoneScan(): Promise<PhoneCandidate[]>
@@ -859,6 +931,11 @@ export interface PetAPI {
   readAvatar(kind: 'user' | 'assistant'): Promise<string | null>
   /** Brings the settings window to the front (model management lives there). */
   openSettings(tab?: string): Promise<void>
+  /** 上次自动或手动检查到的更新状态；还没检查过时为 null。 */
+  updateStatus(): Promise<UpdateStatus | null>
+  /** 吐槽卡：手动换一条；主进程推新内容时回调。 */
+  refreshRoast(): Promise<string | null>
+  onRoastText(callback: (roast: { text: string; at: number }) => void): () => void
   /** Opens the first-run configuration wizard (DeepSeek setup). */
   openOnboarding(): Promise<void>
   setAvatarState(state: AvatarState): Promise<void>

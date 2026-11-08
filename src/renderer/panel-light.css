@@ -1,6 +1,7 @@
 /* 由 scripts/build-panel-light.cjs 生成，不要手改。 */
 
 body.panel-theme-light .panel-bubble{
+  opacity: var(--window-opacity, 1);
   position: absolute;
   z-index: 4;
   right: 10px;
@@ -143,6 +144,11 @@ body.panel-theme-light.panel-placement-left.panel-window .panel-bubble, body.pan
 body.panel-theme-light.panel-placement-left .panel-bubble::after, body.panel-theme-light.panel-placement-right .panel-bubble::after{ display: none; }
 
 body.panel-theme-light .panel-bubble *{ box-sizing: border-box; }
+/* 新版本提示：一条窄横幅，不抢对话内容的注意力，也不自动下载任何东西。 */
+body.panel-theme-light .panel-update-banner{ display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 12px; border-bottom: 1px solid rgba(2, 25, 65, 0.16); color: #000f28; background: rgba(20, 68, 151, 0.16); font-size: var(--text-xs); }
+body.panel-theme-light .panel-update-actions{ display: flex; align-items: center; gap: 4px; }
+body.panel-theme-light .panel-update-banner button{ padding: 2px 8px; border: 0; border-radius: 6px; color: #000a15; background: rgba(0, 48, 129, 0.26); font: inherit; cursor: pointer; }
+body.panel-theme-light .panel-update-banner button:hover{ background: rgba(0, 44, 109, 0.38); }
 body.panel-theme-light .panel-bubble button, body.panel-theme-light .panel-bubble textarea, body.panel-theme-light .panel-bubble .composer-editor{ font: inherit; }
 body.panel-theme-light .panel-bubble button{ cursor: pointer; }
 body.panel-theme-light .panel-bubble button:disabled{ cursor: not-allowed; }
@@ -209,8 +215,8 @@ body.panel-theme-light .panel-status{ display: inline-flex; align-items: center;
 body.panel-theme-light .panel-status i{ flex: none; width: 8px; height: 8px; border-radius: 50%; background: #9db9e9; transform: translateY(0.8px); }
 body.panel-theme-light .panel-status-planning, body.panel-theme-light .panel-status-executing, body.panel-theme-light .panel-status-verifying{ color: #f5d39b; }
 body.panel-theme-light .panel-status-planning i, body.panel-theme-light .panel-status-executing i, body.panel-theme-light .panel-status-verifying i{ background: #f3c36f; box-shadow: 0 0 8px rgba(144, 96, 12, 0.3); opacity: calc(1 - .5 * var(--panel-pulse-p, 0)); transform: scale(calc(1 - .15 * var(--panel-pulse-p, 0))); }
-body.panel-theme-light .panel-status-awaiting_approval{ color: #a9d5ff; }
-body.panel-theme-light .panel-status-awaiting_approval i{ background: #7bbaff; box-shadow: 0 0 8px rgba(0, 63, 132, 0.3); animation: panel-wait-blink 1s ease-in-out infinite; }
+body.panel-theme-light .panel-status-awaiting_approval{ color: #28004f; }
+body.panel-theme-light .panel-status-awaiting_approval i{ background: #4a0082; box-shadow: 0 0 8px rgba(74, 0, 130, 0.45); animation: panel-wait-blink 1s ease-in-out infinite; }
 @keyframes panel-wait-blink { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
 body.panel-theme-light .panel-status-done{ color: #a8e8bc; }
 body.panel-theme-light .panel-status-done i{ background: #80d6a1; box-shadow: 0 0 8px rgba(41, 127, 74, 0.3); }
@@ -224,7 +230,7 @@ body.panel-theme-light .panel-status-cancelled i{ background: #a9b5ce; }
    high until pushed down by that pixel. */
 body.panel-theme-light .panel-task-dot{ display: inline-block; flex: none; width: 6.4px; height: 6.4px; border-radius: 50%; background: #40567c; transform: translateY(0.8px); }
 body.panel-theme-light .panel-task-dot-planning, body.panel-theme-light .panel-task-dot-executing, body.panel-theme-light .panel-task-dot-verifying{ background: #f3c36f; }
-body.panel-theme-light .panel-task-dot-awaiting_approval{ background: #7bbaff; }
+body.panel-theme-light .panel-task-dot-awaiting_approval{ background: #4a0082; }
 body.panel-theme-light .panel-task-dot-done{ background: #80d6a1; }
 body.panel-theme-light .panel-task-dot-failed{ background: #f48790; }
 body.panel-theme-light .panel-task-dot-cancelled{ background: #a9b5ce; }
@@ -438,7 +444,11 @@ body.panel-theme-light .panel-quick-tabs{ display: flex; align-items: center; ga
 body.panel-theme-light .panel-quick-tabs::-webkit-scrollbar{ display: none; }
 /* 会话标签是悬浮的小圆角矩形：四周留出空隙，不再把侧边线接到栏底。
    当前会话只用背景和描边高亮，不再加顶部强调线。 */
-body.panel-theme-light .panel-quick-tab{ position: relative; display: flex; align-items: center; justify-content: center; gap: 5px; flex: 1 1 0; min-width: 0; max-width: 160px; height: 26px; padding: 0 20px 0 8px; overflow: hidden; border: 1px solid transparent; border-radius: 7px; color: #1f3051; background: rgba(3, 38, 100, 0.055); font-size: var(--text-sm) !important; white-space: nowrap; touch-action: none; }
+body.panel-theme-light .panel-quick-tab{ position: relative; display: flex; align-items: center; justify-content: center; gap: 5px; flex: 1 1 0; min-width: 0; max-width: 160px; height: 26px; padding: 0 20px 0 8px; overflow: hidden; border: 1px solid transparent; border-radius: 7px; color: #1f3051; background: rgba(3, 38, 100, 0.055); font-size: var(--text-sm) !important; white-space: nowrap; touch-action: none; animation: quick-tab-in .16s cubic-bezier(.22, .75, .25, 1) both; }
+/* 新建的标签从窄到宽弹出；关闭时先收 180ms，再从标签条拿掉。 */
+@keyframes quick-tab-in { from { opacity: 0; transform: scaleX(.55) scaleY(.86); } to { opacity: 1; transform: none; } }
+@keyframes quick-tab-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: scaleX(.55) scaleY(.86); } }
+body.panel-theme-light .panel-quick-tab.is-closing{ pointer-events: none; animation: quick-tab-out .18s ease-in forwards; }
 body.panel-theme-light .panel-quick-tab-label{ min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* 关闭标签：鼠标悬停时才露出来，点了只把会话从顶部移回未归档。 */
 body.panel-theme-light .panel-quick-tab-close{ position: absolute; right: 4px; top: 50%; transform: translateY(-50%); flex: none; display: grid; place-items: center; width: 13px; height: 13px; border-radius: 4px; color: #273d62; font-size: var(--text-2xs); line-height: 1; opacity: 0; transition: opacity .12s ease, background .12s ease, color .12s ease; }
@@ -925,7 +935,9 @@ body.panel-theme-light .panel-bubble:not(.is-empty) .panel-compose-dock:not(.is-
   padding: 0;
 }
 body.panel-theme-light .panel-compose-dock.is-open{ min-height: 0; align-items: stretch; justify-content: stretch; padding: 8px 12px 10px; }
-body.panel-theme-light .panel-bubble.is-compact.is-composing .panel-compose-dock.is-open{ min-height: 0; padding: 40px 12px 10px; }
+/* 不参与压缩：flex: 1 会让 dock 被气泡高度压扁，居中的输入区上下一起溢出，
+   底排按钮落到气泡外面。按内容撑开，窗口高度再按它量。 */
+body.panel-theme-light .panel-bubble.is-compact.is-composing .panel-compose-dock.is-open{ flex: none; min-height: 0; padding: 40px 12px 10px; }
 body.panel-theme-light .panel-compose-trigger{ display: grid; place-items: center; width: 37px; height: 37px; border: 1px solid rgba(0, 18, 45, 0.88); border-radius: 50%; color: #000000; background: rgba(72, 108, 178, 0.97); }
 body.panel-theme-light .panel-compose-trigger:hover{ background: rgba(51, 88, 156, 0.96); transform: translateY(-1px); }
 body.panel-theme-light .panel-compose-trigger svg{ width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
@@ -1082,7 +1094,7 @@ body.panel-theme-light .panel-composer textarea::-webkit-scrollbar-thumb{ border
 body.panel-theme-light .panel-composer textarea::-webkit-scrollbar-thumb:hover{ background: rgba(0, 22, 57, 0.78); }
 body.panel-theme-light .panel-composer textarea::placeholder{ color: #2a3d66; }
 body.panel-theme-light .panel-send{ position: relative; z-index: 7; display: grid; place-items: center; flex: none; width: 29px; height: 29px; padding: 0; border: 0; border-radius: 8px; }
-body.panel-theme-light .panel-composer-toolbar{ position: relative; z-index: 6; display: flex; align-items: center; gap: 6px; flex: none; min-height: 29px; margin: 0 0 -2px -3px; }
+body.panel-theme-light .panel-composer-toolbar{ position: relative; z-index: 6; display: flex; align-items: center; gap: 6px; flex: none; min-height: 29px; margin: 0 0 0 -3px; }
 /* 审批模式：输入框左下角的图标按钮，只显示图标。四档各有一个图标和
    一种低饱和颜色；只有完全访问和自我进化额外带一点边框，其余保持中性。 */
 body.panel-theme-light .panel-approval-wrap{ position: relative; display: flex; flex: none; }
@@ -1287,7 +1299,7 @@ body.panel-theme-light .panel-send-spinner{ width: 13px; height: 13px; border: 2
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes voice-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .55; transform: scale(.85); } }
 @media (prefers-reduced-motion: reduce) {
-body.panel-theme-light .panel-bubble:not([hidden]), body.panel-theme-light .panel-library-drawer, body.panel-theme-light .panel-library-drawer.is-closing, body.panel-theme-light .panel-composer, body.panel-theme-light .panel-composer.is-closing, body.panel-theme-light .panel-send-spinner, body.panel-theme-light .panel-scroll-bottom, body.panel-theme-light .panel-scroll-ring, body.panel-theme-light .panel-thought-state.is-running, body.panel-theme-light .panel-turn-stats-dot.is-running, body.panel-theme-light .panel-working-dots i, body.panel-theme-light .panel-cluster-state.is-running, body.panel-theme-light .panel-attachment-preview, body.panel-theme-light .panel-status > i{ animation: none; }
+body.panel-theme-light .panel-bubble:not([hidden]), body.panel-theme-light .panel-library-drawer, body.panel-theme-light .panel-library-drawer.is-closing, body.panel-theme-light .panel-composer, body.panel-theme-light .panel-composer.is-closing, body.panel-theme-light .panel-send-spinner, body.panel-theme-light .panel-scroll-bottom, body.panel-theme-light .panel-scroll-ring, body.panel-theme-light .panel-thought-state.is-running, body.panel-theme-light .panel-turn-stats-dot.is-running, body.panel-theme-light .panel-working-dots i, body.panel-theme-light .panel-cluster-state.is-running, body.panel-theme-light .panel-attachment-preview, body.panel-theme-light .panel-status > i, body.panel-theme-light .panel-quick-tab, body.panel-theme-light .panel-quick-tab.is-closing{ animation: none; }
 body.panel-theme-light .panel-bubble, body.panel-theme-light .panel-model-menu, body.panel-theme-light .panel-context-tooltip, body.panel-theme-light .panel-cluster-chevron, body.panel-theme-light .panel-tasks-chevron, body.panel-theme-light .panel-mode-switch, body.panel-theme-light .panel-mode-switch::after{ transition: none; }
 body.panel-theme-light .panel-compose-trigger:hover{ transform: none; }
 body.panel-theme-light .panel-live-label{ animation: none; text-shadow: none; background-image: none; -webkit-text-fill-color: var(--panel-live-base); }

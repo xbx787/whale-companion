@@ -150,6 +150,9 @@
 .settings-voice-url { color: #cfe0ff; word-break: break-all; }
 .settings-voice-hint button { height: 25px; padding: 0 8px; border: 1px solid rgba(190, 213, 253, .28); border-radius: 7px; color: #dbe8ff; background: rgba(160, 191, 251, .1); font-size: var(--text-xs); }
 .settings-voice-toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 30px; padding: 0; border: 0; color: #dbe8ff; background: transparent; font-size: var(--text-sm); text-align: left; }
+/* 行内开关压过 `.settings-row button` 的通用块状样式，否则会被撑成带底色的方框。 */
+.settings-row button.settings-voice-toggle { height: auto; padding: 0; border-radius: 0; background: transparent; }
+.settings-row button.settings-voice-toggle:hover { background: transparent; }
 .settings-voice-switch { position: relative; flex: none; width: 34px; height: 19px; border-radius: 999px; background: rgba(190, 212, 255, .22); transition: background .16s ease; }
 .settings-voice-switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 15px; height: 15px; border-radius: 50%; background: #c9d9f6; transition: transform .16s ease, background .16s ease; }
 .settings-voice-toggle.is-on .settings-voice-switch { background: #6fb4ff; }

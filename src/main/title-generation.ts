@@ -22,7 +22,7 @@ export async function generateCarriedSummary(apiKey: string, source: string, sig
   model = 'deepseek-flash'): Promise<string | null> {
   const prompt = source.trim().slice(0, 24_000)
   if (!prompt) return null
-  const instructions = '你为一段对话写承接摘要：保留用户目标、已经做出的决定、关键结论、未完成事项和重要文件路径。不要寒暄，不要编造，不要超过 600 字，只输出摘要正文。'
+  const instructions = '你为一段对话写上下文摘要：保留用户目标、已经做出的决定、关键结论、未完成事项和重要文件路径。不要寒暄，不要编造，不要超过 600 字，只输出摘要正文。'
   try {
     const response = await fetch('https://api.deepseek.com/responses', {
       method: 'POST',
@@ -31,7 +31,7 @@ export async function generateCarriedSummary(apiKey: string, source: string, sig
         model,
         instructions,
         reasoning: { effort: 'none' },
-        input: [{ role: 'user', content: `为下面的对话写承接摘要：\n${prompt}` }],
+        input: [{ role: 'user', content: `为下面的对话写上下文摘要：\n${prompt}` }],
         max_output_tokens: 900
       }),
       signal

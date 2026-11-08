@@ -5,20 +5,48 @@ import type { SettingsIpcDeps } from './index'
 /** 设置窗口相关的 IPC。依赖由 index.ts 的 buildSettingsIpcDeps 注入，
  *  可变状态用 getter 读实时值。拆出来以后 settings 这块的改动不用再翻主文件。 */
 export function registerSettingsIpc(deps: SettingsIpcDeps): void {
+  ipcMain.handle('pet:settings:preview-opacity', (event, request: unknown) => {
+    if (!deps.settingsTrusted(event)) return
+    const { target, value } = (request ?? {}) as { target?: unknown; value?: unknown }
+    if (typeof value !== 'number' || !Number.isFinite(value)) return
+    const opacity = deps.opacityFor(value)
+    const win = target === 'avatar' ? deps.avatarWindow : deps.panelWindow
+    if (win && !win.isDestroyed()) {
+      win.webContents.send(target === 'avatar' ? 'pet:avatar-opacity' : 'pet:window-opacity', opacity)
+    }
+  })
+  ipcMain.handle('pet:settings:check-updates', async (event) => {
+    if (!deps.settingsTrusted(event)) throw new Error('无效的界面请求。')
+    return deps.updateService.check()
+  })
+  ipcMain.handle('pet:settings:auto-update', (event, enabled: unknown) => {
+    if (!deps.settingsTrusted(event)) throw new Error('无效的界面请求。')
+    deps.updateService.setAuto(enabled === true)
+    return enabled === true
+  })
+  ipcMain.handle('pet:settings:auto-update-state', (event) => {
+    if (!deps.settingsTrusted(event)) throw new Error('无效的界面请求。')
+    return deps.updateService.autoEnabled()
+  })
   ipcMain.handle('pet:settings:get', async (event) => {
     if (!deps.settingsTrusted(event)) throw new Error('无效的界面请求。')
     return publicSettings((await deps.activeController().getLibraryState()).settings)
   })
   ipcMain.handle('pet:settings:update', (event, patch: unknown) => {
     if (!deps.settingsTrusted(event)) throw new Error('无效的界面请求。')
-    return deps.activeController().updateSettings(deps.conversationSettingsPatch(patch)).then((settings) => {
+    const nextPatch = deps.conversationSettingsPatch(patch)
+    return deps.activeController().updateSettings(nextPatch).then((settings) => {
       deps.memory.setEnabled(settings.memoryEnabled)
       deps.discardSidesWithoutLiveParents()
       // 界面尺寸等显示设置也要立刻传给头像窗口里的小面板，不必等下一个事件。
       deps.broadcastUiSize(settings.uiSize)
       deps.currentWindowOpacity = deps.opacityFor(settings.windowOpacity)
+      deps.currentAvatarOpacity = deps.opacityFor(settings.avatarOpacity)
       deps.panelWindow?.setOpacity(deps.currentWindowOpacity)
-      deps.avatarWindow?.setOpacity(deps.currentWindowOpacity)
+      deps.avatarWindow?.setOpacity(1)
+      // 透明窗口的 setOpacity 在 Windows 上无效，渲染层用 CSS 变量接这两个值。
+      deps.panelWindow?.webContents.send('pet:window-opacity', deps.currentWindowOpacity)
+      deps.avatarWindow?.webContents.send('pet:avatar-opacity', deps.currentAvatarOpacity)
       deps.currentAvatarSize = settings.avatarSize
       // 面板贴哪一侧改了：立刻按新位置重排，不必等下一次打开。
       const nextPlacement = settings.panelPlacement ?? 'top'
@@ -28,6 +56,7 @@ export function registerSettingsIpc(deps: SettingsIpcDeps): void {
       }
       // 人物大小变了，余额卡的高度和位置要跟着重新对齐。
       deps.syncBalancePosition()
+      if (nextPatch.roastEnabled !== undefined) deps.onRoastToggle(settings.roastEnabled !== false)
       deps.publishSnapshot()
       return publicSettings(settings)
     })

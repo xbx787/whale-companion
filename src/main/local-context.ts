@@ -404,7 +404,7 @@ export async function expandFileMentions(message: string, workspaceRoot: string,
     }
     if (!inside(root, actual)) throw new Error(`@ 文件引用不能越过工作区：${mention.value}`)
     if (seen.has(actual)) continue
-    if (references.length >= maxFiles) throw new Error(`一次最多引用 ${maxFiles} 个文件或目录。`)
+    if (references.length >= maxFiles) throw new Error(`一次最多引用 ${maxFiles} 个文件或目录。去掉几个再发送。`)
     const stat = await fs.stat(actual)
     if (!stat.isFile() && !stat.isDirectory()) throw new Error(`引用路径不是文件或目录：${mention.value}`)
     const kind = stat.isDirectory() ? 'directory' : 'file'

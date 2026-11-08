@@ -1194,7 +1194,7 @@ export class DshAcpAgentClient implements ModelClient {
     }
     if (firstError) {
       console.warn('DSH compact failed:', firstError instanceof Error ? firstError.message : String(firstError))
-      throw new Error('上下文压缩暂时失败：摘要模型这次没有返回正文。已保留原上下文，请稍后重试。')
+      throw new Error('上下文压缩暂时失败：摘要模型这次没有返回正文。原上下文已保留，可以稍后重试，也可以改用「在新对话中继续」。')
     }
     // 压缩完成立刻刷新：面板这一帧就显示压缩后的占用，而不是等下一轮。
     const usage = await this.readContextUsage()

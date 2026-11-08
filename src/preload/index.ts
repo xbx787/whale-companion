@@ -46,6 +46,10 @@ const api: PetAPI = {
   getContextUsage: (conversationId) => ipcRenderer.invoke('pet:get-context-usage', conversationId),
   compactConversation: (conversationId) => ipcRenderer.invoke('pet:compact-conversation', conversationId),
   carryConversation: (conversationId) => ipcRenderer.invoke('pet:carry-conversation', conversationId),
+  voiceModelStatus: () => ipcRenderer.invoke('pet:voice-model-status'),
+  downloadVoiceModel: () => ipcRenderer.invoke('pet:voice-model-download'),
+  cancelVoiceModelDownload: () => ipcRenderer.invoke('pet:voice-model-cancel'),
+  transcribeLocalAudio: (samples, sampleRate) => ipcRenderer.invoke('pet:voice-transcribe-local', { samples, sampleRate }),
   phoneStatus: () => ipcRenderer.invoke('pet:phone:status'),
   phoneScan: () => ipcRenderer.invoke('pet:phone:scan'),
   phoneConnect: (host, password) => ipcRenderer.invoke('pet:phone:connect', host, password),
@@ -94,6 +98,13 @@ const api: PetAPI = {
   setAvatar: (kind, bytes) => ipcRenderer.invoke('pet:set-avatar', kind, bytes),
   readAvatar: (kind) => ipcRenderer.invoke('pet:read-avatar', kind),
   openSettings: (tab?: string) => ipcRenderer.invoke('pet:open-settings', tab),
+  updateStatus: () => ipcRenderer.invoke('pet:update-status'),
+  refreshRoast: () => ipcRenderer.invoke('pet:roast-refresh'),
+  onRoastText: (callback: (roast: { text: string; at: number }) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, value: { text: string; at: number }): void => { callback(value) }
+    ipcRenderer.on('pet:roast-text', handler)
+    return () => { ipcRenderer.removeListener('pet:roast-text', handler) }
+  },
   openOnboarding: () => ipcRenderer.invoke('pet:open-onboarding'),
   interruptTurn: (conversationId) => ipcRenderer.invoke('pet:interrupt-turn', conversationId),
   backgroundTask: (toolUseId, conversationId) => ipcRenderer.invoke('pet:background-task', toolUseId, conversationId),
@@ -189,6 +200,15 @@ const api: PetAPI = {
 // CSS 只认 <html data-ui-size>，所以这里直接写 DOM，不经过渲染器。
 ipcRenderer.on('pet:ui-size', (_event, size: unknown) => {
   document.documentElement.dataset.uiSize = size === 'medium' || size === 'large' ? size : 'small'
+})
+// 透明窗口在 Windows 上 setOpacity 不生效，改用 CSS 变量控制内容不透明度。
+ipcRenderer.on('pet:window-opacity', (_event, value: unknown) => {
+  const opacity = typeof value === 'number' && Number.isFinite(value) ? Math.min(1, Math.max(0.1, value)) : 1
+  document.documentElement.style.setProperty('--window-opacity', String(opacity))
+})
+ipcRenderer.on('pet:avatar-opacity', (_event, value: unknown) => {
+  const opacity = typeof value === 'number' && Number.isFinite(value) ? Math.min(1, Math.max(0.1, value)) : 1
+  document.documentElement.style.setProperty('--avatar-opacity', String(opacity))
 })
 
 contextBridge.exposeInMainWorld('pet', api)

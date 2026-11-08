@@ -12,12 +12,30 @@ button { cursor: pointer; }
 button:disabled, input:disabled, select:disabled { cursor: default; opacity: .55; }
 .settings-window { display: flex; flex-direction: column; height: 100%; min-height: 0; padding: 24px 30px 14px; overflow: hidden; background: linear-gradient(155deg, #27427e 0%, #162854 45%, #0c1b3e 100%); }
 .settings-header, .settings-tabs, .settings-quit, .settings-notice { flex: none; }
-.settings-window > main { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; overflow: hidden; }
+.settings-window > main, .settings-main > main { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; overflow: hidden; }
+/* 两级导航：左栏是带图标的类别，顶部是当前类别下的小标题；两套图标不重复。 */
+.settings-body { display: flex; flex: 1 1 auto; gap: 14px; min-height: 0; overflow: hidden; }
+/* 左栏是主导航，贯穿整个内容区：顶部与顶部小标题同高，底部与内容卡片对齐。 */
+/* 左栏和主栏同高同起点：都从 body 顶部撑到底部，成功提示贴在左栏底部。 */
+.settings-sidebar { display: flex; flex: none; align-self: stretch; flex-direction: column; gap: 6px; width: 116px; min-height: 0; padding: 6px; border: 1px solid rgba(184, 209, 255, .22); border-radius: 13px; background: rgba(9, 21, 53, .4); }
+.settings-sidebar-list { display: flex; flex: 1 1 auto; flex-direction: column; gap: 3px; min-height: 0; }
+.settings-sidebar-notice { flex: none; padding: 6px 8px; border-radius: 8px; color: #a8e8bc; background: rgba(128, 214, 161, .12); font-size: var(--text-xs); line-height: 1.4; text-align: center; overflow-wrap: anywhere; }
+.settings-group { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 9px; border: 0; border-radius: 9px; color: #a9bee4; background: transparent; font-size: var(--text-sm); font-weight: 600; text-align: left; }
+.settings-group:hover { color: #dbe8ff; background: rgba(181, 205, 255, .1); }
+.settings-group.is-active { color: #eaf4ff; background: rgba(111, 211, 255, .16); }
+.settings-group:focus-visible, .settings-subtab:focus-visible { outline: 2px solid #b4d1ff; outline-offset: 2px; }
+.settings-main { display: flex; flex: 1 1 auto; flex-direction: column; gap: 10px; min-width: 0; min-height: 0; overflow: hidden; }
+.settings-subtabs { display: flex; flex: none; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.settings-subtabs::-webkit-scrollbar { display: none; }
+.settings-subtab { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 0; border-radius: 9px; color: #a9bee4; background: transparent; font-size: var(--text-sm); font-weight: 600; white-space: nowrap; }
+.settings-subtab:hover { color: #dbe8ff; background: rgba(181, 205, 255, .1); }
+.settings-subtab.is-active { color: #eaf4ff; background: rgba(111, 211, 255, .14); }
+.settings-icon { flex: none; width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .settings-header { display: flex; align-items: center; gap: 13px; margin-bottom: 16px; }
 /* 窗口没有系统边框：标题栏画在这里——按住空白处拖动窗口，按钮不参与拖动。
    × 与余额卡上的收起按钮同一副配方。 */
 .settings-header { -webkit-app-region: drag; }
-.settings-close { -webkit-app-region: no-drag; display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 8px; color: #c8d9fa; background: transparent; font: var(--glyph-md)/1 var(--font-ui); cursor: pointer; transition: background .15s ease, color .15s ease; }
+.settings-close { margin-left: auto; -webkit-app-region: no-drag; display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 8px; color: #c8d9fa; background: transparent; font: var(--glyph-md)/1 var(--font-ui); cursor: pointer; transition: background .15s ease, color .15s ease; }
 .settings-close:hover, .settings-close:focus-visible { color: #fff; background: rgba(184, 210, 255, .17); }
 /* One group shows at a time, so the small
    window never scrolls through the whole list. The chip style follows the
@@ -41,13 +59,20 @@ button:disabled, input:disabled, select:disabled { cursor: default; opacity: .55
 .settings-copy { flex: 1; min-width: 0; }
 .settings-copy label { font-size: var(--text-md); font-weight: 600; }
 .settings-copy p { margin: 5px 0 0; color: #a9bee4; font-size: var(--text-sm); line-height: 1.5; }
+
+/* 隐私类开关的确认浮层：盖住整页，必须明确选一次，不随设置页滚动跑掉。 */
+.settings-confirm-overlay { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 24px; background: rgba(4, 12, 30, .58); -webkit-app-region: no-drag; }
+.settings-confirm-card { display: grid; gap: 10px; width: min(420px, 100%); padding: 18px 20px; border: 1px solid rgba(184, 209, 255, .3); border-radius: 14px; background: linear-gradient(160deg, #26417d, #12244c); box-shadow: 0 18px 46px rgba(0, 0, 0, .45); }
+.settings-confirm-card h2 { margin: 0; font-size: var(--text-lg); font-weight: 600; }
+.settings-confirm-card p { margin: 0; color: #c6d6f2; font-size: var(--text-sm); line-height: 1.6; }
+.settings-confirm-card .settings-workspace-confirm-actions { justify-content: flex-end; }
 .settings-row form { display: flex; align-items: center; gap: 7px; flex: none; }
 .settings-row input, .settings-row select { height: 32px; border: 1px solid rgba(190, 213, 253, .35); border-radius: 8px; color: #eef4ff; background: rgba(10, 24, 58, .45); outline: none; }
 .settings-row input:focus-visible, .settings-row select:focus-visible, .settings-row button:focus-visible { outline: 2px solid #b4d1ff; outline-offset: 2px; }
 .settings-row input { width: 52px; padding: 0 7px; text-align: center; }
 .settings-row select { width: 80px; padding: 0 8px; }
 .settings-row button { flex: none; height: 32px; padding: 0 12px; border: 0; border-radius: 8px; color: #172b56; background: #bbd2ff; font-weight: 600; }
-.settings-row button:not(:disabled):hover { background: #d8e5ff; }
+.settings-row button:not(.settings-voice-toggle):not(:disabled):hover { background: #d8e5ff; }
 /* Two classes on purpose: the generic `.settings-row button` rule (0,1,1)
    would otherwise stretch the switch into a padded block. */
 .settings-row .settings-switch { position: relative; flex: none; width: 34px; height: 19px; padding: 0; border: 0; border-radius: 999px; background: rgba(190, 212, 255, .22); transition: background .16s ease; }
@@ -157,6 +182,11 @@ button:disabled, input:disabled, select:disabled { cursor: default; opacity: .55
 .settings-size-picker .settings-size-option:not(:disabled):hover { color: #dbe8ff; background: rgba(181, 205, 255, .12); }
 .settings-size-picker .settings-size-option.is-active { color: #172b56; background: #bbd2ff; border-color: transparent; }
 
+/* 人物设定里的分区标题：长期记忆、称呼、人设预设。 */
+.settings-group-heading { margin: 0; padding: 22px 18px 10px; color: #e6f0ff; font-size: var(--text-lg); font-weight: 600; letter-spacing: .01em; }
+.settings-group-heading + .settings-row { border-top: 0; }
+.settings-group-hint { margin: 0; padding: 0 18px 12px; color: #c5d8f8; font-size: var(--text-sm); line-height: 1.6; }
+
 /* 三个库：MCP / 技能 / 插件。顶部分档，下面是已安装和同名市场。 */
 /* 本地已有条目由 Claude 配置直接加载，不写进应用索引，因此没有“移除”。 */
 .settings-library-external { flex: none; padding: 1px 8px; border-radius: 999px; color: #9bd8ad; background: rgba(110, 214, 145, .10); font-size: var(--text-xs); }
@@ -186,7 +216,7 @@ button:disabled, input:disabled, select:disabled { cursor: default; opacity: .55
 .settings-library-version { padding: 1px 5px; border-radius: 5px; color: #9fb8e1; background: rgba(160, 191, 251, .1); font-size: var(--text-2xs); font-weight: 400; }
 .settings-library-item > button { flex: none; height: 28px; padding: 0 10px; border: 1px solid rgba(190, 213, 253, .28); border-radius: 8px; color: #dbe8ff; background: rgba(160, 191, 251, .1); font-size: var(--text-sm); font-weight: 400; }
 .settings-library-item > button:hover:not(:disabled) { background: rgba(160, 191, 251, .22); }
-.settings-library-actions { display: flex; flex: none; flex-direction: column; gap: 6px; }
+.settings-library-actions { display: flex; flex: none; flex-direction: row; align-items: center; gap: 6px; }
 .settings-library-actions button { height: 28px; padding: 0 10px; border: 1px solid rgba(190, 213, 253, .28); border-radius: 8px; color: #dbe8ff; background: rgba(160, 191, 251, .1); font-size: var(--text-sm); font-weight: 400; }
 .settings-library-actions button:hover:not(:disabled) { background: rgba(160, 191, 251, .22); }
 .settings-library-health.is-ok { color: #9bd8ad; }
@@ -225,12 +255,12 @@ button:disabled, input:disabled, select:disabled { cursor: default; opacity: .55
 .settings-library-search input {width:100%;box-sizing:border-box;padding:7px 10px;border-radius:8px;border:1px solid rgba(140,190,255,.28);background:rgba(10,35,75,.55);color:inherit;font:inherit;outline:none}
 .settings-library-search input:focus {border-color:rgba(160,205,255,.75)}
 .settings-library-source {display:block;margin-top:2px;opacity:.62}
-.settings-opacity { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.settings-opacity input[type="range"] { width: 140px; }
-.settings-opacity span { min-width: 40px; color: var(--text-muted); font-size: var(--text-xs); }
-.settings-opacity { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.settings-opacity input[type="range"] { width: 140px; }
-.settings-opacity span { min-width: 40px; color: var(--text-muted); font-size: var(--text-xs); }
+.settings-opacity { display: flex; align-items: center; gap: 12px; min-width: 0; flex: none; }
+.settings-opacity > span { min-width: 40px; color: var(--text-muted); font-size: var(--text-xs); }
+.settings-opacity input[type="range"] { flex: 1; width: 100%; accent-color: #bbd2ff; }
+.settings-opacity { display: flex; align-items: center; gap: 12px; min-width: 0; flex: none; }
+.settings-opacity > span { min-width: 40px; color: var(--text-muted); font-size: var(--text-xs); }
+.settings-opacity input[type="range"] { flex: 1; width: 100%; accent-color: #bbd2ff; }
 .settings-allowed-list { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .settings-allowed-item { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border: 1px solid rgba(190, 212, 255, .24); border-radius: 6px; font-size: var(--text-xs); }
 .settings-allowed-item button { padding: 0 4px; border: 0; background: transparent; color: var(--text-muted); font-size: var(--text-xs); }

@@ -11,6 +11,9 @@ interface BalanceCardProps {
   error: string | null;
   onRefresh: () => void;
   onClose: () => void;
+  /** 有值时显示吐槽卡，否则显示余额。 */
+  roast?: { text: string; at: number } | null;
+  onRefreshRoast?: () => void;
 }
 
 function formatNext(at: number, nextTier: 'peak' | 'off_peak'): string {
@@ -20,7 +23,7 @@ function formatNext(at: number, nextTier: 'peak' | 'off_peak'): string {
   return `${date} 转${nextTier === 'peak' ? '峰时' : '谷时'}`;
 }
 
-export function BalanceCard({ visible, snapshot, loading, error, onRefresh, onClose }: BalanceCardProps) {
+export function BalanceCard({ visible, snapshot, loading, error, onRefresh, onClose, roast, onRefreshRoast }: BalanceCardProps) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     if (!visible) return;
@@ -29,6 +32,23 @@ export function BalanceCard({ visible, snapshot, loading, error, onRefresh, onCl
     return () => window.clearInterval(timer);
   }, [visible]);
   if (!visible) return null;
+
+  if (roast) {
+    const at = new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(roast.at));
+    return (
+      <aside className="balance-peek is-roast" aria-label="吐槽">
+        <div className="balance-top">
+          <span className="balance-brand"><i aria-hidden="true" />吐槽</span>
+          <span className="balance-updated">{at}</span>
+          <div className="balance-actions">
+            <button type="button" aria-label="换一条" title="换一条" onClick={onRefreshRoast}>↻</button>
+            <button type="button" aria-label="收起吐槽卡片" title="收起" onClick={onClose}>×</button>
+          </div>
+        </div>
+        <p className="balance-roast-text">{roast.text}</p>
+      </aside>
+    );
+  }
 
   const peak = getPeakStatus(now);
   const checked = snapshot?.checkedAt ? new Intl.DateTimeFormat('zh-CN', {

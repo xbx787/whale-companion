@@ -40,7 +40,7 @@ export async function snapshotPhoneMentions(
     .filter((mention) => mention.kind === 'phone')
     .map((mention) => [mention.id, mention])).values()]
   if (!mentions.length) return ''
-  if (mentions.length > MAX_SESSIONS) throw new Error(`一次最多引用 ${MAX_SESSIONS} 个手机会话。`)
+  if (mentions.length > MAX_SESSIONS) throw new Error(`一次最多引用 ${MAX_SESSIONS} 个手机对话。去掉几个再发送。`)
   const blocks: string[] = []
   for (const mention of mentions) {
     let records: PhoneMessageRecord[]

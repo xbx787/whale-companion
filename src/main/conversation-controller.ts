@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { AgentCapabilities, AppSnapshot, ApprovalMode, AskAnswers, ContextUsageSnapshot, ConversationBatchAction, ConversationBatchResult, ModelMode, ModelProfile, PhoneMessageRecord, TimelineEntry, UserAttachment } from '../shared/contracts'
-import { AUTO_COMPACT_DEFAULT_PERCENT, normalizeApprovalMode, normalizeModelMode } from '../shared/contracts'
+import { AUTO_COMPACT_DEFAULT_PERCENT, PANEL_AUTO_COLLAPSE_DEFAULT_MINUTES, normalizeApprovalMode, normalizeModelMode } from '../shared/contracts'
 import { DEEPSEEK_ANTHROPIC_BASE_URL, DEEPSEEK_DEFAULT_MODEL } from './deepseek-endpoint'
 import { deleteTurnEntries, type AgentRuntime } from './agent-runtime'
 import type { DialogueLine } from './deepseek'
@@ -89,12 +89,16 @@ function visiblePending(message: PendingMessage): PendingMessage {
  * working in parallel while the panel shows whichever one the user picked.
  */
 /** 后台会话空闲多久释放 ACP 子进程。0 或负数关闭回收。
- *  默认 15 分钟：一个空转的 DSH 进程仍占约 200MB，常驻桌面没必要一直养着。 */
-function idleDisposeMs(): number {
+ *  与面板自动收起共用同一个设置：闲置多久收面板，就闲置多久释放进程。
+ *  环境变量 DESKTOP_PET_IDLE_DISPOSE_MS 仍可覆盖（测试用）。 */
+function idleDisposeMs(settings: ConversationSettings | null | undefined): number {
   const raw = process.env.DESKTOP_PET_IDLE_DISPOSE_MS
-  if (raw === undefined) return 15 * 60_000
-  const value = Number(raw)
-  return Number.isFinite(value) ? value : 15 * 60_000
+  if (raw !== undefined) {
+    const value = Number(raw)
+    return Number.isFinite(value) ? value : PANEL_AUTO_COLLAPSE_DEFAULT_MINUTES * 60_000
+  }
+  const minutes = settings?.panelAutoCollapseMinutes ?? PANEL_AUTO_COLLAPSE_DEFAULT_MINUTES
+  return minutes * 60_000
 }
 
 export class ConversationController {
@@ -313,7 +317,7 @@ export class ConversationController {
     const existing = this.runtimes.get(id)
     if (existing) return existing
     const rec = record ?? (await this.store.getConversation(id))
-    if (!rec) throw new ConversationStoreError('NOT_FOUND', '找不到这个会话。')
+    if (!rec) throw new ConversationStoreError('NOT_FOUND', '这个对话可能已被删除或归档。回会话库看看，或新建一个。')
     const runtime = this.createRuntime(id, () => this.handleRuntimeChange())
     runtime.conversationId = id
     runtime.restoreConversation(rec)
@@ -485,7 +489,7 @@ export class ConversationController {
   /** 空闲到期后释放运行时。会话记录里保留了 sdkSessionId，下次发送时
    *  ensureRuntime 会重建进程并恢复同一会话，上下文不丢。 */
   private scheduleIdleDisposal(id: string): void {
-    const threshold = idleDisposeMs()
+    const threshold = idleDisposeMs(this.library?.settings)
     if (threshold <= 0) return
     const existing = this.idleTimers.get(id)
     if (existing) clearTimeout(existing)
@@ -506,6 +510,11 @@ export class ConversationController {
     }
     this.runtimes.delete(id)
     await runtime.dispose().catch(() => undefined)
+    // 释放的是当前显示的会话时，快照必须立刻退回磁盘记录：有 runtime 时
+    // displayedRecord 是 null，不补这一下，面板会读到空时间线，像是对话被清空。
+    if (this.activeId === id && !this.displayedRecord) {
+      this.displayedRecord = await this.store.getConversation(id).catch(() => null)
+    }
     this.emit()
   }
 
@@ -677,7 +686,7 @@ export class ConversationController {
     conversationId?: string): Promise<void> {
     await this.initialize()
     const id = conversationId ?? this.activeId
-    if (!id) throw new ConversationStoreError('NOT_FOUND', '找不到这个会话。')
+    if (!id) throw new ConversationStoreError('NOT_FOUND', '这个对话可能已被删除或归档。回会话库看看，或新建一个。')
     const clean = text.trim()
     if (!clean) return
     if (!from) throw new ConversationStoreError('INVALID_INPUT', '消息来源无效。')
@@ -687,7 +696,7 @@ export class ConversationController {
     const stamped = { ...from, name, badge }
     await this.serialize(async () => {
       const target = await this.store.getConversation(id)
-      if (!target) throw new ConversationStoreError('NOT_FOUND', '找不到这个会话。')
+      if (!target) throw new ConversationStoreError('NOT_FOUND', '这个对话可能已被删除或归档。回会话库看看，或新建一个。')
       const runtime = await this.ensureRuntime(id, target)
       runtime.appendExternalMessage(stamped, clean.slice(0, 8_000))
       await this.persistConversation(id)
@@ -713,9 +722,9 @@ export class ConversationController {
   async sendSystemMessage(text: string, conversationId?: string): Promise<void> {
     await this.initialize()
     const id = conversationId ?? this.activeId
-    if (!id) throw new ConversationStoreError('NOT_FOUND', '找不到这个会话。')
+    if (!id) throw new ConversationStoreError('NOT_FOUND', '这个对话可能已被删除或归档。回会话库看看，或新建一个。')
     const target = await this.store.getConversation(id)
-    if (!target) throw new ConversationStoreError('NOT_FOUND', '找不到这个会话。')
+    if (!target) throw new ConversationStoreError('NOT_FOUND', '这个对话可能已被删除或归档。回会话库看看，或新建一个。')
     const runtime = await this.ensureRuntime(id, target)
     await runtime.sendMessage(text, [], '', undefined, true)
   }
@@ -724,7 +733,7 @@ export class ConversationController {
     sender?: TimelineEntry['sender']): Promise<PendingMessage> {
     await this.initialize()
     const id = conversationId ?? this.activeId
-    if (!id) throw new ConversationStoreError('NOT_FOUND', '找不到这个会话。')
+    if (!id) throw new ConversationStoreError('NOT_FOUND', '这个对话可能已被删除或归档。回会话库看看，或新建一个。')
     if (strategy !== 'queue' && strategy !== 'steer') {
       throw new ConversationStoreError('INVALID_INPUT', '不支持的发送方式。')
     }
@@ -758,7 +767,7 @@ export class ConversationController {
       // A slow @ reference can finish after a bulk archive/delete. Check the
       // destination inside the same controller operation that queues the turn.
       const target = await this.store.getConversation(id)
-      if (!target) throw new ConversationStoreError('NOT_FOUND', '找不到这个会话。')
+      if (!target) throw new ConversationStoreError('NOT_FOUND', '这个对话可能已被删除或归档。回会话库看看，或新建一个。')
       if (target.archivedAt !== null) throw new ConversationStoreError('ARCHIVED_CONVERSATION', '请先恢复归档会话。')
       const runtime = await this.ensureRuntime(id, target)
       // A foreground subagent blocks the running turn. The user just sent
@@ -1052,7 +1061,7 @@ export class ConversationController {
     return this.serialize(async () => {
       const activeCount = this.library?.conversations.filter((item) => !item.archivedAt).length ?? 0
       if (activeCount >= UNARCHIVED_LIMIT) {
-        throw new Error(`未归档最多 ${UNARCHIVED_LIMIT} 个会话，先归档一个再新建。`)
+        throw new Error(`同时打开的对话最多 ${UNARCHIVED_LIMIT} 个。先在会话库归档一个不用的，再回来新建。`)
       }
       const mode = this.displayedRuntime()?.getSnapshot().mode
         ?? this.library?.conversations.find((item) => item.id === this.activeId)?.mode
@@ -1067,14 +1076,14 @@ export class ConversationController {
   async carryConversation(conversationId?: string): Promise<ConversationRecord> {
     await this.initialize()
     const sourceId = conversationId ?? this.activeId
-    if (!sourceId) throw new ConversationStoreError('NOT_FOUND', '找不到这个会话。')
+    if (!sourceId) throw new ConversationStoreError('NOT_FOUND', '这个对话可能已被删除或归档。回会话库看看，或新建一个。')
     if (this.runtimes.get(sourceId)?.isRunning()) {
-      throw new ConversationStoreError('INVALID_INPUT', '这段对话还在运行，等它停下来再继续。')
+      throw new ConversationStoreError('INVALID_INPUT', '这段对话还在回复。可以先点停止，或者等它结束再试。')
     }
     const source = await this.store.getConversationRef(sourceId)
-    if (!source) throw new ConversationStoreError('NOT_FOUND', '找不到这个会话。')
+    if (!source) throw new ConversationStoreError('NOT_FOUND', '这个对话可能已被删除或归档。回会话库看看，或新建一个。')
     const turns = recentTurnText(source.history)
-    if (!turns) throw new ConversationStoreError('INVALID_INPUT', '这段对话还没有内容可以承接。')
+    if (!turns) throw new ConversationStoreError('INVALID_INPUT', '这段对话还没聊过内容。先聊几轮，再开新对话。')
     const summary = this.summarize
       ? await this.summarize(turns).then((value) => value?.trim() || null, () => null)
       : null
@@ -1082,7 +1091,7 @@ export class ConversationController {
     return this.serialize(async () => {
       const activeCount = this.library?.conversations.filter((item) => !item.archivedAt).length ?? 0
       if (activeCount >= UNARCHIVED_LIMIT) {
-        throw new Error(`未归档最多 ${UNARCHIVED_LIMIT} 个会话，先归档一个再新建。`)
+        throw new Error(`同时打开的对话最多 ${UNARCHIVED_LIMIT} 个。先在会话库归档一个不用的，再回来新建。`)
       }
       const created = await this.store.createConversation(`${source.title}（续）`, source.mode)
       await this.store.updateConversation(created.id, {
@@ -1127,7 +1136,7 @@ export class ConversationController {
     return this.serialize(async () => {
       const activeCount = this.library?.conversations.filter((item) => !item.archivedAt).length ?? 0
       if (activeCount >= UNARCHIVED_LIMIT) {
-        throw new Error(`未归档最多 ${UNARCHIVED_LIMIT} 个会话，先归档一个再恢复。`)
+        throw new Error(`同时打开的对话最多 ${UNARCHIVED_LIMIT} 个。先归档一个不用的，再回来恢复。`)
       }
       await this.store.restoreConversation(id)
       await this.setDisplayed(id)
@@ -1250,6 +1259,10 @@ export class ConversationController {
         }
       }
       await this.refreshLibrary()
+      // 阈值改小要立刻生效：已有 runtime 的空闲计时还按旧值排着，重排一次。
+      if (patch.panelAutoCollapseMinutes !== undefined) {
+        for (const id of this.runtimes.keys()) this.scheduleIdleDisposal(id)
+      }
       if (patch.modelProfiles !== undefined || patch.activeModelProfileId !== undefined ||
           patch.userName !== undefined || patch.assistantName !== undefined || patch.effort !== undefined) {
         this.onRuntimeConfigurationChange?.()
@@ -1479,10 +1492,10 @@ export class ConversationController {
   async exportConversation(conversationId?: string): Promise<ConversationExport> {
     await this.initialize()
     const id = conversationId ?? this.activeId
-    if (!id) throw new ConversationStoreError('NOT_FOUND', '找不到这个会话。')
+    if (!id) throw new ConversationStoreError('NOT_FOUND', '这个对话可能已被删除或归档。回会话库看看，或新建一个。')
     await this.persistConversation(id)
     const conversation = await this.store.getConversation(id)
-    if (!conversation) throw new ConversationStoreError('NOT_FOUND', '找不到这个会话。')
+    if (!conversation) throw new ConversationStoreError('NOT_FOUND', '这个对话可能已被删除或归档。回会话库看看，或新建一个。')
     return {
       format: 'dsh-conversation',
       version: 1,
@@ -1523,7 +1536,7 @@ export class ConversationController {
     await this.initialize()
     const cid = conversationId ?? this.activeId
     const runtime = this.runtimeIfAny(cid)
-    if (!runtime) throw new Error('找不到这个会话。')
+    if (!runtime) throw new Error('这个对话可能已被删除或归档。回会话库看看，或新建一个。')
     await runtime.approveAction(id)
     await this.serialize(async () => this.persistConversation(cid!))
     this.scheduleDrain(cid!)
@@ -1533,7 +1546,7 @@ export class ConversationController {
     await this.initialize()
     const cid = conversationId ?? this.activeId
     const runtime = this.runtimeIfAny(cid)
-    if (!runtime) throw new Error('找不到这个会话。')
+    if (!runtime) throw new Error('这个对话可能已被删除或归档。回会话库看看，或新建一个。')
     runtime.rejectAction(id)
     await this.serialize(async () => this.persistConversation(cid!))
     this.scheduleDrain(cid!)
@@ -1542,21 +1555,21 @@ export class ConversationController {
   async answerQuestion(id: string, answers: AskAnswers | null, conversationId?: string): Promise<void> {
     await this.initialize()
     const runtime = this.runtimeIfAny(conversationId ?? this.activeId)
-    if (!runtime) throw new Error('找不到这个会话。')
+    if (!runtime) throw new Error('这个对话可能已被删除或归档。回会话库看看，或新建一个。')
     await runtime.answerQuestion(id, answers)
   }
 
   async answerPlan(id: string, approved: boolean, conversationId?: string): Promise<void> {
     await this.initialize()
     const runtime = this.runtimeIfAny(conversationId ?? this.activeId)
-    if (!runtime) throw new Error('找不到这个会话。')
+    if (!runtime) throw new Error('这个对话可能已被删除或归档。回会话库看看，或新建一个。')
     await runtime.answerPlan(id, approved)
   }
 
   async answerPermission(id: string, decision: 'once' | 'always' | 'deny', conversationId?: string): Promise<void> {
     await this.initialize()
     const runtime = this.runtimeIfAny(conversationId ?? this.activeId)
-    if (!runtime) throw new Error('找不到这个会话。')
+    if (!runtime) throw new Error('这个对话可能已被删除或归档。回会话库看看，或新建一个。')
     await runtime.answerPermission(id, decision)
   }
 
@@ -1576,7 +1589,7 @@ export class ConversationController {
   async backgroundTask(toolUseId: string, conversationId?: string): Promise<boolean> {
     await this.initialize()
     const runtime = this.runtimeIfAny(conversationId ?? this.activeId)
-    if (!runtime) throw new Error('找不到这个会话。')
+    if (!runtime) throw new Error('这个对话可能已被删除或归档。回会话库看看，或新建一个。')
     return runtime.backgroundSubagent(toolUseId)
   }
 
@@ -1584,7 +1597,7 @@ export class ConversationController {
   async stopTask(taskId: string, conversationId?: string): Promise<void> {
     await this.initialize()
     const runtime = this.runtimeIfAny(conversationId ?? this.activeId)
-    if (!runtime) throw new Error('找不到这个会话。')
+    if (!runtime) throw new Error('这个对话可能已被删除或归档。回会话库看看，或新建一个。')
     await runtime.stopSubagent(taskId)
   }
 
@@ -1592,7 +1605,7 @@ export class ConversationController {
   async messageSubagent(toolUseId: string, text: string, conversationId?: string): Promise<boolean> {
     await this.initialize()
     const runtime = this.runtimeIfAny(conversationId ?? this.activeId)
-    if (!runtime) throw new Error('找不到这个会话。')
+    if (!runtime) throw new Error('这个对话可能已被删除或归档。回会话库看看，或新建一个。')
     return runtime.messageSubagent(toolUseId, text)
   }
 

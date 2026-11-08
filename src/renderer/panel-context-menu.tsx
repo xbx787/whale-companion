@@ -38,7 +38,7 @@ export function ContextMenu({ wrapperRef, usage, compacting, carrying, open, aut
         }}>
         自动压缩阈值 {autoCompactPercent}%
       </div>
-      <button type="button" className="panel-compact-button" disabled={carrying} onClick={onCarry}>{carrying ? '承接中…' : '在新对话中继续'}</button>
+      <button type="button" className="panel-compact-button" disabled={carrying} onClick={onCarry}>{carrying ? '创建新对话中' : '在新对话中继续'}</button>
       <button type="button" className="panel-compact-button" disabled={compacting} onClick={onCompact}>{compacting ? '压缩中…' : '压缩上下文'}</button>
     </div>
   </div>

@@ -1,6 +1,6 @@
 {
   "name": "desktop-resident-agent",
-  "version": "0.0.150",
+  "version": "0.0.153",
   "private": true,
   "license": "UNLICENSED",
   "author": "DesktopPetProject",
@@ -86,7 +86,6 @@
         "filter": [
           "**/*",
           "!**/.pnpm/@deepseek-ai+libreoffice-kit-*",
-          "!**/.pnpm/sherpa-onnx-*",
           "!**/.pnpm/@deepseek-ai+dsh-experiment*",
           "!**/.pnpm/@anthropic-ai+sdk*",
           "!**/.pnpm/@google+genai*",

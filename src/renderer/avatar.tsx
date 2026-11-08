@@ -77,7 +77,8 @@ function Avatar() {
     ? `${live2dManifest.id}:${live2dManifest.performanceProfileId}`
     : null;
   const live2dLayer = resolveLive2DLayerState(live2dManifestKey, live2dLoad);
-  const useLive2D = live2dLayer.visible;
+  // Live2D 未就绪或加载失败时退回 sprite 立绘，避免人物整个消失。
+  const useLive2D = live2dLayer.visible && live2dLoad.ready && !live2dLoad.failed;
   useEffect(() => {
     // Deselecting a model destroys its Pixi instance. Resetting here ensures
     // choosing the same model later waits for the newly mounted instance.
@@ -92,16 +93,21 @@ function Avatar() {
   const moveQueued = useRef(false);
   const moveDirty = useRef(false);
   const hitTargetRef = useRef<HTMLButtonElement | null>(null);
-  /** pointerup 与键盘可能在同一帧各触发一次切换；300ms 内只认第一次，
-   *  否则主进程会先 show 再 hide，看起来像闪了一下。 */
+  /** pointerup 与键盘可能在同一帧各触发一次切换；150ms 内只认第一次，
+   *  否则主进程会先 show 再 hide，看起来像闪了一下。窗口开得慢时，更短的
+   *  防抖也不会把用户的下一次点击吞掉。 */
   const lastPanelToggleAt = useRef(0);
   function togglePanel(bridge: { showPanel: () => Promise<void>; hidePanel: () => Promise<void> }): Promise<void> {
     const now = performance.now();
-    if (now - lastPanelToggleAt.current < 300) return Promise.resolve();
+    if (now - lastPanelToggleAt.current < 150) return Promise.resolve();
     lastPanelToggleAt.current = now;
     return panelOpen ? bridge.hidePanel() : bridge.showPanel();
   }
   const live2dBox = useRef<AvatarBox | null>(null);
+  /** 人物可见框：状态点始终相对它定位，窗口怎么拖都不漂。 */
+  const [portraitBox, setPortraitBox] = useState<AvatarBox | null>(null);
+  /** 每次点击/拖动结束都重挂人物与状态点，按当前窗口重新算一次位置。 */
+  const [renderEpoch, setRenderEpoch] = useState(0);
   const gestureRef = useRef<HTMLDivElement | null>(null);
   const entryRef = useRef<HTMLDivElement | null>(null);
   const idleRef = useRef<HTMLDivElement | null>(null);
@@ -158,6 +164,7 @@ function Avatar() {
       const next = { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
       if (sameAvatarBox(live2dBox.current, next)) return;
       live2dBox.current = next;
+      setPortraitBox(next);
       try {
         void petBridge().setAvatarBox(next).catch(() => undefined);
       } catch {
@@ -471,7 +478,8 @@ function Avatar() {
     // 引用里，之后的每一次按下都被它挡掉——拖动和单击一起失灵。超过两秒的
     // 旧会话一律当成丢事件清掉，然后照常开始这一次。
     if (pointer.current) {
-      if (Date.now() - pointer.current.at < 2000) return;
+      // 上一次的 pointerup 丢了（别的窗口抢走指针、系统手势插进来）：清掉会话
+      // 并按这一次重新开始，不能把这次按下直接吞掉，否则用户得点第二下。
       pointer.current = null;
       queueDrag((bridge) => bridge.endDrag());
     }
@@ -542,6 +550,8 @@ function Avatar() {
       }
       queueDrag((bridge) => togglePanel(bridge));
     }
+    // 交互结束重挂一次：人物和状态点按当前窗口尺寸重新计算，避免多次拖动后累积漂移。
+    if (!cancelled) setRenderEpoch((value) => value + 1);
   }
 
   // 7px 在 125% 缩放下是 8.75 个设备像素：圆边被抗锯齿抹成不圆的边，3px
@@ -622,13 +632,13 @@ function Avatar() {
               personaId={personaId}
               size={avatarSize}
               manageGeometry={!live2dLayer.mount}
-              onBoxChange={(box: AvatarBox) => { void petBridge().setAvatarBox(box).catch(() => undefined); }} />}
+              onBoxChange={(box: AvatarBox) => { setPortraitBox(box); void petBridge().setAvatarBox(box).catch(() => undefined); }} />}
           effects={<AvatarStateEffects />}
         />
       </button>
       {/* 状态条必须是舞台的直接子元素。放进按钮里会相对按钮（人物大小）
           定位，点会落到头发中间，而不是窗口右上角。 */}
-      {statusConversations.length > 0 && <span className="avatar-status-strip" aria-hidden="true">
+      {statusConversations.length > 0 && <span key={`avatar-dots-${renderEpoch}`} className="avatar-status-strip" aria-hidden="true">
         <span className="avatar-status-dots">
           {Array.from({ length: statusSlots }, (_, index) => {
             // 半径随人物大小缩放：人物越大，弧线仍贴着头部。
@@ -678,6 +688,14 @@ function BalanceOverlay() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const refreshId = useRef(0);
+  const [roast, setRoast] = useState<{ text: string; at: number } | null>(null);
+  useEffect(() => {
+    try {
+      return petBridge().onRoastText((next) => setRoast(next));
+    } catch {
+      return undefined;
+    }
+  }, []);
 
   async function refreshBalance() {
     const requestId = ++refreshId.current;
@@ -710,6 +728,8 @@ function BalanceOverlay() {
     snapshot={snapshot}
     loading={loading}
     error={error}
+    roast={roast}
+    onRefreshRoast={() => { void petBridge().refreshRoast().catch(() => undefined); }}
     onRefresh={() => { void refreshBalance(); }}
     onClose={() => { void petBridge().setBalanceOpen(false).catch(() => setError('余额卡片暂时无法收起。')); }}
   />;

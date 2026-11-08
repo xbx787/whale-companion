@@ -17,7 +17,7 @@ export async function snapshotSessionMentions(text: string, currentId: string,
     .filter((mention) => mention.kind !== 'phone')
     .map((mention) => [mention.id, mention])).values()]
   if (!mentions.length) return ''
-  if (mentions.length > MAX_SESSIONS) throw new Error(`一次最多引用 ${MAX_SESSIONS} 个会话。`)
+  if (mentions.length > MAX_SESSIONS) throw new Error(`一次最多引用 ${MAX_SESSIONS} 个对话。去掉几个再发送。`)
   const cache = new Map<string, ConversationRecord | null>()
   const get = async (id: string): Promise<ConversationRecord | null> => {
     if (!cache.has(id)) cache.set(id, await load(id))

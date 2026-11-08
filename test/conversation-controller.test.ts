@@ -117,6 +117,26 @@ describe('conversation controller', () => {
     expect(observed.at(-1)).toEqual({ id: null, active: null, shown: null })
   })
 
+  it('keeps the displayed timeline after the idle runtime is released', async () => {
+    process.env.DESKTOP_PET_IDLE_DISPOSE_MS = '50'
+    try {
+      const store = new ConversationStore(testRoot)
+      const record = await store.createConversation('空闲回收', 'dsh')
+      await store.setActiveConversation(record.id)
+      const model: ModelClient = { respond: async () => ({ text: '答复' }) }
+      const controller = new ConversationController(store,
+        (_conversationId, onChange) => new AgentRuntime(new NoteStore(testRoot), model, onChange))
+      await controller.initialize()
+      await controller.sendMessage('你好')
+      await until(() => Boolean(controller.displayedRuntime()?.getSnapshot().timeline.some((entry) => entry.kind === 'assistant')), 'reply')
+      expect(controller.getSnapshot().timeline.length).toBeGreaterThan(0)
+      await until(() => controller.displayedRuntime() === null, 'idle disposal')
+      expect(controller.getSnapshot().timeline.length).toBeGreaterThan(0)
+    } finally {
+      delete process.env.DESKTOP_PET_IDLE_DISPOSE_MS
+    }
+  })
+
   it('blocks single and bulk removal of a busy child and only targets its owner on model change', async () => {
     const store = new ConversationStore(testRoot)
     const a = await store.createConversation('A', 'dsh')
