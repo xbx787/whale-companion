@@ -1033,7 +1033,7 @@ export function SettingsPage() {
         <div className="settings-row settings-prompt-row">
           <div className="settings-copy"><label htmlFor="roast-prompt">吐槽提示词</label><p>生成吐槽时用的系统提示词，留空使用内置。改完点应用。</p></div>
           <form onSubmit={(event) => { event.preventDefault(); saveRoastPrompt() }}>
-            <textarea id="roast-prompt" rows={4} maxLength={4000} value={roastPromptDraft} disabled={!settings || busy}
+            <textarea id="roast-prompt" rows={8} maxLength={4000} value={roastPromptDraft} disabled={!settings || busy}
               placeholder="留空使用内置提示词"
               onChange={(event) => setRoastPromptDraft(event.target.value)} />
             <button type="submit" disabled={!settings || busy || roastPromptDraft.trim() === (settings?.roastPrompt ?? '')}>应用</button>

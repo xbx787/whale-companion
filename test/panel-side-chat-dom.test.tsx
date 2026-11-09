@@ -388,7 +388,7 @@ describe('temporary side chat stays in the same panel', () => {
     await mount()
     const input = await editor()
     await act(async () => { type(input, '/'); })
-    expect(host.querySelector('[aria-label="选择命令"]')?.textContent).toContain('填写问题后开启临时会话')
+    expect(host.querySelector('[aria-label="选择命令"]')?.textContent ?? '').not.toContain('填写问题后开启临时会话')
     sideRuntimeState = { ...sideRuntime, taskStatus: 'executing' }
     await act(async () => { for (const listener of sideListeners) listener(side(true, sideRuntimeState)) })
     await act(async () => click(host.querySelector('button[aria-label="收起临时会话，返回主线"]')!))
@@ -396,7 +396,8 @@ describe('temporary side chat stays in the same panel', () => {
     await act(async () => click(host.querySelector('button[aria-label^="展开临时会话"]')!))
     await act(async () => { type(input, '/'); })
     const choices = host.querySelector('[aria-label="选择命令"]')?.textContent ?? ''
-    expect(choices).toContain('review')
+    // 内置命令已不进选择器，review 也是 command，不应出现。
+    expect(choices).not.toContain('review')
     for (const name of ['new', 'side', 'btw', 'sessions', 'model', 'help', 'goal', 'compact']) {
       expect(choices).not.toContain(`/${name}`)
     }

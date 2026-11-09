@@ -33,7 +33,7 @@ export function VoiceButton({ phase, canListen, disabled, onToggle }: {
         : canListen ? '开始语音输入' : '语音输入未配置，点击打开设置'
   return <button type="button"
     className={`panel-tool-button panel-microphone-button${listening ? ' is-listening' : ''}${speaking ? ' is-speaking' : ''}${processing ? ' is-processing' : ''}`}
-    aria-label={label} aria-pressed={listening} disabled={disabled}
+    aria-label={label} title={label} aria-pressed={listening} disabled={disabled}
     onClick={onToggle}>
     {listening
       ? <span className="panel-voice-recording" aria-hidden="true"><i /></span>

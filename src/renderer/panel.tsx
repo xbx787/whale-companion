@@ -685,18 +685,18 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
         : bridge.listAppCommands().then((options) => { workflowCacheRef.current = options; return options; });
       void fetchOptions.then((options) => {
         if (cancelled) return;
-        const available = sideExpanded
-          ? options.filter((option) => option.kind !== 'command' || !MAIN_ONLY_SIDE_COMMANDS.has(option.name.replace(/^\//u, '').toLowerCase()))
-          : options;
-        setSuggestionItems(workflowSuggestionItems(available.map((option) =>
-          !sideExpanded && option.kind === 'command' && (option.name === 'side' || option.name === 'btw')
-            ? { ...option, description: '填写问题后开启临时会话；空命令不会开启' }
-            : option), suggestionTrigger));
+        // / 只列 skill、mcp 和插件，内置命令不再进选择器。
+        const skills = options.filter((option) => option.kind === 'skill');
+        const libraryItems = librarySuggestionItems(
+          installedLibraries.filter((item) => item.kind === 'mcp' || item.kind === 'skill' || item.kind === 'plugin'),
+          suggestionTrigger.query
+        );
+        setSuggestionItems([...libraryItems, ...workflowSuggestionItems(skills, suggestionTrigger)]);
       }).catch(() => { if (!cancelled) { setSuggestionItems([]); setSuggestionFailed(true); } }).finally(() => { if (!cancelled) setSuggestionLoading(false); });
     } else {
-      const libraryItems = librarySuggestionItems(installedLibraries, suggestionTrigger.query);
+      // @ 只列对话和文件，不再混入 skill / mcp / 插件。
       const sessions = sessionSuggestionItems(library?.conversations ?? [], suggestionTrigger.query, library?.activeConversationId ?? null);
-      setSuggestionItems([...libraryItems, ...sessions]);
+      setSuggestionItems([...sessions]);
       timer = window.setTimeout(() => {
         void bridge.searchWorkspaceFiles(suggestionTrigger.query).then((files) => {
           if (cancelled) return;
@@ -706,8 +706,8 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
             detail: `${file.kind === 'directory' ? '目录' : '文件'}，${file.relativePath}`,
             insertText: fileMention(file.relativePath)
           }));
-          setSuggestionItems([...libraryItems, ...sessions, ...fileItems].slice(0, 10));
-        }).catch(() => { if (!cancelled) { setSuggestionItems([...libraryItems, ...sessions]); setSuggestionFailed(true); } }).finally(() => { if (!cancelled) setSuggestionLoading(false); });
+          setSuggestionItems([...sessions, ...fileItems].slice(0, 10));
+        }).catch(() => { if (!cancelled) { setSuggestionItems([...sessions]); setSuggestionFailed(true); } }).finally(() => { if (!cancelled) setSuggestionLoading(false); });
       }, 120);
     }
     return () => { cancelled = true; if (timer !== undefined) window.clearTimeout(timer); };

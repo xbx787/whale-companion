@@ -49,7 +49,7 @@ body.avatar-window { -webkit-user-select: none; user-select: none; }
 }
 
 .avatar-hit-target:active { cursor: grabbing; }
-.avatar-hit-target:focus-visible { outline: 2px solid #9fe5d9; outline-offset: -3px; }
+.avatar-hit-target:focus-visible { outline: none; }
 /* The avatar lives in its own BrowserWindow. Its status pulse must be local;
    the panel's --panel-pulse-p variable never reaches this document. */
 /* 右上角：每个对话一个状态点，按顶部标签顺序排成一排；当前对话略大。

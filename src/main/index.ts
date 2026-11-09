@@ -157,6 +157,23 @@ let balanceContent: 'balance' | 'roast' = 'roast'
 let lastUserInputAt = Date.now()
 /** 上次给出完整时间的日期：只在启动后第一次或跨天时给。 */
 let lastRoastDay = ''
+/** 最近几轮聊过的方向，避免总落在同一个套路里。 */
+let recentRoastTopics: string[] = []
+const ROAST_TOPICS = [
+  '主人手边正在做的事',
+  '小鲸自己正在忙什么',
+  '这个时间点适合做的事',
+  '游戏、番剧或爱好',
+  '生活里的小观察',
+  '随口问主人一句'
+]
+function pickRoastTopic(): string {
+  const fresh = ROAST_TOPICS.filter((topic) => !recentRoastTopics.includes(topic))
+  const pool = fresh.length ? fresh : ROAST_TOPICS
+  const topic = pool[Math.floor(Math.random() * pool.length)]
+  recentRoastTopics = [...recentRoastTopics, topic].slice(-3)
+  return topic
+}
 /** 中午、傍晚、凌晨这些节点，允许模型自然地提一句。 */
 function timeMoment(hour: number): string | undefined {
   if (hour >= 5 && hour < 8) return '清晨'
@@ -230,6 +247,7 @@ const roastService = new RoastService({
       const moment = timeMoment(now.getHours())
       const text = await generateRoast(key, {
         scene, hour: now.getHours(), recent, conversation, window, image, prompt, allowTime, moment,
+        topic: pickRoastTopic(),
         log: (message) => {
           try {
             appendFileSync(path.join(dataRoot, 'roast.log'), `${new Date().toISOString()} gen ${message}\n`)

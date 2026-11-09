@@ -146,8 +146,15 @@ function Avatar() {
   // compacting, so using it here could let a fidget interrupt those states.
   const idleBehaviorAllowed = lanes.task === 'idle' && lanes.voice === 'silent' && lanes.interaction === 'none';
   const stateFace = faceForAvatarEmotion(lanes.emotion);
-  // 状态提示压过一切（只持续几秒）；偷窥的探头次之；空闲轮换垫底。
-  const desiredFace = stateFace ?? (peekFace ? 'peek' : idleBehaviorAllowed ? poseId : null);
+  // 偷窥的探头优先于思考等持续情绪；但短暂状态表情可以先盖几秒再回探头。
+  const [stateOverride, setStateOverride] = useState<string | null>(null)
+  useEffect(() => {
+    if (!peekFace || !stateFace) return
+    setStateOverride(stateFace)
+    const timer = window.setTimeout(() => setStateOverride(null), 2600)
+    return () => window.clearTimeout(timer)
+  }, [peekFace, stateFace])
+  const desiredFace = peekFace ? (stateOverride ?? 'peek') : stateFace ?? (idleBehaviorAllowed ? poseId : null);
   const desiredArt = avatarFaceUrl(personaId, desiredFace);
   const entryCue = entryCueFor(lanes);
 
@@ -586,6 +593,7 @@ function Avatar() {
         className="avatar-hit-target"
         type="button"
         aria-label="桌面角色，单击切换聊天气泡，拖动可移动位置"
+        title="单击切换聊天气泡，拖动可移动位置；右键更多"
         onMouseDown={(event) => {
           // Chromium starts Windows middle-button autoscroll on mousedown.
           // Cancelling auxclick alone is too late and can swallow later drags.

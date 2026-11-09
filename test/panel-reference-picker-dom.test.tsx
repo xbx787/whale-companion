@@ -100,7 +100,8 @@ describe('Claudian style composer discovery', () => {
     await type('$')
     expect([...host.querySelectorAll('.panel-suggestion-item')].map((item) => item.textContent)).toEqual(['技能review技能，用户，代码审查'])
     await type('/')
-    expect([...host.querySelectorAll('.panel-suggestion-item')].map((item) => item.textContent)).toEqual(['命令compact命令，内置，压缩对话'])
+    // 斜杠只列 skill、mcp 和插件；内置命令不再出现。
+    expect([...host.querySelectorAll('.panel-suggestion-item')].map((item) => item.textContent)).toEqual([])
 
     const editor = await type('@')
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 150)) })
@@ -119,11 +120,12 @@ describe('Claudian style composer discovery', () => {
     await act(async () => host.querySelector<HTMLElement>('.panel-compose-trigger')?.click())
 
     const editor = await type('/comp')
-    expect([...host.querySelectorAll('.panel-suggestion-item')].map((item) => item.textContent)).toEqual(['命令compact命令，内置，压缩对话'])
+    // 内置命令不再进选择器，/comp 没有可补全项。
+    expect([...host.querySelectorAll('.panel-suggestion-item')].map((item) => item.textContent)).toEqual([])
     await act(async () => {
       editor.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }))
       await Promise.resolve()
     })
-    expect(editor.textContent).toBe('/compact ')
+    expect(editor.textContent).toBe('/comp')
   })
 })

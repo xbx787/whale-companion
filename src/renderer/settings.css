@@ -247,7 +247,7 @@ button:disabled, input:disabled, select:disabled { cursor: default; opacity: .55
 .settings-quit-actions { display: flex; flex: none; gap: 8px; }
 .settings-quit-actions button { height: 30px; padding: 0 12px; border: 1px solid rgba(190, 213, 253, .28); border-radius: 8px; color: #dbe8ff; background: rgba(160, 191, 251, .1); font-size: var(--text-sm); }
 .settings-quit-actions button:hover { background: rgba(160, 191, 251, .22); }
-.settings-quit-actions .is-danger { color: #fff; background: rgba(240, 126, 144, .55); border-color: transparent; }
+.settings-quit-actions .is-danger { color: #fff; background: #d94a63; border-color: #d94a63; }
 
 .settings-capability { flex: none; color: #9fd8b6; font-size: var(--text-sm); }
 
