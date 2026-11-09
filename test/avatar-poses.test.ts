@@ -5,7 +5,7 @@ describe('pose library', () => {
   it('rotates only upright expressions and never randomly jumps into a whole-body pose', () => {
     const ids = POSES.map((pose) => pose.id)
     expect(new Set(ids).size).toBe(ids.length)
-    expect(ids).toEqual(['surprise', 'sleepy', 'shy'])
+    expect(ids).toEqual(['surprise', 'sleepy', 'shy', 'peek'])
     expect(POSES.every((pose) => pose.kind === 'expression')).toBe(true)
     expect(ids).not.toContain('doze')
     expect(poseSrc('doze')).toBeNull()

@@ -1,6 +1,6 @@
 import { personaById } from '../shared/personas'
 
-export type AvatarFaceId = 'focus' | 'smile' | 'surprise' | 'sleepy' | 'shy' | 'failed'
+export type AvatarFaceId = 'focus' | 'smile' | 'surprise' | 'sleepy' | 'shy' | 'failed' | 'question' | 'peek'
 
 export interface PersonaMotionProfile {
   /** RGB triplet consumed by CSS as `rgb(var(--avatar-accent) / alpha)`. */
@@ -40,7 +40,9 @@ const rigs: Record<string, PersonaVisualRig> = {
       surprise: new URL('./assets/poses/surprise@2x.png', import.meta.url).href,
       sleepy: new URL('./assets/poses/sleepy@2x.png', import.meta.url).href,
       shy: new URL('./assets/poses/shy@2x.png', import.meta.url).href,
-      failed: new URL('./assets/poses/failed@2x.png', import.meta.url).href
+      failed: new URL('./assets/poses/failed@2x.png', import.meta.url).href,
+      question: new URL('./assets/poses/question@2x.png', import.meta.url).href,
+      peek: new URL('./assets/poses/peek@2x.png', import.meta.url).href
     },
     motion: { accent: '122 190 246', energy: 1, statusAnchor: { x: .88, y: .09 }, faceAnchor: { x: .50, y: .35 } }
   },

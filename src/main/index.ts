@@ -203,6 +203,10 @@ const roastService = new RoastService({
         const shot = await captureScreenBase64()
         if (shot) image = shot
       }
+      // 偷窥截屏时让角色换成探头偷看的表情；开关关掉前一直保持。
+      if (image && avatarWindow && !avatarWindow.isDestroyed()) {
+        avatarWindow.webContents.send('pet:peek-face', true)
+      }
       const prompt = typeof settings.roastPrompt === 'string' ? settings.roastPrompt.trim() : ''
       const now = new Date()
       const today = now.toDateString()
@@ -1243,6 +1247,10 @@ function sendUiSizeWhenLoaded(win: BrowserWindow): void {
     win.webContents.send('pet:ui-size', currentUiSize)
     win.webContents.send('pet:window-opacity', currentWindowOpacity)
     win.webContents.send('pet:avatar-opacity', currentAvatarOpacity)
+    // 重启后偷窥还开着的话，角色要直接是探头偷看的样子。
+    try {
+      win.webContents.send('pet:peek-face', activeController().currentSettings().eyeEnabled === true)
+    } catch { /* 设置还没就绪就先不切 */ }
   })
 }
 
@@ -2295,6 +2303,9 @@ function buildSettingsIpcDeps() {
     settingsTrusted,
     activeController,
     personaDirectory: path.join(dataRoot, 'persona'),
+    sendPeekFace: (active: boolean) => {
+      if (avatarWindow && !avatarWindow.isDestroyed()) avatarWindow.webContents.send('pet:peek-face', active)
+    },
     memory,
     updateService,
     conversationSettingsPatch,

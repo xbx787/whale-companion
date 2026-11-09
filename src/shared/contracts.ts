@@ -938,6 +938,8 @@ export interface PetAPI {
   /** 吐槽卡：手动换一条；主进程推新内容时回调。 */
   refreshRoast(): Promise<string | null>
   onRoastText(callback: (roast: { text: string; at: number } | null) => void): () => void
+  /** 偷窥模式截屏时短暂换成探头偷看的表情。 */
+  onPeekFace?(callback: (active: boolean) => void): () => void
   /** Opens the first-run configuration wizard (DeepSeek setup). */
   openOnboarding(): Promise<void>
   setAvatarState(state: AvatarState): Promise<void>

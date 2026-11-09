@@ -32,7 +32,9 @@ export async function generateRoast(
     const body: Record<string, unknown> = {
       model: input.image ? 'deepseek-flash' : 'deepseek-chat',
       temperature: 1.2,
-      max_tokens: 160,
+      // 思考过程也占 max_tokens；160 会被思考吃光，正文变成空串。
+      max_tokens: 800,
+      thinking: { type: 'disabled' },
       messages: [
         { role: 'system', content: input.prompt?.trim() || PROMPT },
         {

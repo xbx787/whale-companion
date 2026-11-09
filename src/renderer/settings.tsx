@@ -1277,8 +1277,9 @@ export function SettingsPage() {
     {eyeConfirm && <div className="settings-confirm-overlay" role="alertdialog" aria-modal="true" aria-label="确认开启偷窥模式">
       <div className="settings-confirm-card">
         <h2>开启偷窥模式？</h2>
-        <p>开启后小鲸会定时截屏，发给模型分析。私人窗口请先关掉。</p>
-        <p>截图只用于当次分析，不会存成文件，可以随时关闭。</p>
+        <p>开启后，每条吐槽生成时小鲸会截一张当前屏幕发给模型。角色会换成「探头偷看」的表情，你随时能看出它正在看。</p>
+        <p>聊天窗口、密码和私人内容请先关掉或移开。截图只用于当次分析，不存文件，随时可以关。</p>
+        <p>偷窥一直开着时，探头表情会保持；任务提示会短暂盖过它几秒，然后自动回到探头。</p>
         <div className="settings-workspace-confirm-actions">
           <button type="button" onClick={() => setEyeConfirm(false)}>取消</button>
           <button type="button" className="is-danger" onClick={() => { setEyeConfirm(false); void update({ eyeEnabled: true }) }}>确认开启</button>

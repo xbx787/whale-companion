@@ -10,7 +10,8 @@ export interface PoseSpec {
 export const POSES: readonly PoseSpec[] = [
   { id: 'surprise', kind: 'expression' },
   { id: 'sleepy', kind: 'expression' },
-  { id: 'shy', kind: 'expression' }
+  { id: 'shy', kind: 'expression' },
+  { id: 'peek', kind: 'expression' }
 ];
 
 const SOURCES: Record<string, string> = {
@@ -20,7 +21,8 @@ const SOURCES: Record<string, string> = {
   sleepy: new URL('./assets/poses/sleepy.png', import.meta.url).href,
   shy: new URL('./assets/poses/shy.png', import.meta.url).href,
   failed: new URL('./assets/poses/failed.png', import.meta.url).href,
-  question: new URL('./assets/poses/question.png', import.meta.url).href
+  question: new URL('./assets/poses/question.png', import.meta.url).href,
+  peek: new URL('./assets/poses/peek.png', import.meta.url).href
 };
 
 export function poseSrc(id: string): string | null {

@@ -66,6 +66,8 @@ export function registerSettingsIpc(deps: SettingsIpcDeps): void {
       deps.currentAvatarOpacity = deps.opacityFor(settings.avatarOpacity)
       deps.panelWindow?.setOpacity(deps.currentWindowOpacity)
       deps.avatarWindow?.setOpacity(1)
+      // 偷窥开关变化时，角色立刻切到探头偷看或换回。
+      deps.sendPeekFace?.(settings.eyeEnabled === true)
       // 透明窗口的 setOpacity 在 Windows 上无效，渲染层用 CSS 变量接这两个值。
       deps.panelWindow?.webContents.send('pet:window-opacity', deps.currentWindowOpacity)
       deps.avatarWindow?.webContents.send('pet:avatar-opacity', deps.currentAvatarOpacity)

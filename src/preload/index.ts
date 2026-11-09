@@ -105,6 +105,11 @@ const api: PetAPI = {
     ipcRenderer.on('pet:roast-text', handler)
     return () => { ipcRenderer.removeListener('pet:roast-text', handler) }
   },
+  onPeekFace: (callback: (active: boolean) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, value: boolean): void => { callback(value === true) }
+    ipcRenderer.on('pet:peek-face', handler)
+    return () => { ipcRenderer.removeListener('pet:peek-face', handler) }
+  },
   openOnboarding: () => ipcRenderer.invoke('pet:open-onboarding'),
   interruptTurn: (conversationId) => ipcRenderer.invoke('pet:interrupt-turn', conversationId),
   backgroundTask: (toolUseId, conversationId) => ipcRenderer.invoke('pet:background-task', toolUseId, conversationId),

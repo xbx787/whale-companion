@@ -61,6 +61,8 @@ function Avatar() {
   const { snapshot, error, run } = usePetState();
   const [approval, setApproval] = useState<{ id: string; title: string; detail?: string } | null>(null);
   useEffect(() => petBridge().onApprovalRequest((request) => setApproval(request)), []);
+  // 偷窥截屏时换成探头偷看的表情，截完自动换回。
+  useEffect(() => petBridge().onPeekFace?.((active) => setPeekFace(active)), []);
   const personaId = snapshot?.conversationLibrary?.settings.personaId ?? 'xiaojing';
   const personaArt = avatarArtFor(personaId);
   const personaRig = avatarRigFor(personaId);
@@ -114,7 +116,8 @@ function Avatar() {
   const swapRef = useRef<HTMLDivElement | null>(null);
   const idleStop = useRef<(() => void) | null>(null);
   const ahogeRef = useRef<HTMLImageElement | null>(null);
-  const [poseId, setPoseId] = useState<string | null>(null);
+  const [poseId, setPoseId] = useState<string | null>(null)
+  const [peekFace, setPeekFace] = useState(false);
   const lastPose = useRef<string | null>(null);
   const greeted = useRef(false);
   const [visibleArt, setVisibleArt] = useState<string | null>(null);
@@ -143,7 +146,8 @@ function Avatar() {
   // compacting, so using it here could let a fidget interrupt those states.
   const idleBehaviorAllowed = lanes.task === 'idle' && lanes.voice === 'silent' && lanes.interaction === 'none';
   const stateFace = faceForAvatarEmotion(lanes.emotion);
-  const desiredFace = stateFace ?? (idleBehaviorAllowed ? poseId : null);
+  // 状态提示压过一切（只持续几秒）；偷窥的探头次之；空闲轮换垫底。
+  const desiredFace = stateFace ?? (peekFace ? 'peek' : idleBehaviorAllowed ? poseId : null);
   const desiredArt = avatarFaceUrl(personaId, desiredFace);
   const entryCue = entryCueFor(lanes);
 
