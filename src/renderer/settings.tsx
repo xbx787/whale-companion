@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { PluginSummary, AgentCapabilities, ConversationSettings, ModelProfile, UpdateStatus } from '../shared/contracts'
-import { PANEL_AUTO_COLLAPSE_CHOICES, PANEL_AUTO_COLLAPSE_DEFAULT_MINUTES, PEEK_INTERVAL_CHOICES, ROAST_BURST_CHOICES, ROAST_IDLE_CHOICES, ROAST_INTERVAL_CHOICES } from '../shared/contracts'
+import { PANEL_AUTO_COLLAPSE_CHOICES, PANEL_AUTO_COLLAPSE_DEFAULT_MINUTES, ROAST_INTERVAL_CHOICES } from '../shared/contracts'
 import { LIBRARY_KINDS, LIBRARY_LABELS, LIBRARY_MARKET_LABELS, type LibraryItem, type LibraryKind, type LibrarySnapshot } from '../shared/libraries'
 import { PERSONA_PRESETS } from '../shared/personas'
 import { personaAvatarUrl } from './avatar-art'
@@ -1018,24 +1018,10 @@ export function SettingsPage() {
             onClick={() => { void update({ roastEnabled: !(settings?.roastEnabled === true) }) }} />
         </div>
         <div className="settings-row">
-          <div className="settings-copy"><label htmlFor="roast-interval">轮换间隔</label><p>卡片开着、手上有动作时，隔这么久换一条。</p></div>
+          <div className="settings-copy"><label htmlFor="roast-interval">轮换间隔</label><p>只有吐槽卡打开着，才隔这么久换一条；卡片关掉或切回余额就停止刷新。</p></div>
           <select id="roast-interval" value={settings?.roastIntervalMinutes ?? 8} disabled={!settings || busy}
             onChange={(event) => { void update({ roastIntervalMinutes: Number(event.target.value) }) }}>
             {ROAST_INTERVAL_CHOICES.map((minutes) => <option key={minutes} value={minutes}>{minutes} 分钟</option>)}
-          </select>
-        </div>
-        <div className="settings-row">
-          <div className="settings-copy"><label htmlFor="roast-idle">空闲暂停</label><p>这么久没操作就停换，回来重新计时。</p></div>
-          <select id="roast-idle" value={settings?.roastIdlePauseMinutes ?? 10} disabled={!settings || busy}
-            onChange={(event) => { void update({ roastIdlePauseMinutes: Number(event.target.value) }) }}>
-            {ROAST_IDLE_CHOICES.map((minutes) => <option key={minutes} value={minutes}>{minutes} 分钟</option>)}
-          </select>
-        </div>
-        <div className="settings-row">
-          <div className="settings-copy"><label htmlFor="roast-burst">连续换新</label><p>连续自动换 {settings?.roastBurstLimit ?? 5} 次后间隔翻倍，动一下恢复。</p></div>
-          <select id="roast-burst" value={settings?.roastBurstLimit ?? 5} disabled={!settings || busy}
-            onChange={(event) => { void update({ roastBurstLimit: Number(event.target.value) }) }}>
-            {ROAST_BURST_CHOICES.map((count) => <option key={count} value={count}>{count} 次</option>)}
           </select>
         </div>
         <div className="settings-row">

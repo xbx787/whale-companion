@@ -32,34 +32,19 @@ describe('roast service', () => {
     expect(emitted).toHaveLength(1)
   })
 
-  it('stops when idle longer than the pause and when hidden', async () => {
-    const idle = serviceAt({ lastInputOffsetMs: 11 * 60_000 })
-    idle.advance(20 * 60_000)
-    await idle.service.tick()
-    expect(idle.emitted).toHaveLength(0)
-
+  it('stops only when the card is hidden', async () => {
     const hidden = serviceAt({ visible: false })
     hidden.advance(20 * 60_000)
     await hidden.service.tick()
     expect(hidden.emitted).toHaveLength(0)
   })
 
-  it('doubles the interval after the burst limit until the user acts', async () => {
+  it('keeps the interval flat instead of backing off', async () => {
     const { service, emitted, advance } = serviceAt({})
-    for (let index = 0; index < 5; index += 1) {
+    for (let index = 0; index < 7; index += 1) {
       advance(8 * 60_000)
       await service.tick()
     }
-    expect(emitted).toHaveLength(5)
-    advance(8 * 60_000)
-    await service.tick()
-    expect(emitted).toHaveLength(5)
-    advance(8 * 60_000)
-    await service.tick()
-    expect(emitted).toHaveLength(6)
-    service.touch()
-    advance(8 * 60_000)
-    await service.tick()
     expect(emitted).toHaveLength(7)
   })
 

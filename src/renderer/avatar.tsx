@@ -633,6 +633,7 @@ function Avatar() {
                 }} />}
           fallback={<WhalePortrait gestureRef={gestureRef} entryRef={entryRef} idleRef={idleRef} swapRef={swapRef} ahogeRef={ahogeRef}
               artworkUrl={visibleArt}
+      artworkFace={desiredFace}
               personaId={personaId}
               size={avatarSize}
               manageGeometry={!live2dLayer.mount}

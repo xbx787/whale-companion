@@ -17,7 +17,31 @@ const PROMPT = [
   '不要复述屏幕上的隐私内容（账号、聊天对象、文件全文），不要编造没看到的东西。'
 ].join('\n')
 
-/** 截主屏，返回 JPEG base64；失败返回 null。 */
+/** 采样判断是否几乎全黑：Windows 上 desktopCapturer 偶尔返回黑帧，不能拿它当屏幕内容。 */
+function isMostlyBlack(image: Electron.NativeImage): boolean {
+  try {
+    const { width, height } = image.getSize()
+    if (!width || !height) return true
+    const bitmap = image.toBitmap()
+    const stepX = Math.max(1, Math.floor(width / 24))
+    const stepY = Math.max(1, Math.floor(height / 24))
+    let dark = 0
+    let total = 0
+    for (let y = 0; y < height; y += stepY) {
+      for (let x = 0; x < width; x += stepX) {
+        const index = (y * width + x) * 4
+        const luminance = 0.299 * bitmap[index] + 0.587 * bitmap[index + 1] + 0.114 * bitmap[index + 2]
+        total++
+        if (luminance < 12) dark++
+      }
+    }
+    return total > 0 && dark / total > 0.97
+  } catch {
+    return false
+  }
+}
+
+/** 截主屏，返回 JPEG base64；失败或截到黑帧返回 null。 */
 export async function captureScreenBase64(): Promise<string | null> {
   try {
     const sources = await desktopCapturer.getSources({
@@ -25,7 +49,9 @@ export async function captureScreenBase64(): Promise<string | null> {
       thumbnailSize: { width: 1280, height: 720 }
     })
     if (!sources.length) return null
-    return sources[0].thumbnail.toJPEG(68).toString('base64')
+    const image = sources[0].thumbnail
+    if (!image || image.isEmpty() || isMostlyBlack(image)) return null
+    return image.toJPEG(68).toString('base64')
   } catch {
     return null
   }

@@ -3,13 +3,14 @@ import type { AvatarBox, AvatarSize } from '../shared/contracts';
 import { avatarArtFor } from './avatar-art';
 import { avatarDisplaySize } from './avatar-geometry';
 
-export function WhalePortrait({ gestureRef, entryRef, idleRef, swapRef, ahogeRef, artworkUrl, size, personaId, onBoxChange, manageGeometry = true }: {
+export function WhalePortrait({ gestureRef, entryRef, idleRef, swapRef, ahogeRef, artworkUrl, artworkFace, size, personaId, onBoxChange, manageGeometry = true }: {
   gestureRef?: Ref<HTMLDivElement>;
   entryRef?: Ref<HTMLDivElement>;
   idleRef?: Ref<HTMLDivElement>;
   swapRef?: Ref<HTMLDivElement>;
   ahogeRef?: Ref<HTMLImageElement>;
   artworkUrl?: string | null;
+  artworkFace?: string | null;
   size?: AvatarSize;
   personaId?: string | null;
   onBoxChange?: (box: AvatarBox) => void;
@@ -67,7 +68,7 @@ export function WhalePortrait({ gestureRef, entryRef, idleRef, swapRef, ahogeRef
                   <div className="avatar-portrait">
                     {art.body && <img ref={baseRef} className="avatar-artwork" src={art.body} alt=""
                       draggable={false} onLoad={schedule} style={{ opacity: artworkUrl ? 0 : 1 }} />}
-                    {artworkUrl && <img className="avatar-artwork avatar-artwork-variant" src={artworkUrl} alt="" draggable={false} />}
+                    {artworkUrl && <img className={`avatar-artwork avatar-artwork-variant${artworkFace === 'peek' ? ' is-peek' : ''}`} src={artworkUrl} alt="" draggable={false} />}
                   </div>
                 </div>
               </div>

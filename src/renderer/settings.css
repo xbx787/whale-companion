@@ -83,8 +83,9 @@ button:disabled, input:disabled, select:disabled { cursor: default; opacity: .55
 .settings-row input[type="text"] { width: 150px; padding: 0 10px; text-align: left; }
 .settings-row select.settings-wide-select { width: 148px; }
 /* 附加指令要能写多行：说明在左，编辑区和应用键在右，整体保持同一行的节奏。 */
-.settings-prompt-row { align-items: flex-start; }
-.settings-prompt-row form { flex-direction: column; align-items: stretch; width: min(360px, 48%); }
+.settings-prompt-row { flex-direction: column; align-items: stretch; }
+.settings-prompt-row .settings-copy { width: 100%; }
+.settings-prompt-row form { flex-direction: column; align-items: stretch; width: 100%; }
 .settings-prompt-row textarea { width: 100%; min-height: 76px; padding: 7px 9px; border: 1px solid rgba(190, 213, 253, .35); border-radius: 8px; color: #eef4ff; background: rgba(10, 24, 58, .45); font-family: inherit; font-size: var(--text-sm); line-height: 1.5; outline: none; resize: vertical; }
 .settings-prompt-row textarea:focus-visible { outline: 2px solid #b4d1ff; outline-offset: 2px; }
 .settings-prompt-row button { align-self: flex-end; }

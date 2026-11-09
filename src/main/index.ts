@@ -180,7 +180,8 @@ const roastService = new RoastService({
       return { enabled: false, intervalMinutes: 8, idlePauseMinutes: 10, burstLimit: 5 }
     }
   },
-  visible: () => Boolean(balanceOpen && balanceWindow && !balanceWindow.isDestroyed() && balanceWindow.isVisible()),
+  // 只有吐槽卡真的开着且停在吐槽页才轮换；切回余额或关掉窗口都停表。
+  visible: () => Boolean(balanceOpen && balanceContent === 'roast' && balanceWindow && !balanceWindow.isDestroyed() && balanceWindow.isVisible()),
   lastInputAt: () => lastUserInputAt,
   // 能连模型就用模型写，拿不到 key 或失败时由 roastService 决定是否回退本地。
   generate: async (scene, recent) => {
@@ -188,13 +189,27 @@ const roastService = new RoastService({
       const settings = activeController().currentSettings()
       const key = getDeepSeekBalanceKey(settings, deepseekKey)
       if (!key) return null
-      // 只给会话标题当话题背景，不传原始消息：避免吐槽照着原话复述日志、命令和数字。
+      // 标题 + 最近一条用户消息里清洗过的自然语言：给模型一点真在做什么，
+      // 但去掉代码块、路径和链接，避免它照着技术细节复述。
       let conversation = ''
       try {
         const snap = activeController().getSnapshot()
         const activeId = snap.conversationLibrary.activeConversationId
         const title = snap.conversationLibrary.conversations.find((item) => item.id === activeId)?.title ?? ''
-        conversation = title.slice(0, 40)
+        const lastUser = [...snap.timeline].reverse()
+          .find((item) => (item as { kind?: string }).kind === 'user')
+        const raw = typeof (lastUser as { text?: unknown } | undefined)?.text === 'string'
+          ? (lastUser as { text: string }).text
+          : ''
+        const cleaned = raw
+          .replace(/```[\s\S]*?```/gu, ' ')
+          .replace(/`[^`]*`/gu, ' ')
+          .replace(/[A-Za-z]:\\[^\s]+/gu, ' ')
+          .replace(/https?:\/\/\S+/gu, ' ')
+          .replace(/\s+/gu, ' ')
+          .trim()
+          .slice(0, 80)
+        conversation = [title, cleaned].filter(Boolean).join(' / ').slice(0, 120)
       } catch { /* 会话还没就绪就不带上下文 */ }
       const window = await foregroundWindowTitle()
       // 偷窥开关现在只管“这条吐槽要不要附带一张当前屏幕”，不再单独定时。

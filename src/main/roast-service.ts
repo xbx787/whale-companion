@@ -82,17 +82,14 @@ export class RoastService {
     return text
   }
 
-  /** 每 30 秒调用一次：满足可见、有交互、到点、没退避时才自动换。 */
+  /** 每 30 秒调用一次：只要吐槽卡开着就按间隔换，没有任何退避。 */
   async tick(): Promise<void> {
     const settings = this.deps.settings()
     if (!settings.enabled || !this.deps.visible()) return
     const now = this.now()
-    const idleMs = now - this.deps.lastInputAt()
-    if (idleMs >= settings.idlePauseMinutes * 60_000) return
-    const base = Math.max(1, settings.intervalMinutes) * 60_000
-    const interval = this.autoCount >= Math.max(1, settings.burstLimit) ? base * 2 : base
+    const interval = Math.max(1, settings.intervalMinutes) * 60_000
     if (this.emittedAt && now - this.emittedAt < interval) return
-    await this.emit(sceneFor({ hour: new Date(now).getHours(), idleMinutes: idleMs / 60_000 }))
+    await this.emit(sceneFor({ hour: new Date(now).getHours(), idleMinutes: 0 }))
   }
 
   start(): void {
