@@ -188,17 +188,13 @@ const roastService = new RoastService({
       const settings = activeController().currentSettings()
       const key = getDeepSeekBalanceKey(settings, deepseekKey)
       if (!key) return null
-      // 带一点当前对话的上下文，但只给两小段，避免每条吐槽都扯回工作。
+      // 只给会话标题当话题背景，不传原始消息：避免吐槽照着原话复述日志、命令和数字。
       let conversation = ''
       try {
-        const timeline = activeController().getSnapshot().timeline
-        conversation = timeline
-          .filter((item) => (item as { kind?: string }).kind === 'user')
-          .slice(-2)
-          .map((item) => (typeof (item as { text?: unknown }).text === 'string' ? (item as { text: string }).text : ''))
-          .filter(Boolean)
-          .join(' / ')
-          .slice(0, 200)
+        const snap = activeController().getSnapshot()
+        const activeId = snap.conversationLibrary.activeConversationId
+        const title = snap.conversationLibrary.conversations.find((item) => item.id === activeId)?.title ?? ''
+        conversation = title.slice(0, 40)
       } catch { /* 会话还没就绪就不带上下文 */ }
       const window = await foregroundWindowTitle()
       // 偷窥开关现在只管“这条吐槽要不要附带一张当前屏幕”，不再单独定时。
@@ -214,7 +210,12 @@ const roastService = new RoastService({
       const allowTime = lastRoastDay !== today
       const moment = timeMoment(now.getHours())
       const text = await generateRoast(key, {
-        scene, hour: now.getHours(), recent, conversation, window, image, prompt, allowTime, moment
+        scene, hour: now.getHours(), recent, conversation, window, image, prompt, allowTime, moment,
+        log: (message) => {
+          try {
+            appendFileSync(path.join(dataRoot, 'roast.log'), `${new Date().toISOString()} gen ${message}\n`)
+          } catch { /* 日志失败不影响生成 */ }
+        }
       })
       if (text) lastRoastDay = today
       return text

@@ -3,15 +3,17 @@
 
 const PROMPT = [
   '你是小鲸，住在主人 Windows 桌面角落的鲸鱼娘。现在要写一条给主人看的吐槽。',
-  '要求：像人随口说的，可以是一句、两句或三句，也可以反问；可以生活化地打趣，但不攻击主人本人。',
-  '具体一点：提手边的事、状态、对话里的内容；没给时间或时段就别提几点，也不要每条都提窗口标题。',
+  '像亲近的人在旁边小声说话：可以打趣、可以撒娇、可以示弱求关注，但不要做作，不要堆叠词装可爱。',
+  '吐槽对象是事情和状态，不是主人本人：不嘲讽、不指责、不说“你又…”，不揭短，不让人难堪。',
+  '和最近几条不要重复：换话题、换角度，别总盯着同一件事说。',
+  '对话内容只当话题背景，不要复述里面的句子、日志、文件名、命令、秒数或数字。',
+  '少用技术词：不聊代码、日志、接口、部署、文件路径；对话里出现这些词也别照搬。',
+  '如果没给窗口标题、也没给附图，就不要提屏幕上的任何东西，也不要猜主人在做什么。',
+  '有值得提醒的任务或桌面信息（报错、卡住的任务、异常窗口、等待处理的提示）时优先提醒一句，但不要每条都提醒，整体以吐槽为主。',
+  '不提健康建议（久坐、眼睛、吃饭、睡觉），不催睡觉。',
+  '不提隐私内容（账号、聊天对象、文件全文）。',
   '不要空泛地讲道理，不要对仗，不要每句都像金句。',
-  '有时可以顺带提一句最近对话里的内容，但不要每条都提；生活、爱好、时间、身体状态也都可以聊。',
-  '只根据给出的信息说话。不要编造没给出的具体事物：应用、文件、歌曲、视频通话、课程、设置、学习计时，一律不要凭空提。',
-  '如果没给窗口标题、也没给截图，就只聊时间和状态，不要假装看到了屏幕上的东西。',
-  '如果截图或对话里有值得提醒的任务或桌面信息（明显的报错、卡住的任务、异常窗口、等待处理的提示），优先提醒一句；但不要做健康提醒（久坐、眼睛累、吃饭、睡觉），也不要催睡觉。',
-  '不要提屏幕上的隐私内容（账号、聊天对象、文件全文）。',
-  '只输出正文，不加引号、不加解释、不用 emoji。通常三行以内、45 个字符左右；如果确有必要把提醒说清楚，可以更长，卡片能滚动，但别写成一大段。'
+  '只输出正文，不加引号、不加解释。一到三句，通常 45 字左右；确有必要可长一点，但别写成一大段。可以少量用 emoji，别堆。'
 ].join('\n')
 
 const SCENE_LABEL: Record<string, string> = {
@@ -24,7 +26,7 @@ const SCENE_LABEL: Record<string, string> = {
 
 export async function generateRoast(
   apiKey: string,
-  input: { scene: string; hour: number; recent: readonly string[]; conversation?: string; window?: string; image?: string; prompt?: string; allowTime?: boolean; moment?: string }
+  input: { scene: string; hour: number; recent: readonly string[]; conversation?: string; window?: string; image?: string; prompt?: string; allowTime?: boolean; moment?: string; log?: (message: string) => void }
 ): Promise<string | null> {
   try {
     const body: Record<string, unknown> = {
@@ -63,15 +65,19 @@ export async function generateRoast(
       headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
       body: JSON.stringify(body)
     })
-    if (!response.ok) return null
+    if (!response.ok) { input.log?.(`http ${response.status}`); return null }
     const data = await response.json() as { choices?: { message?: { content?: string } }[] }
     const raw = data.choices?.[0]?.message?.content?.trim() ?? ''
     const text = raw.replace(/^[「“"']|[」”"']$/gu, '').trim()
-    if (text.length < 2 || text.length > 120) return null
-    // 超过三句或带列表符号的，宁可回退本地语料，别把模型的自言自语贴上去。
-    if (/^[-*#\d]/u.test(text) || text.split(/[。！？!?]/u).filter((part) => part.trim()).length > 3) return null
+    if (text.length < 2) { input.log?.(`short ${raw.length}`); return null }
+    // 卡片能滚动，长度不再硬卡；只在明显跑飞时丢掉。
+    if (text.length > 400) { input.log?.(`long ${text.length}`); return null }
+    if (/^[-*#\d]/u.test(text)) { input.log?.('list-like'); return null }
+    // 允许一到五句，超过五句才视为模型跑题。
+    if (text.split(/[。！？!?]/u).filter((part) => part.trim()).length > 5) { input.log?.('too-many-sentences'); return null }
     return text
-  } catch {
+  } catch (error) {
+    input.log?.(`error ${error instanceof Error ? error.message : String(error)}`)
     return null
   }
 }

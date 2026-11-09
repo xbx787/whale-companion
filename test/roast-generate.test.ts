@@ -25,7 +25,7 @@ describe('generateRoast', () => {
   it('rejects list-like and overlong replies so the card can fall back', async () => {
     respond({ choices: [{ message: { content: '- 第一句\n- 第二句' } }] })
     expect(await generateRoast('sk-test', { scene: 'general', hour: 23, recent: [] })).toBeNull()
-    respond({ choices: [{ message: { content: '啊'.repeat(200) } }] })
+    respond({ choices: [{ message: { content: '啊'.repeat(500) } }] })
     expect(await generateRoast('sk-test', { scene: 'general', hour: 23, recent: [] })).toBeNull()
   })
 })
