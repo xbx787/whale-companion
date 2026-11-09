@@ -593,7 +593,7 @@ function Avatar() {
         className="avatar-hit-target"
         type="button"
         aria-label="桌面角色，单击切换聊天气泡，拖动可移动位置"
-        title="单击切换聊天气泡，拖动可移动位置；右键更多"
+        title="左键拖动，中键余额/吐槽，右键设置"
         onMouseDown={(event) => {
           // Chromium starts Windows middle-button autoscroll on mousedown.
           // Cancelling auxclick alone is too late and can swallow later drags.

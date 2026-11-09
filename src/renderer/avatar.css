@@ -98,8 +98,8 @@ body.avatar-window { -webkit-user-select: none; user-select: none; }
 .avatar-portrait { display: grid; place-items: center; }
 .avatar-artwork, .avatar-ahoge { grid-area: 1 / 1; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
 
-/* 探头偷看这张内容偏小，放大一点，贴着底边不改变站位。 */
-.avatar-artwork.is-peek { transform: scale(1.14); transform-origin: 50% 100%; }
+/* 探头偷看这张显示得大一点：用宽高重新布局，让浏览器按原图重新采样，比 transform 拉位图清楚。 */
+.avatar-artwork.is-peek { width: 118%; height: 118%; margin: -9% 0 0 -9%; }
 
 /* Breathing remains an independent low-amplitude channel in every state. */
 @keyframes whale-breath {
