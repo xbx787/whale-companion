@@ -260,16 +260,18 @@ const roastService = new RoastService({
       return null
     }
   },
-  emit: (text, at) => {
-    balanceContent = 'roast'
-    if (!balanceOpen) setBalanceOpen(true)
-    pushBalanceCard({ text, at })
-  }
-})
+    emit: (text, at) => {
+      balanceContent = 'roast'
+      if (!balanceOpen) setBalanceOpen(true)
+      pushBalanceCard({ text, at })
+      syncPeekFace()
+    }
+  })
 function showRoastCard(): void {
   balanceContent = 'roast'
   if (!balanceOpen) setBalanceOpen(true)
   if (!roastService.current()) roastService.refresh('general')
+  syncPeekFace()
 }
 
 /** 把卡片内容推给角色窗口和独立卡片窗口；null 表示回到余额。 */
@@ -300,6 +302,7 @@ function toggleBalanceCard(): void {
         }
       })
     }
+    syncPeekFace()
     return
   }
   // 吐槽状态下再点一下：收起。
@@ -1280,9 +1283,10 @@ function sendUiSizeWhenLoaded(win: BrowserWindow): void {
     win.webContents.send('pet:ui-size', currentUiSize)
     win.webContents.send('pet:window-opacity', currentWindowOpacity)
     win.webContents.send('pet:avatar-opacity', currentAvatarOpacity)
-    // 重启后偷窥还开着的话，角色要直接是探头偷看的样子。
+    // 重启后偷窥还开着、且吐槽卡正显示，角色才要是探头的样子。
     try {
-      win.webContents.send('pet:peek-face', activeController().currentSettings().eyeEnabled === true)
+      const eyeOn = activeController().currentSettings().eyeEnabled === true
+      win.webContents.send('pet:peek-face', eyeOn && balanceOpen && balanceContent === 'roast')
     } catch { /* 设置还没就绪就先不切 */ }
   })
 }
@@ -1645,6 +1649,18 @@ async function resumeEvolveTask(): Promise<void> {
   }
 }
 
+/** 探头表情只在“偷窥开着且吐槽卡正显示”时常驻，卡片收起就换回去。 */
+function syncPeekFace(): void {
+  let eyeOn = false
+  try {
+    eyeOn = activeController().currentSettings().eyeEnabled === true
+  } catch {
+    eyeOn = false
+  }
+  const on = eyeOn && balanceOpen && balanceContent === 'roast'
+  if (avatarWindow && !avatarWindow.isDestroyed()) avatarWindow.webContents.send('pet:peek-face', on)
+}
+
 function setBalanceOpen(open: boolean): void {
   if (balanceOpen === open) return
   balanceOpen = open
@@ -1662,6 +1678,7 @@ function setBalanceOpen(open: boolean): void {
   if (balanceWindowReady && balanceWindow && !balanceWindow.isDestroyed()) {
     balanceWindow.webContents.send('pet:balance-open', open)
   }
+  syncPeekFace()
 }
 
 function showPanel(): void {
@@ -2336,8 +2353,8 @@ function buildSettingsIpcDeps() {
     settingsTrusted,
     activeController,
     personaDirectory: path.join(dataRoot, 'persona'),
-    sendPeekFace: (active: boolean) => {
-      if (avatarWindow && !avatarWindow.isDestroyed()) avatarWindow.webContents.send('pet:peek-face', active)
+    sendPeekFace: (_active: boolean) => {
+      syncPeekFace()
     },
     memory,
     updateService,

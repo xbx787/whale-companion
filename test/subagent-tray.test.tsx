@@ -36,17 +36,20 @@ async function render(tasks: SubagentTask[], callbacks: {
   await act(async () => root!.render(<SubagentTray subagents={tasks} {...callbacks} />))
 }
 
+const rows = () => container!.querySelectorAll<HTMLButtonElement>('.panel-subagent-row-head')
+const detail = () => container!.querySelector<HTMLElement>('.panel-subagent-detail')
+
 describe('SubagentTray', () => {
-  it('renders one robot head per subagent and nothing when there are none', async () => {
+  it('renders one row per subagent and nothing at all when there are none', async () => {
     await render([])
-    expect(container!.querySelectorAll('.panel-subagent-icon')).toHaveLength(0)
+    expect(container!.querySelectorAll('.panel-subagent-row-head')).toHaveLength(0)
+    expect(container!.querySelector('.panel-subagent-list')).toBeNull()
     await render([makeTask('t1', '研究协议'), makeTask('t2', '查历史'), makeTask('t3', '写摘要')])
-    const icons = container!.querySelectorAll('.panel-subagent-icon')
-    expect(icons).toHaveLength(3)
-    expect(icons[0]?.getAttribute('aria-label')).toContain('研究协议')
+    expect(rows()).toHaveLength(3)
+    expect(rows()[0]?.getAttribute('aria-label')).toContain('研究协议')
   })
 
-  it('opens a compact read-only pane with the counters and the child timeline', async () => {
+  it('expands the details under the row instead of a floating pane', async () => {
     const task = makeTask('t1', '研究协议', {
       toolUses: 3, totalTokens: 1_200, lastToolName: 'Read',
       timeline: [
@@ -56,36 +59,22 @@ describe('SubagentTray', () => {
       ]
     })
     await render([task])
-    await act(async () => container!.querySelector<HTMLButtonElement>('.panel-subagent-icon')!.click())
-    const pane = document.querySelector('.panel-subagent-popover')
+    await act(async () => rows()[0]!.click())
+    const pane = detail()
     expect(pane).not.toBeNull()
     expect(pane!.textContent).toContain('研究协议')
     expect(pane!.textContent).toContain('3 次工具')
-    expect(pane!.textContent).toContain('最近：读取')
-    expect(pane!.textContent).not.toContain('token')
+    expect(pane!.textContent).toContain('1,200 tokens')
     expect(pane!.textContent).toContain('看到两份文档')
     expect(pane!.textContent).toContain('读取')
-    // The first line names the kind and its ordinal; there is no footer note.
-    expect(pane!.querySelector('.panel-subagent-head')?.textContent).toContain('子代理 1')
-    expect(pane!.textContent).not.toContain('不支持向子代理发消息')
-    expect([...pane!.querySelectorAll('button')].map((button) => button.textContent))
-      .not.toContain('发消息')
+    // 详情里不再有“思维链”三个字，直接就是子智能体的输出。
+    expect(pane!.textContent).not.toContain('思维链')
+    expect(rows()[0]!.getAttribute('aria-expanded')).toBe('true')
+    await act(async () => rows()[0]!.click())
+    expect(detail()).toBeNull()
   })
 
-  it('never closes because of scrolling or pointer movement inside the pane', async () => {
-    await render([makeTask('t1', '跑很久')])
-    await act(async () => container!.querySelector<HTMLButtonElement>('.panel-subagent-icon')!.click())
-    const pane = document.querySelector<HTMLElement>('.panel-subagent-popover')!
-    await act(async () => { pane.dispatchEvent(new Event('scroll', { bubbles: true })) })
-    expect(document.querySelector('.panel-subagent-popover')).not.toBeNull()
-    await act(async () => { pane.dispatchEvent(new Event('pointerdown', { bubbles: true })) })
-    expect(document.querySelector('.panel-subagent-popover')).not.toBeNull()
-    // An explicit outside click is the one thing that dismisses it.
-    await act(async () => { document.body.dispatchEvent(new Event('pointerdown', { bubbles: true })) })
-    expect(document.querySelector('.panel-subagent-popover')).toBeNull()
-  })
-
-  it('switches between subagents without closing the pane', async () => {
+  it('keeps only one row open at a time and switches without closing the list', async () => {
     const first = makeTask('t1', '研究协议', {
       timeline: [{ id: 'a', time: new Date().toISOString(), kind: 'assistant', text: '协议步骤一' }]
     })
@@ -93,14 +82,12 @@ describe('SubagentTray', () => {
       timeline: [{ id: 'b', time: new Date().toISOString(), kind: 'assistant', text: '历史结论' }]
     })
     await render([first, second])
-    const icons = () => container!.querySelectorAll<HTMLButtonElement>('.panel-subagent-icon')
-    await act(async () => icons()[0]!.click())
-    expect(document.querySelector('.panel-subagent-popover')?.textContent).toContain('协议步骤一')
-    await act(async () => icons()[1]!.click())
-    expect(document.querySelector('.panel-subagent-popover')?.textContent).toContain('历史结论')
-    expect(document.querySelector('.panel-subagent-popover')?.textContent).not.toContain('协议步骤一')
-    await act(async () => icons()[1]!.click())
-    expect(document.querySelector('.panel-subagent-popover')).toBeNull()
+    await act(async () => rows()[0]!.click())
+    expect(detail()?.textContent).toContain('协议步骤一')
+    await act(async () => rows()[1]!.click())
+    expect(detail()?.textContent).toContain('历史结论')
+    expect(detail()?.textContent).not.toContain('协议步骤一')
+    expect(rows()).toHaveLength(2)
   })
 
   it('offers background and stop for a running subagent only', async () => {
@@ -108,27 +95,25 @@ describe('SubagentTray', () => {
     const onStopTask = vi.fn()
     const task = makeTask('t1', '跑很久')
     await render([task], { onBackgroundTask, onStopTask })
-    await act(async () => container!.querySelector<HTMLButtonElement>('.panel-subagent-icon')!.click())
-    const pane = () => document.querySelector<HTMLElement>('.panel-subagent-popover')!
-    expect([...pane().querySelectorAll<HTMLButtonElement>('.panel-subagent-actions button')]
+    await act(async () => rows()[0]!.click())
+    const pane = detail()!
+    expect([...pane.querySelectorAll<HTMLButtonElement>('.panel-subagent-actions button')]
       .map((button) => button.textContent)).toEqual(['后台运行', '停止'])
-    const buttons = pane().querySelectorAll<HTMLButtonElement>('.panel-subagent-actions button')
+    const buttons = pane.querySelectorAll<HTMLButtonElement>('.panel-subagent-actions button')
     await act(async () => buttons[0]!.click())
     expect(onBackgroundTask).toHaveBeenCalledWith(task)
     await act(async () => buttons[1]!.click())
     expect(onStopTask).toHaveBeenCalledWith(task)
     await render([{ ...task, isBackgrounded: true }], { onBackgroundTask, onStopTask })
-    expect([...pane().querySelectorAll<HTMLButtonElement>('.panel-subagent-actions button')]
+    expect([...detail()!.querySelectorAll<HTMLButtonElement>('.panel-subagent-actions button')]
       .map((button) => button.textContent)).toEqual(['停止'])
   })
 
   it('keeps a finished subagent on the row in green', async () => {
     vi.useFakeTimers()
     await render([makeTask('t1', '快结束了')])
-    expect(container!.querySelectorAll('.panel-subagent-icon')).toHaveLength(1)
+    expect(rows()).toHaveLength(1)
     await render([makeTask('t1', '快结束了', { status: 'completed', endedAt: new Date().toISOString() })])
-    expect(container!.querySelector('.panel-subagent-icon')?.className).toContain('is-completed')
-    await act(async () => vi.advanceTimersByTime(30_000))
-    expect(container!.querySelectorAll('.panel-subagent-icon')).toHaveLength(1)
+    expect(container!.querySelector('.panel-subagent-row')?.className).toContain('is-completed')
   })
 })

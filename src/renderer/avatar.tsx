@@ -340,7 +340,7 @@ function Avatar() {
   useEffect(() => {
     if (!idleBehaviorAllowed || reducedMotion || useLive2D) return;
     const quiet = (): boolean =>
-      !document.hidden && !document.body.classList.contains('is-resting') && !prefersReducedMotion();
+      !document.hidden && !prefersReducedMotion();
     const actions: AvatarBehaviorActions = {
       fidget: () => quiet() ? playIdleFidget(idleRef.current) : undefined,
       ...(personaArt.poses ? {

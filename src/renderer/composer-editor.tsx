@@ -242,7 +242,7 @@ export const ComposerEditor = forwardRef(function ComposerEditor({
     }
   }), [onChange])
 
-  const empty = !value.trim()
+  const empty = value.length === 0
 
   return <div
     ref={rootRef}

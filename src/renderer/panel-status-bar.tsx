@@ -35,7 +35,6 @@ export function PanelStatusBar({ sideOpen, sideExpanded, onToggleSide, onDiscard
     </div>}
     {!sideExpanded && (
       <div className="panel-status-row">
-        <span className={`panel-status panel-status-${status}`} role="status"><i />{live ? <span className="panel-live-label">{taskLabels[status]}</span> : taskLabels[status]}</span>
         <SubagentTray conversationId={conversationId} subagents={snapshot?.subagents} controlsEnabled={controlsEnabled}
           onBackgroundTask={!controlsEnabled || snapshot?.mode === 'dsh' ? undefined : onBackgroundTask}
           onStopTask={!controlsEnabled ? undefined : onStopTask}

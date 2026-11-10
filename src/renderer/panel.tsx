@@ -432,7 +432,7 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
       } else {
         const restored = restoreComposerState(composerStash.current, nextId);
         composerStateRef.current = restored;
-        setDraft(restored.draft);
+        setDraft(restored.draft.trim() ? restored.draft : '');
         setAttachments(restored.attachments);
         setCaretIndex(restored.draft.length);
         const goalDraftOpen = Boolean(nextId && goalPromptStash.current.get(nextId));
@@ -490,7 +490,7 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
         ? restoreComposerState(sideComposerStash.current, next.sessionId)
         : restoreComposerState(composerStash.current, activeConversationIdRef.current);
       composerStateRef.current = { draft: restored.draft, attachments: [...restored.attachments] };
-      setDraft(restored.draft);
+      setDraft(restored.draft.trim() ? restored.draft : '');
       setAttachments([...restored.attachments]);
       setCaretIndex(restored.draft.length);
       setAttachmentError(null);
@@ -957,7 +957,7 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
     }
     if (!stillHere) return;
     composerStateRef.current = restored;
-    setDraft(restored.draft);
+    setDraft(restored.draft.trim() ? restored.draft : '');
     setAttachments(restored.attachments);
     if (restored.attachments.length > 5) setAttachmentError('已保留全部附件；一次最多发送 5 个，请先移除多余附件。');
     if (goal) setGoalPrompting(true);
@@ -1028,7 +1028,7 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
     stashComposerState(sideComposerStash.current, sessionId, restored.draft, restored.attachments);
     if (stillHere) {
       composerStateRef.current = restored;
-      setDraft(restored.draft);
+      setDraft(restored.draft.trim() ? restored.draft : '');
       setAttachments(restored.attachments);
       setComposerOpen(true);
       setAttachmentError('临时会话发送失败，草稿已恢复。');
@@ -1354,7 +1354,7 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
       return;
     }
     composerStateRef.current = next;
-    setDraft(next.draft);
+    setDraft(next.draft.trim() ? next.draft : '');
     setAttachments(next.attachments);
     if (dropped) setAttachmentError('最多 5 个附件，部分附件未剪切回。');
     setComposerOpen(true);
@@ -1752,6 +1752,15 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
   // not executing, even if the runtime's last coarse status said so.
   const awaitingInteraction = (source?: typeof snapshot): boolean => Boolean(source?.proposal || source?.plan || source?.question || source?.permission);
   const status = awaitingInteraction(snapshot) ? 'awaiting_approval' : snapshot?.taskStatus ?? 'idle';
+  // 一条消息跑完就自动回到底部，免得还要手动点“回到底部”。
+  const lastTaskStatusRef = useRef(status);
+  useEffect(() => {
+    const previous = lastTaskStatusRef.current;
+    lastTaskStatusRef.current = status;
+    const wasLive = ['planning', 'executing', 'verifying', 'awaiting_approval'].includes(previous);
+    const settled = ['done', 'failed', 'cancelled', 'idle'].includes(status);
+    if (wasLive && settled) window.setTimeout(() => scrollToBottom(), 200);
+  }, [status]);
   const sideStatus = sideSessionId
     ? awaitingInteraction(sideChat?.snapshot) ? 'awaiting_approval' : sideChat?.snapshot?.taskStatus ?? 'idle'
     : 'idle';
@@ -1774,7 +1783,7 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
   const layout: BubbleLayout = !compactEmpty ? 'full' : attachments.length ? 'composer_attachments' : 'composer';
   // 首帧测量常偏小（字体还没落位），底部那排按钮会被窗口裁掉一截；
   // 测量口径已经把状态行和 padding 算进去了，这里只留 2px 防舍入。
-  const compactComposerHeight = Math.max(120, (composeDockHeight || (112 + composerHeight + (attachments.length ? 26 : 0))) + 2);
+  const compactComposerHeight = Math.max(156, (composeDockHeight || (150 + composerHeight + (attachments.length ? 26 : 0))) + 2);
   // 闲置自动收起：面板没人操作、也没有任务在跑时，到设定分钟数就把对话框收掉。
   // 点角色重新打开会重载快照；runtime 由空闲回收按同一个阈值释放，下次发消息
   // 时用 sdkSessionId 恢复，所以收起不等于丢上下文。
@@ -2200,7 +2209,7 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
         onClose={() => setTurnMenu(null)}
       />}
       <section className="panel-workspace" ref={workspaceRef}>
-        {!compactEmpty && <header className={`panel-chat-header${expanded ? ' is-browser' : ' is-numeric'}`} ref={sessionHeaderRef} onPointerDown={(event) => { const target = event.target as HTMLElement; if (target.closest('button, a, input, textarea, .panel-quick-tab')) return; beginWindowDrag(event, true); }}>
+        {(!compactEmpty || composerOpen) && <header className={`panel-chat-header${expanded ? ' is-browser' : ' is-numeric'}`} ref={sessionHeaderRef} onPointerDown={(event) => { const target = event.target as HTMLElement; if (target.closest('button, a, input, textarea, .panel-quick-tab')) return; beginWindowDrag(event, true); }}>
           <button type="button" className="panel-library-toggle" aria-label={expanded ? '会话/拓展' : '会话菜单'} title={expanded ? '会话 → 拓展 → 收起' : '会话菜单'} aria-haspopup={expanded ? undefined : 'menu'} aria-expanded={expanded ? libraryOpen : sessionMenuOpen} onClick={expanded ? () => {
             // 大窗三态循环：会话 → 拓展 → 收起；再次打开回到会话，筛选与搜索保留。
             if (!libraryOpen) { setLibraryTab('sessions'); void openLibrary(); return }

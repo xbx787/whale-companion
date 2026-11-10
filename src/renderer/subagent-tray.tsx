@@ -1,26 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import type { SubagentTask } from '../shared/contracts'
 import { formatDuration } from './duration'
 import { RunningDots } from './running-dots'
 import { toolLabel } from '../shared/tool-labels'
 
-/** A finished subagent keeps its head for a beat so its ending is visible. */
+/** 状态栏里一行一只子智能体，箭头展开详情，详情里直接跑它的思考与工具。 */
 const STATUS_LABEL: Record<SubagentTask['status'], string> = {
   running: '运行中',
   completed: '已完成',
   failed: '失败',
   stopped: '已停止'
-}
-
-function RobotIcon() {
-  return <svg viewBox="0 0 20 20" aria-hidden="true">
-    <rect x="3.8" y="6.4" width="12.4" height="9.2" rx="2.6" />
-    <path d="M10 3.2v3.2" />
-    <circle cx="7.5" cy="10.9" r="1.05" className="panel-subagent-eye" />
-    <circle cx="12.5" cy="10.9" r="1.05" className="panel-subagent-eye" />
-    <path d="M8 13.6h4" />
-  </svg>
 }
 
 function elapsedText(task: SubagentTask): string {
@@ -32,28 +21,15 @@ function elapsedText(task: SubagentTask): string {
   return ms !== undefined && ms > 0 ? formatDuration(Math.floor(ms / 1000)) : '—'
 }
 
-interface PopoverAnchor {
-  left: number
-  top: number
-  bottom: number
-}
-
-/** Fixed on the body layer: the feed's scroll clip must not cut the pane. */
-function popoverStyle(anchor: PopoverAnchor): Record<string, string | number> {
-  const width = Math.min(300, window.innerWidth - 16)
-  const left = Math.max(8, Math.min(anchor.left, window.innerWidth - width - 8))
-  const spaceAbove = anchor.top
-  const spaceBelow = window.innerHeight - anchor.bottom
-  const openBelow = spaceAbove < 260 && spaceBelow > spaceAbove
-  const maxHeight = Math.max(80, Math.min(280, (openBelow ? spaceBelow : spaceAbove) - 10))
-  return openBelow
-    ? { left, width, top: anchor.bottom + 6, maxHeight }
-    : { left, width, bottom: window.innerHeight - anchor.top + 6, maxHeight }
+function tokenText(task: SubagentTask): string {
+  const tokens = task.totalTokens
+  if (typeof tokens !== 'number' || tokens <= 0) return ''
+  return tokens >= 1000 ? `${(tokens / 1000).toFixed(1)}K tok` : `${tokens} tok`
 }
 
 function Steps({ task }: { task: SubagentTask }) {
   const entries = task.timeline ?? []
-  if (!entries.length) return null
+  if (!entries.length) return <p className="panel-subagent-empty">还没有输出</p>
   return <ol className="panel-subagent-timeline">
     {entries.map((entry) => <li key={entry.id} className={`panel-subagent-step is-${entry.kind}`}>
       <span className="panel-subagent-step-mark" aria-hidden="true">
@@ -65,9 +41,8 @@ function Steps({ task }: { task: SubagentTask }) {
 }
 
 /**
- * One robot head per Task-tool subagent, living in the status row. Clicking a
- * head opens a compact read-only pane: identity, running counters, the child's
- * latest steps and the two controls the SDK exposes (background, stop).
+ * 状态栏里的子智能体列表：没有子智能体时整块不占位；有就逐行展开，
+ * 点行或右侧箭头把详情铺在该行下面，详情里持续输出思考与工具。
  */
 export function SubagentTray({ conversationId, subagents, controlsEnabled = true, onBackgroundTask, onStopTask, onMessageSubagent }: {
   /** 切换会话时才清空已保留的卡片；同一会话内不因快照抖动重挂载。 */
@@ -96,13 +71,9 @@ export function SubagentTray({ conversationId, subagents, controlsEnabled = true
     } catch { return [] }
   })
   const [openTaskId, setOpenTaskId] = useState<string | null>(null)
-  const [anchor, setAnchor] = useState<PopoverAnchor | null>(null)
   const [messageDraft, setMessageDraft] = useState('')
   const [messageSent, setMessageSent] = useState(false)
-  // 工具链默认展开；用户收起后在整个弹层生命周期内记住。
-  const [stepsOpen, setStepsOpen] = useState(true)
   const sentTimer = useRef<number | undefined>(undefined)
-  const popoverRef = useRef<HTMLDivElement | null>(null)
   // 只有真正换会话才清空；快照里 subagents 短暂为空不能把卡片抹掉。
   const lastConversationRef = useRef(conversationId)
   useEffect(() => {
@@ -144,97 +115,73 @@ export function SubagentTray({ conversationId, subagents, controlsEnabled = true
     } catch { /* 存储不可用时只是少了跨挂载缓存 */ }
   }, [cacheKey, displayed])
 
-  // Only an explicit outside click or Esc closes the pane. Scrolling, moving
-  // the pointer over it and dragging its own scrollbar must never dismiss it.
-  useEffect(() => {
-    if (!openTaskId) return
-    const closeOutside = (event: PointerEvent): void => {
-      const target = event.target
-      if (!(target instanceof Node)) return
-      if (popoverRef.current?.contains(target)) return
-      if (target instanceof Element && target.closest('.panel-subagent-icons')) return
-      setOpenTaskId(null)
-    }
-    const closeKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') setOpenTaskId(null)
-    }
-    document.addEventListener('pointerdown', closeOutside, true)
-    document.addEventListener('keydown', closeKey, true)
-    return () => {
-      document.removeEventListener('pointerdown', closeOutside, true)
-      document.removeEventListener('keydown', closeKey, true)
-    }
-  }, [openTaskId])
-
   if (!displayed.length) return null
-  const openTask = displayed.find((task) => task.taskId === openTaskId)
   const sendMessage = (): void => {
     const text = messageDraft.trim()
-    if (!text || !openTask || !onMessageSubagent) return
-    onMessageSubagent(openTask, text)
+    const task = displayed.find((item) => item.taskId === openTaskId)
+    if (!text || !task || !onMessageSubagent) return
+    onMessageSubagent(task, text)
     setMessageDraft('')
     setMessageSent(true)
     if (sentTimer.current !== undefined) window.clearTimeout(sentTimer.current)
     sentTimer.current = window.setTimeout(() => setMessageSent(false), 2_000)
   }
-  return <>
-    <span className="panel-subagent-icons" role="group" aria-label="子代理">
-      {displayed.map((task) => <button key={task.taskId} type="button"
-        className={`panel-subagent-icon is-${task.status}${openTaskId === task.taskId ? ' is-open' : ''}`}
-        aria-label={`子代理：${task.description}，${STATUS_LABEL[task.status]}`}
-        aria-expanded={openTaskId === task.taskId}
-        title={task.description}
-        onClick={(event) => {
-          if (openTaskId === task.taskId) { setOpenTaskId(null); return }
-          const rect = event.currentTarget.getBoundingClientRect()
-          setAnchor({ left: rect.left, top: rect.top, bottom: rect.bottom })
-          setOpenTaskId(task.taskId)
-        }}
-        onContextMenu={(event) => {
-          event.preventDefault()
-          // 右键删掉这张卡片；只有已结束的代理可以删，运行中的留给停止按钮。
-          if (task.status === 'running') return
-          setDisplayed((current) => current.filter((item) => item.taskId !== task.taskId))
-          setRemoved((current) => new Set(current).add(task.taskId))
-          if (openTaskId === task.taskId) setOpenTaskId(null)
-        }}>
-        <RobotIcon /><span className="panel-subagent-name">{task.description}</span>
-      </button>)}
-    </span>
-    {openTask && anchor && createPortal(<div ref={popoverRef} className="panel-subagent-popover"
-      style={popoverStyle(anchor)} role="dialog" aria-label={`子代理 ${displayed.indexOf(openTask) + 1}：${openTask.description}`}>
-      <div className="panel-subagent-head">
-        <span className={`panel-subagent-dot is-${openTask.status}`} aria-hidden="true" />
-        <span className="panel-subagent-title">子代理 {displayed.indexOf(openTask) + 1}</span>
-        <span className={`panel-subagent-state is-${openTask.status}`}>{STATUS_LABEL[openTask.status]}</span>
-      </div>
-      <p className="panel-subagent-desc" title={openTask.description}>{openTask.description}</p>
-      {openTask.summary && <p className="panel-subagent-summary" title={openTask.summary}>{openTask.summary}</p>}
-      <p className="panel-subagent-meta">
-        {openTask.lastToolName ? `最近：${toolLabel(openTask.lastToolName)}` : '等待输出'}
-        {'　'}{openTask.toolUses ?? 0} 次工具，{elapsedText(openTask)}
-      </p>
-      {openTask.timeline?.length ? <>
-        <button type="button" className="panel-subagent-chain-toggle" aria-expanded={stepsOpen}
-          onClick={() => setStepsOpen((open) => !open)}>
-          {stepsOpen ? '收起工具链' : '展开工具链'}
+  return <div className="panel-subagent-list" role="group" aria-label="子智能体">
+    {displayed.map((task, index) => {
+      const open = openTaskId === task.taskId
+      return <div key={task.taskId} className={`panel-subagent-row is-${task.status}${open ? ' is-open' : ''}`}>
+        <button type="button" className="panel-subagent-row-head"
+          aria-label={`子智能体 ${index + 1}：${task.description}，${STATUS_LABEL[task.status]}`}
+          aria-expanded={open}
+          title={task.description}
+          onClick={() => setOpenTaskId(open ? null : task.taskId)}
+          onContextMenu={(event) => {
+            event.preventDefault()
+            // 右键删掉这一行；只有已结束的代理可以删，运行中的留给停止按钮。
+            if (task.status === 'running') return
+            setDisplayed((current) => current.filter((item) => item.taskId !== task.taskId))
+            setRemoved((current) => new Set(current).add(task.taskId))
+            if (openTaskId === task.taskId) setOpenTaskId(null)
+          }}>
+          <span className={`panel-subagent-dot is-${task.status}`} aria-hidden="true" />
+          <span className="panel-subagent-main">
+            <span className="panel-subagent-name">{task.description}</span>
+            <span className="panel-subagent-sub">
+              {task.summary ?? (task.lastToolName ? `最近：${toolLabel(task.lastToolName)}` : STATUS_LABEL[task.status])}
+            </span>
+          </span>
+          <span className="panel-subagent-figures">
+            {tokenText(task) && <span>{tokenText(task)}</span>}
+            <span>{elapsedText(task)}</span>
+          </span>
+          <span className={`panel-subagent-caret${open ? ' is-open' : ''}`} aria-hidden="true" />
         </button>
-        {stepsOpen && <Steps task={openTask} />}
-      </> : null}
-      {(onBackgroundTask || onStopTask) && openTask.status === 'running' && <div className="panel-subagent-actions">
-        {openTask.toolUseId && onBackgroundTask && !openTask.isBackgrounded &&
-          <button type="button" onClick={() => onBackgroundTask(openTask)}>后台运行</button>}
-        {onStopTask && <button type="button" className="is-stop" onClick={() => onStopTask(openTask)}>停止</button>}
-      </div>}
-      {!controlsEnabled && openTask.status === 'running' && <p className="panel-subagent-note">DSH 不支持单独停止子代理；需要中止时请用整轮「停止」。</p>}
-      {openTask.status === 'running' && openTask.toolUseId && onMessageSubagent && <form className="panel-subagent-message"
-        onSubmit={(event) => { event.preventDefault(); sendMessage() }}>
-        <input value={messageDraft} maxLength={4_000}
-          placeholder={messageSent ? '已转达' : '通过主对话转达'}
-          aria-label="通过主对话转达给子代理"
-          onChange={(event) => { setMessageDraft(event.target.value); setMessageSent(false) }} />
-        <button type="submit" disabled={!messageDraft.trim()}>转达</button>
-      </form>}
-    </div>, document.body)}
-  </>
+        {open && <div className="panel-subagent-detail" role="region" aria-label={`子智能体 ${index + 1} 详情`}>
+          <p className="panel-subagent-desc">{task.description}</p>
+          <p className="panel-subagent-meta">
+            {STATUS_LABEL[task.status]}
+            {task.subagentType ? `　${task.subagentType}` : ''}
+            {`　${task.toolUses ?? 0} 次工具，${elapsedText(task)}`}
+            {task.totalTokens ? `，${task.totalTokens.toLocaleString()} tokens` : ''}
+            {task.isBackgrounded ? '　后台运行' : ''}
+          </p>
+          <Steps task={task} />
+          {(onBackgroundTask || onStopTask) && task.status === 'running' && <div className="panel-subagent-actions">
+            {task.toolUseId && onBackgroundTask && !task.isBackgrounded &&
+              <button type="button" onClick={() => onBackgroundTask(task)}>后台运行</button>}
+            {onStopTask && <button type="button" className="is-stop" onClick={() => onStopTask(task)}>停止</button>}
+          </div>}
+          {!controlsEnabled && task.status === 'running' && <p className="panel-subagent-note">DSH 不支持单独停止子代理；需要中止时请用整轮「停止」。</p>}
+          {task.status === 'running' && task.toolUseId && onMessageSubagent && <form className="panel-subagent-message"
+            onSubmit={(event) => { event.preventDefault(); sendMessage() }}>
+            <input value={messageDraft} maxLength={4_000}
+              placeholder={messageSent ? '已转达' : '通过主对话转达'}
+              aria-label="通过主对话转达给子代理"
+              onChange={(event) => { setMessageDraft(event.target.value); setMessageSent(false) }} />
+            <button type="submit" disabled={!messageDraft.trim()}>转达</button>
+          </form>}
+        </div>}
+      </div>
+    })}
+  </div>
 }

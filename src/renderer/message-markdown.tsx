@@ -9,6 +9,9 @@ import { fittedFontSize } from './formula-fit';
 import { petBridge } from './pet-state';
 
 function safeMarkdownUrl(value: string): string {
+  // 本地图片和本地链接要能穿过白名单，之后还会按本地路径单独校验。
+  if (/^file:\/\//i.test(value)) return value;
+  if (/^[a-zA-Z]:[\\/]/.test(value)) return value;
   try {
     const url = new URL(value);
     return ['http:', 'https:', 'mailto:'].includes(url.protocol) ? url.href : '';
@@ -79,9 +82,20 @@ const components: Components = {
   // Message text should never trigger a remote image request.
   img: ({ alt, src }) => {
     const local = localImageUrl(typeof src === 'string' ? src : '');
-    return local
-      ? <img className="panel-markdown-image" src={local} alt={alt ?? ''} loading="lazy" />
-      : <span className="panel-markdown-image">{alt ? `[图片：${alt}]` : '[图片]'}</span>;
+    if (!local) return <span className="panel-markdown-image">{alt ? `[图片：${alt}]` : '[图片]'}</span>;
+    // 点图用系统默认程序打开原图；file:///D:/x 还原成 D:\x。
+    const openOriginal = (): void => {
+      const target = local.startsWith('file:///')
+        ? decodeURI(local.slice('file:///'.length)).replace(/\//g, '\\')
+        : local;
+      try {
+        void petBridge().openPath(target).catch(() => undefined);
+      } catch { /* 静态预览没有桌面桥 */ }
+    };
+    return <img className="panel-markdown-image" src={local} alt={alt ?? ''} loading="lazy"
+      title="点击用默认程序打开原图" role="button" tabIndex={0}
+      onClick={openOriginal}
+      onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openOriginal(); } }} />;
   },
   a: ({ href, children }) => href
     ? <a href={href} title={href} onClick={(event) => {

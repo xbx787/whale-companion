@@ -219,6 +219,9 @@ body.panel-placement-right .panel-bubble::after { display: none; }
   min-height: 34px;
   padding: 3px 15px 0;
 }
+/* 这栏只放子智能体；没有子智能体时（容器为空）整行不占位。 */
+.panel-status-row:empty { display: none; }
+.panel-status-row:has(.panel-subagent-list) { flex-wrap: wrap; align-items: flex-start; }
 /* 顶格：状态行的 15px 左内边距已经和消息区对齐，这里不再叠一层缩进。
    圆点从 7px 放大到 8px，并补一设备像素的基线偏移，免得比文字显得矮。 */
 .panel-status { display: inline-flex; align-items: center; gap: 7px; flex: none; color: #c5d6fb; font-size: var(--text-sm); white-space: nowrap; }
@@ -831,6 +834,22 @@ body.panel-placement-right .panel-bubble::after { display: none; }
 .panel-subagent-icon { display: inline-flex; align-items: center; justify-content: center; gap: 5px; flex: none; width: auto; min-width: 26px; height: 26px; padding: 0 8px 0 5px; border: 1px solid rgba(190, 212, 255, .2); border-radius: 8px; color: #bfe4ff; background: rgba(127, 216, 255, .08); }
 .panel-subagent-icon svg { width: 17px; height: 17px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 .panel-subagent-name { max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-2xs); line-height: 1; }
+/* 子智能体列表：一行一只，箭头展开详情，详情里直接跑它的思考与工具。 */
+.panel-subagent-list { display: flex; flex: 1 1 220px; flex-direction: column; gap: 2px; min-width: 0; max-height: 240px; overflow: auto; }
+.panel-subagent-list::-webkit-scrollbar { width: 4px; }
+.panel-subagent-list::-webkit-scrollbar-thumb { border-radius: 4px; background: rgba(170, 195, 240, .4); }
+.panel-subagent-row { border: 1px solid rgba(190, 212, 255, .14); border-radius: 8px; background: rgba(127, 216, 255, .05); }
+.panel-subagent-row.is-open { background: rgba(127, 216, 255, .09); }
+.panel-subagent-row-head { display: flex; align-items: center; gap: 7px; width: 100%; padding: 4px 8px; border: 0; background: transparent; color: inherit; text-align: left; }
+.panel-subagent-row-head:hover { background: rgba(127, 216, 255, .08); }
+.panel-subagent-main { display: flex; flex: 1 1 auto; flex-direction: column; gap: 1px; min-width: 0; }
+.panel-subagent-list .panel-subagent-name { max-width: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-xs); }
+.panel-subagent-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #90a8d4; font-size: var(--text-2xs); }
+.panel-subagent-figures { display: flex; flex: none; gap: 8px; color: #90a8d4; font-size: var(--text-2xs); font-variant-numeric: tabular-nums; }
+.panel-subagent-caret { flex: none; width: 0; height: 0; border-left: 5px solid currentColor; border-top: 4px solid transparent; border-bottom: 4px solid transparent; color: #9fb6df; transition: transform .15s ease; }
+.panel-subagent-caret.is-open { transform: rotate(90deg); }
+.panel-subagent-detail { display: grid; gap: 6px; padding: 2px 9px 9px; border-top: 1px solid rgba(190, 212, 255, .12); }
+.panel-subagent-empty { margin: 0; color: #90a8d4; font-size: var(--text-2xs); }
 .panel-subagent-icon .panel-subagent-eye { fill: currentColor; stroke: none; }
 .panel-subagent-icon.is-completed { color: #9fd8b6; border-color: rgba(159, 216, 182, .26); }
 .panel-subagent-icon.is-failed { color: #e8a7a7; border-color: rgba(232, 167, 167, .3); }

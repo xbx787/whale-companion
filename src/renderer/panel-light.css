@@ -209,6 +209,9 @@ body.panel-theme-light .panel-status-row{
   min-height: 34px;
   padding: 3px 15px 0;
 }
+/* 这栏只放子智能体；没有子智能体时（容器为空）整行不占位。 */
+body.panel-theme-light .panel-status-row:empty{ display: none; }
+body.panel-theme-light .panel-status-row:has(.panel-subagent-list){ flex-wrap: wrap; align-items: flex-start; }
 /* 顶格：状态行的 15px 左内边距已经和消息区对齐，这里不再叠一层缩进。
    圆点从 7px 放大到 8px，并补一设备像素的基线偏移，免得比文字显得矮。 */
 body.panel-theme-light .panel-status{ display: inline-flex; align-items: center; gap: 7px; flex: none; color: #04153a; font-size: var(--text-sm); white-space: nowrap; }
@@ -819,6 +822,22 @@ body.panel-theme-light .panel-subagent-icons{ display: inline-flex; flex: none; 
 body.panel-theme-light .panel-subagent-icon{ display: inline-flex; align-items: center; justify-content: center; gap: 5px; flex: none; width: auto; min-width: 26px; height: 26px; padding: 0 8px 0 5px; border: 1px solid rgba(0, 22, 65, 0.2); border-radius: 8px; color: #002540; background: rgba(0, 89, 128, 0.08); }
 body.panel-theme-light .panel-subagent-icon svg{ width: 17px; height: 17px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 body.panel-theme-light .panel-subagent-name{ max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-2xs); line-height: 1; }
+/* 子智能体列表：一行一只，箭头展开详情，详情里直接跑它的思考与工具。 */
+body.panel-theme-light .panel-subagent-list{ display: flex; flex: 1 1 220px; flex-direction: column; gap: 2px; min-width: 0; max-height: 240px; overflow: auto; }
+body.panel-theme-light .panel-subagent-list::-webkit-scrollbar{ width: 4px; }
+body.panel-theme-light .panel-subagent-list::-webkit-scrollbar-thumb{ border-radius: 4px; background: rgba(15, 40, 85, 0.4); }
+body.panel-theme-light .panel-subagent-row{ border: 1px solid rgba(0, 22, 65, 0.14); border-radius: 8px; background: rgba(0, 89, 128, 0.05); }
+body.panel-theme-light .panel-subagent-row.is-open{ background: rgba(0, 89, 128, 0.09); }
+body.panel-theme-light .panel-subagent-row-head{ display: flex; align-items: center; gap: 7px; width: 100%; padding: 4px 8px; border: 0; background: transparent; color: inherit; text-align: left; }
+body.panel-theme-light .panel-subagent-row-head:hover{ background: rgba(0, 89, 128, 0.08); }
+body.panel-theme-light .panel-subagent-main{ display: flex; flex: 1 1 auto; flex-direction: column; gap: 1px; min-width: 0; }
+body.panel-theme-light .panel-subagent-list .panel-subagent-name{ max-width: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-xs); }
+body.panel-theme-light .panel-subagent-sub{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #2b436f; font-size: var(--text-2xs); }
+body.panel-theme-light .panel-subagent-figures{ display: flex; flex: none; gap: 8px; color: #2b436f; font-size: var(--text-2xs); font-variant-numeric: tabular-nums; }
+body.panel-theme-light .panel-subagent-caret{ flex: none; width: 0; height: 0; border-left: 5px solid currentColor; border-top: 4px solid transparent; border-bottom: 4px solid transparent; color: #203760; transition: transform .15s ease; }
+body.panel-theme-light .panel-subagent-caret.is-open{ transform: rotate(90deg); }
+body.panel-theme-light .panel-subagent-detail{ display: grid; gap: 6px; padding: 2px 9px 9px; border-top: 1px solid rgba(0, 22, 65, 0.12); }
+body.panel-theme-light .panel-subagent-empty{ margin: 0; color: #2b436f; font-size: var(--text-2xs); }
 body.panel-theme-light .panel-subagent-icon .panel-subagent-eye{ fill: currentColor; stroke: none; }
 body.panel-theme-light .panel-subagent-icon.is-completed{ color: #27603e; border-color: rgba(39, 96, 62, 0.26); }
 body.panel-theme-light .panel-subagent-icon.is-failed{ color: #581717; border-color: rgba(88, 23, 23, 0.3); }
