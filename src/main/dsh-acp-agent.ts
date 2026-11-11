@@ -379,9 +379,13 @@ export class DshAcpAgentClient implements ModelClient {
     const toolNames = new Map<string, string>()
 
     const onNotification = (notification: DshAcpNotification): void => {
-      if (notification.method === 'session/subagent_event') {
-        this.handleSubagentEvent(notification.params, sessionId)
-        return
+      // DSH 把子会话事件塞在 session/update 的 sessionUpdate 里，不是独立方法。
+      if (notification.method === 'session/update') {
+        const candidate = objectValue(notification.params.update)
+        if (textValue(candidate.sessionUpdate) === 'subagent_event') {
+          this.handleSubagentEvent(candidate, sessionId)
+          return
+        }
       }
       if (notification.method !== 'session/update') return
       const params = notification.params

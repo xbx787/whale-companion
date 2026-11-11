@@ -429,6 +429,8 @@ function parseIndex(raw: string): { settings: ConversationSettings; activeConver
       visibleConversationTabs: Number(settings.visibleConversationTabs),
       autoArchiveAfterDays: settings.autoArchiveAfterDays,
       effort: isEffortLevel(settings.effort) ? settings.effort : 'max',
+    temperature: typeof settings.temperature === 'number' ? Math.min(2, Math.max(0, settings.temperature)) : 0.4,
+    topP: typeof settings.topP === 'number' ? Math.min(1, Math.max(0.01, settings.topP)) : 0.01,
       ...readExtendedSettings(settings)
     },
     activeConversationId: value.activeConversationId,
@@ -477,7 +479,9 @@ function parseLibrary(raw: string): { library: PersistedLibrary; migrated: boole
         ? { visibleConversationTabs: Math.min(MAX_VISIBLE_TABS, Number(settings.maxActiveConversations)), autoArchiveAfterDays: 0, effort: 'max',
             ...readExtendedSettings(settings) }
         : { visibleConversationTabs: Number(settings.visibleConversationTabs), autoArchiveAfterDays: settings.autoArchiveAfterDays as ConversationSettings['autoArchiveAfterDays'],
-            effort: isEffortLevel(settings.effort) ? settings.effort : 'max', ...readExtendedSettings(settings) },
+            effort: isEffortLevel(settings.effort) ? settings.effort : 'max',
+    temperature: typeof settings.temperature === 'number' ? Math.min(2, Math.max(0, settings.temperature)) : 0.4,
+    topP: typeof settings.topP === 'number' ? Math.min(1, Math.max(0.01, settings.topP)) : 0.01, ...readExtendedSettings(settings) },
       activeConversationId: value.activeConversationId as string | null,
       conversations: records.map(completeRecord)
     },

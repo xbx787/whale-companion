@@ -1025,6 +1025,7 @@ const createRuntime = (conversationId: string, onChange: () => void, persistSess
       })
       // 用 adapter 目录里的模型 id：deepseek-flash 声明了图片输入，deepseek-v4-flash 不在目录里，会被读图工具判定为不支持图片。
       const model = normalizeDshModel(process.env.DSH_MODEL)
+      const currentSettings = activeController().currentSettings()
       if (process.env.DESKTOP_PET_DSH_TRANSPORT === 'sdk-minimal') {
         return new DshAgentClient({
           bridge,
@@ -1034,7 +1035,12 @@ const createRuntime = (conversationId: string, onChange: () => void, persistSess
             cwd: agentWorkspace,
             provider: 'deepseek-official',
             model,
-            env: { DEEPSEEK_API_KEY: key },
+            env: {
+            DEEPSEEK_API_KEY: key,
+            // 采样参数：内核补丁会把这个环境变量写进请求体，设置页可调。
+            DESKTOP_PET_TEMPERATURE: String(typeof currentSettings.temperature === 'number' ? currentSettings.temperature : 0.4),
+            DESKTOP_PET_TOP_P: String(typeof currentSettings.topP === 'number' ? currentSettings.topP : 0.01)
+          },
             mcpBridge: mcpBridgeScript
               ? { script: mcpBridgeScript, endpoint: () => bridge.endpoint }
               : undefined
@@ -1057,7 +1063,12 @@ const createRuntime = (conversationId: string, onChange: () => void, persistSess
           home: dshHome,
           cwd: agentWorkspace,
           systemPrompt: 'You are XiaoJing, a helpful desktop companion. Reply in the user language.',
-          env: { DEEPSEEK_API_KEY: key },
+          env: {
+            DEEPSEEK_API_KEY: key,
+            // 采样参数：内核补丁会把这个环境变量写进请求体，设置页可调。
+            DESKTOP_PET_TEMPERATURE: String(typeof currentSettings.temperature === 'number' ? currentSettings.temperature : 0.4),
+            DESKTOP_PET_TOP_P: String(typeof currentSettings.topP === 'number' ? currentSettings.topP : 0.01)
+          },
           mcpServers: async () => {
             const servers: DshAcpMcpServer[] = []
             const endpoint = bridge.endpoint

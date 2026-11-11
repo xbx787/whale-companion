@@ -607,6 +607,36 @@ if (!source.includes('if (block.type === "text") continue;')) {
   changes.push(`MCP 工具超时 30 分钟: 已应用 ${applied} 处，已存在 ${already} 处`)
 }
 
+// ---- 采样参数：宿主从设置里传温度与 top_p，内核请求体照单写入 ----
+{
+  const anchor = '...options.temperature === void 0 ? {} : { temperature: options.temperature },'
+  const injected = `${anchor}
+\t\t...(process.env.DESKTOP_PET_TEMPERATURE === void 0 ? {} : { temperature: Number(process.env.DESKTOP_PET_TEMPERATURE) }),
+\t\t...(process.env.DESKTOP_PET_TOP_P === void 0 ? {} : { top_p: Number(process.env.DESKTOP_PET_TOP_P) }),`
+  let applied = 0
+  let already = 0
+  let seen = 0
+  for (const dir of fs.readdirSync(pnpmRoot)) {
+    const deepseekFile = path.join(pnpmRoot, dir, 'node_modules', '@deepseek-ai', 'dsh-llm-deepseek', 'lib', 'index.js')
+    if (!fs.existsSync(deepseekFile)) continue
+    seen += 1
+    let deepseekSource = fs.readFileSync(deepseekFile, 'utf8')
+    if (deepseekSource.includes('DESKTOP_PET_TEMPERATURE')) { already += 1; continue }
+    if (!deepseekSource.includes(anchor)) {
+      console.error(`采样参数补丁锚点不存在（${dir}），DSH 版本可能变了。`)
+      process.exit(1)
+    }
+    deepseekSource = deepseekSource.replace(anchor, injected)
+    fs.writeFileSync(deepseekFile, deepseekSource, 'utf8')
+    applied += 1
+  }
+  if (!seen) {
+    console.error('找不到 dsh-llm-deepseek，采样参数补丁无法应用。')
+    process.exit(1)
+  }
+  changes.push(`采样参数注入: 已应用 ${applied} 处，已存在 ${already} 处`)
+}
+
 fs.writeFileSync(file, source, 'utf8')
 console.log(`补丁结果（${file}）：`)
 for (const line of changes) console.log(`  - ${line}`)

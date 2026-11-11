@@ -264,6 +264,9 @@ export interface ConversationSettings {
   /** How deep the model thinks. Values are exactly what DeepSeek accepts on
    *  both wire formats; the app rewrites every outgoing request to match. */
   effort: EffortLevel
+  /** 采样参数：内核补丁会写进请求体，设置页可调。 */
+  temperature?: number
+  topP?: number
   /** Named Anthropic-compatible endpoints the model menu can switch between. */
   modelProfiles: ModelProfile[]
   /** The profile in use; null falls back to the launch environment. */

@@ -221,7 +221,7 @@ body.panel-placement-right .panel-bubble::after { display: none; }
 }
 /* 这栏只放子智能体；没有子智能体时（容器为空）整行不占位。 */
 .panel-status-row:empty { display: none; }
-.panel-status-row:has(.panel-subagent-list) { flex-wrap: wrap; align-items: flex-start; }
+.panel-status-row:has(.panel-subagent-summary) { justify-content: flex-start; }
 /* 顶格：状态行的 15px 左内边距已经和消息区对齐，这里不再叠一层缩进。
    圆点从 7px 放大到 8px，并补一设备像素的基线偏移，免得比文字显得矮。 */
 .panel-status { display: inline-flex; align-items: center; gap: 7px; flex: none; color: #c5d6fb; font-size: var(--text-sm); white-space: nowrap; }
@@ -834,20 +834,24 @@ body.panel-placement-right .panel-bubble::after { display: none; }
 .panel-subagent-icon { display: inline-flex; align-items: center; justify-content: center; gap: 5px; flex: none; width: auto; min-width: 26px; height: 26px; padding: 0 8px 0 5px; border: 1px solid rgba(190, 212, 255, .2); border-radius: 8px; color: #bfe4ff; background: rgba(127, 216, 255, .08); }
 .panel-subagent-icon svg { width: 17px; height: 17px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 .panel-subagent-name { max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-2xs); line-height: 1; }
-/* 子智能体列表：一行一只，箭头展开详情，详情里直接跑它的思考与工具。 */
-.panel-subagent-list { display: flex; flex: 1 1 220px; flex-direction: column; gap: 2px; min-width: 0; max-height: 240px; overflow: auto; }
-.panel-subagent-list::-webkit-scrollbar { width: 4px; }
-.panel-subagent-list::-webkit-scrollbar-thumb { border-radius: 4px; background: rgba(170, 195, 240, .4); }
-.panel-subagent-row { border: 1px solid rgba(190, 212, 255, .14); border-radius: 8px; background: rgba(127, 216, 255, .05); }
-.panel-subagent-row.is-open { background: rgba(127, 216, 255, .09); }
-.panel-subagent-row-head { display: flex; align-items: center; gap: 7px; width: 100%; padding: 4px 8px; border: 0; background: transparent; color: inherit; text-align: left; }
-.panel-subagent-row-head:hover { background: rgba(127, 216, 255, .08); }
-.panel-subagent-main { display: flex; flex: 1 1 auto; flex-direction: column; gap: 1px; min-width: 0; }
-.panel-subagent-list .panel-subagent-name { max-width: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-xs); }
-.panel-subagent-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #90a8d4; font-size: var(--text-2xs); }
-.panel-subagent-figures { display: flex; flex: none; gap: 8px; color: #90a8d4; font-size: var(--text-2xs); font-variant-numeric: tabular-nums; }
-.panel-subagent-caret { flex: none; width: 0; height: 0; border-left: 5px solid currentColor; border-top: 4px solid transparent; border-bottom: 4px solid transparent; color: #9fb6df; transition: transform .15s ease; }
-.panel-subagent-caret.is-open { transform: rotate(90deg); }
+/* 状态栏一条摘要，靠左、不套外框；点开是覆盖在消息区上的子智能体清单。 */
+.panel-subagent-summary { display: inline-flex; align-items: center; gap: 4px; margin: 0; padding: 2px 2px; border: 0; background: transparent; color: #c5d6fb; font-size: var(--text-xs); }
+.panel-subagent-summary:hover { color: #e3eeff; }
+.panel-subagent-chevron { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; transform: rotate(-90deg); transition: transform .15s ease; }
+.panel-subagent-chevron.is-open { transform: rotate(0deg); }
+.panel-subagent-sheet { position: fixed; z-index: 70; display: flex; flex-direction: column; gap: 2px; box-sizing: border-box; max-height: min(420px, 60vh); overflow: auto; padding: 6px; border: 1px solid rgba(150, 185, 240, .28); border-radius: 12px; background: #0d1f3f; box-shadow: 0 18px 40px rgba(0, 0, 0, .45); }
+.panel-subagent-sheet::-webkit-scrollbar { width: 4px; }
+.panel-subagent-sheet::-webkit-scrollbar-thumb { border-radius: 4px; background: rgba(170, 195, 240, .4); }
+.panel-subagent-card { border-radius: 9px; background: rgba(120, 170, 255, .06); }
+.panel-subagent-card.is-open { background: rgba(120, 170, 255, .12); }
+.panel-subagent-card-head { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 8px; border: 0; background: transparent; color: inherit; text-align: left; }
+.panel-subagent-card-head:hover { background: rgba(120, 170, 255, .1); }
+.panel-subagent-card-main { display: flex; flex: 1 1 auto; flex-direction: column; gap: 2px; min-width: 0; }
+.panel-subagent-sheet .panel-subagent-name { font-size: var(--text-sm); color: #e3eeff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.panel-subagent-prompt { font-size: var(--text-2xs); color: #8fa6cf; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.panel-subagent-figures { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; flex: none; color: #9fb6df; font-size: var(--text-2xs); font-variant-numeric: tabular-nums; }
+.panel-subagent-caret { flex: none; width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; color: #9fb6df; transform: rotate(-90deg); transition: transform .15s ease; }
+.panel-subagent-caret.is-open { transform: rotate(0deg); }
 .panel-subagent-detail { display: grid; gap: 6px; padding: 2px 9px 9px; border-top: 1px solid rgba(190, 212, 255, .12); }
 .panel-subagent-empty { margin: 0; color: #90a8d4; font-size: var(--text-2xs); }
 .panel-subagent-icon .panel-subagent-eye { fill: currentColor; stroke: none; }
@@ -924,7 +928,11 @@ body.panel-placement-right .panel-bubble::after { display: none; }
 .panel-markdown .katex-display > .katex { min-width: max-content; }
 .panel-markdown input[type="checkbox"] { pointer-events: none; }
 .panel-markdown-image { color: #a9bee7; font-style: italic; }
-img.panel-markdown-image { display: block; max-width: 100%; margin: 6px 0; border-radius: 8px; color: inherit; font-style: normal; }
+img.panel-markdown-image { display: inline-block; vertical-align: top; width: calc(50% - 16px); height: auto; margin: 8px; border-radius: 8px; color: inherit; font-style: normal; cursor: zoom-in; }
+/* 图片随面板宽度换列：最窄一排两张，最宽一排五张。 */
+@media (min-width: 720px) { img.panel-markdown-image { width: calc(33.333% - 16px); } }
+@media (min-width: 940px) { img.panel-markdown-image { width: calc(25% - 16px); } }
+@media (min-width: 1140px) { img.panel-markdown-image { width: calc(20% - 16px); } }
 
 .panel-approval {
   margin: 15px 0 5px 37px;

@@ -651,7 +651,7 @@ function Avatar() {
       </button>
       {/* 状态条必须是舞台的直接子元素。放进按钮里会相对按钮（人物大小）
           定位，点会落到头发中间，而不是窗口右上角。 */}
-      {statusConversations.length > 0 && <span key={`avatar-dots-${renderEpoch}`} className="avatar-status-strip" aria-hidden="true">
+      {statusConversations.length > 0 && <span className="avatar-status-strip" aria-hidden="true">
         <span className="avatar-status-dots">
           {Array.from({ length: statusSlots }, (_, index) => {
             // 半径随人物大小缩放：人物越大，弧线仍贴着头部。
