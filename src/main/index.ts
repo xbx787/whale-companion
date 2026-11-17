@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeImage, Notification, powerMonitor, screen, shell, Tray } from 'electron'
-import { appendFileSync, existsSync, mkdirSync, promises as fsp, readdirSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, promises as fsp, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { execFile, execFileSync, spawn } from 'node:child_process'
 import { homedir } from 'node:os'
 import path from 'node:path'
@@ -2022,17 +2022,21 @@ function checkProviderHealth(): Promise<void> {
 }
 
 function createTray(): void {
-  // Windows 托盘槽位是 16 逻辑像素；按 DPI 选最接近的物理尺寸，避免系统再缩放一层。
+  // Windows 托盘槽位是 16 逻辑像素；这里按 1.05 倍取图（125% 下是 21 px），
+  // 让角色在托盘里尽量占满。
   const scale = screen.getPrimaryDisplay().scaleFactor
-  const target = Math.round(16 * scale)
-  const traySizes = [16, 20, 24, 32, 40, 48]
+  const target = Math.round(16 * scale * 1.05)
+  const traySizes = [16, 20, 21, 24, 32, 40, 48]
   const traySize = traySizes.reduce((best, size) =>
     Math.abs(size - target) < Math.abs(best - target) ? size : best, traySizes[0])
   const trayFile = `whale-tray-icon-pixel-${traySize}.png`
   const asset = app.isPackaged
     ? path.join(process.resourcesPath, trayFile)
     : path.join(projectRoot, 'src', 'renderer', 'assets', trayFile)
-  const icon = nativeImage.createFromPath(asset)
+  // 按 scaleFactor 声明这张图的实际倍率，否则 Electron 会当成 1 倍图，
+  // Windows 再缩到 16 逻辑像素的托盘槽位，角色会被缩两道、看起来很小。
+  const icon = nativeImage.createEmpty()
+  icon.addRepresentation({ scaleFactor: scale, buffer: readFileSync(asset) })
   if (icon.isEmpty()) throw new Error(`通知区域图标资源不可用：${asset}`)
   contextMenu = Menu.buildFromTemplate([
     { label: '配置向导', click: openOnboarding },

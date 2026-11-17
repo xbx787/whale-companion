@@ -1,6 +1,6 @@
 {
   "name": "desktop-resident-agent",
-  "version": "0.0.171",
+  "version": "0.0.172",
   "private": true,
   "license": "MIT",
   "author": "DesktopPetProject",
@@ -79,6 +79,10 @@
       {
         "from": "src/renderer/assets/whale-tray-icon-pixel-20.png",
         "to": "whale-tray-icon-pixel-20.png"
+      },
+      {
+        "from": "src/renderer/assets/whale-tray-icon-pixel-21.png",
+        "to": "whale-tray-icon-pixel-21.png"
       },
       {
         "from": "src/renderer/assets/whale-tray-icon-pixel-24.png",

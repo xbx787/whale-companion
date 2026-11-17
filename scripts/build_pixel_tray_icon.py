@@ -17,6 +17,7 @@ ICO_OUTPUT = ASSETS / "whale-tray-icon-pixel.ico"
 TRAY_OUTPUTS = {
     16: ASSETS / "whale-tray-icon-pixel-16.png",
     20: ASSETS / "whale-tray-icon-pixel-20.png",
+    21: ASSETS / "whale-tray-icon-pixel-21.png",
     24: ASSETS / "whale-tray-icon-pixel-24.png",
     32: ASSETS / "whale-tray-icon-pixel-32.png",
     40: ASSETS / "whale-tray-icon-pixel-40.png",
@@ -31,10 +32,14 @@ SMALL_MAX_SIZE = 48
 
 
 def ratio_for(size: int) -> float:
+    # 托盘实际只有 16 逻辑像素，角色占满画布才不至于比旁边的图标小一圈；
+    # 16 px 留 1 px 边，20 px 以上几乎占满。
+    if size <= 16:
+        return 0.90
     if size <= 20:
-        return 0.86
+        return 0.98
     if size <= 32:
-        return 0.92
+        return 0.97
     return SMALL_RATIO if size <= SMALL_MAX_SIZE else LARGE_RATIO
 
 
