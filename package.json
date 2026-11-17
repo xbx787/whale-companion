@@ -1,8 +1,8 @@
 {
   "name": "desktop-resident-agent",
-  "version": "0.0.166",
+  "version": "0.0.170",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
   "author": "DesktopPetProject",
   "description": "A resident Windows companion with an auditable task loop",
   "main": "./out/main/index.js",
@@ -73,8 +73,28 @@
         "to": "whale-tray-icon-pixel.png"
       },
       {
+        "from": "src/renderer/assets/whale-tray-icon-pixel-16.png",
+        "to": "whale-tray-icon-pixel-16.png"
+      },
+      {
+        "from": "src/renderer/assets/whale-tray-icon-pixel-20.png",
+        "to": "whale-tray-icon-pixel-20.png"
+      },
+      {
         "from": "src/renderer/assets/whale-tray-icon-pixel-24.png",
         "to": "whale-tray-icon-pixel-24.png"
+      },
+      {
+        "from": "src/renderer/assets/whale-tray-icon-pixel-32.png",
+        "to": "whale-tray-icon-pixel-32.png"
+      },
+      {
+        "from": "src/renderer/assets/whale-tray-icon-pixel-40.png",
+        "to": "whale-tray-icon-pixel-40.png"
+      },
+      {
+        "from": "src/renderer/assets/whale-tray-icon-pixel-48.png",
+        "to": "whale-tray-icon-pixel-48.png"
       },
       {
         "from": "src/renderer/assets/whale-tray-icon-pixel.ico",

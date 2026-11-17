@@ -1,0 +1,12 @@
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <!--
+    安装包由 actions/upload-artifact 打包成 ZIP 后提交，所以根元素是 zip-file。
+    安装包内只有一个 Setup exe；不在这里签 win-unpacked 里的主程序，签名顺序
+    保持“先出安装包、再签安装包”，避免安装包内的 exe 与签名后的 exe 不一致。
+  -->
+  <zip-file>
+    <pe-file path="*.exe">
+      <authenticode-sign/>
+    </pe-file>
+  </zip-file>
+</artifact-configuration>

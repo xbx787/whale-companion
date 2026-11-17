@@ -1,0 +1,113 @@
+name: Signed release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号，例如 0.0.171'
+        required: true
+        type: string
+      sign:
+        description: '提交 SignPath 签名'
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11'
+
+      - name: 安装应用依赖
+        run: npm ci
+
+      - name: 还原 DSH 运行时
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path reference/dsh-runtime | Out-Null
+          Copy-Item ci/dsh-runtime/package.json reference/dsh-runtime/package.json -Force
+          Copy-Item ci/dsh-runtime/pnpm-workspace.yaml reference/dsh-runtime/pnpm-workspace.yaml -Force
+          Push-Location reference/dsh-runtime
+          try { pnpm install --no-frozen-lockfile } finally { Pop-Location }
+
+      - name: 写入版本号
+        shell: pwsh
+        run: |
+          $version = '${{ inputs.version }}'
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "版本号不合法：$version" }
+          $pkg = Get-Content package.json -Raw
+          $pkg = [regex]::Replace($pkg, '"version":\s*"[^"]+"', "`"version`": `"$version`"", 1)
+          [IO.File]::WriteAllText((Join-Path (Get-Location) 'package.json'), $pkg, (New-Object System.Text.UTF8Encoding $false))
+
+      - name: 构建与打包
+        shell: pwsh
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/pack-release.ps1 -NoShortcutSwitch
+
+      - name: 定位安装包
+        id: installer
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem release -Recurse -Filter '*.exe' |
+            Where-Object { $_.Name -match 'Setup' } | Select-Object -First 1
+          if (-not $setup) { throw '找不到安装包。' }
+          "path=$($setup.FullName)" >> $env:GITHUB_OUTPUT
+          "name=$($setup.Name)" >> $env:GITHUB_OUTPUT
+          Write-Output "安装包：$($setup.FullName)"
+
+      - name: 上传未签名安装包
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-installer
+          path: ${{ steps.installer.outputs.path }}
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: 提交 SignPath 签名
+        if: ${{ inputs.sign && vars.SIGNPATH_ORGANIZATION_ID != '' }}
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG || 'installer' }}
+          github-artifact-id: ${{ steps.upload.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 7200
+          output-artifact-directory: signed
+
+      - name: 校验签名
+        if: ${{ inputs.sign && vars.SIGNPATH_ORGANIZATION_ID != '' }}
+        shell: pwsh
+        run: |
+          $signed = Get-ChildItem signed -Recurse -Filter '*.exe' | Select-Object -First 1
+          if (-not $signed) { throw '签名产物缺失。' }
+          $sig = Get-AuthenticodeSignature -LiteralPath $signed.FullName
+          if ($sig.Status -ne 'Valid') { throw "签名无效：$($sig.Status)" }
+          Write-Output "签名者：$($sig.SignerCertificate.Subject)"
+          Write-Output "文件：$($signed.FullName)"
+
+      - name: 上传已签名安装包
+        if: ${{ inputs.sign && vars.SIGNPATH_ORGANIZATION_ID != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: signed-installer
+          path: signed/**/*.exe
+          if-no-files-found: error
+          retention-days: 30

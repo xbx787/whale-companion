@@ -97,8 +97,16 @@ npm.cmd run dev
 - 角色立绘来自公开角色页，仅作个人桌面使用；公开分发前需要确认权利或替换为原创素材。
 - 语音质量取决于本机中文语音包和网络。
 
+## 代码签名
+
+Windows 安装包由 [SignPath.io](https://signpath.io/) 提供免费代码签名，证书由 [SignPath Foundation](https://signpath.org/) 签发。签名只覆盖从本仓库源码在 GitHub Actions 构建的发布产物，签名策略见 [CODE_SIGNING_POLICY.md](./CODE_SIGNING_POLICY.md)。
+
+Free code signing provided by SignPath.io, certificate by SignPath Foundation.
+
 ## 致谢与许可
 
 桌面操作（截屏、点击、输入、窗口与界面自动化）来自 [CursorTouch/Windows-MCP](https://github.com/CursorTouch/Windows-MCP)。小鲸把它收敛成宿主内置的 `win_*` 工具，蓝色截屏标注框、键鼠横幅和方向动画是本项目的本地补丁。
 
 完整第三方组件与许可见 [THIRD-PARTY-NOTICES.md](./THIRD-PARTY-NOTICES.md)。
+
+代码以 [MIT](./LICENSE) 许可发布。角色立绘来自公开角色页，仅作个人桌面使用，不在 MIT 授权范围内；公开分发前需要确认权利或替换为原创素材。
