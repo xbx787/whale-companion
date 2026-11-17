@@ -53,6 +53,26 @@ describe('conversation controller', () => {
     expect(activeSideChatParentId(controller.displayedConversationId(), library)).toBeNull()
   })
 
+  it('moves a conversation tab to the front and beside another one', async () => {
+    const store = new ConversationStore(testRoot)
+    const controller = new ConversationController(store,
+      (_conversationId, onChange) => new AgentRuntime(new NoteStore(testRoot), undefined, onChange))
+    await controller.initialize()
+    const first = controller.displayedConversationId()!
+    const second = (await controller.createConversation('第二个')).id
+    const third = (await controller.createConversation('第三个')).id
+    expect(controller.getSnapshot().conversationLibrary?.settings.tabOrder.slice(0, 3))
+      .toEqual([third, second, first])
+
+    const toFront = await controller.moveConversationTab(first, 'first')
+    expect(toFront.order.slice(0, 3)).toEqual(['新对话', '第三个', '第二个'])
+
+    const afterSecond = await controller.moveConversationTab(first, 'after', second)
+    expect(afterSecond.order.slice(0, 3)).toEqual(['第三个', '第二个', '新对话'])
+
+    await expect(controller.moveConversationTab(first, 'before')).rejects.toThrow('参照对话')
+  })
+
   it('carries a conversation into a new one without touching the source', async () => {
     const store = new ConversationStore(testRoot)
     const source = await store.createConversation('旧对话', 'dsh')
@@ -1271,5 +1291,40 @@ describe('parallel conversations', () => {
       entry.sender?.target === '开发1'), 'delivered message')
     // A conversation cannot message itself, and the body keeps its source.
     await expect(controller.sendToConversation('开发2', 'x', source.id)).rejects.toThrow('不能给当前对话自己发消息')
+  })
+
+  it('rejects a send once shutdown has begun instead of leaving an unanswered turn', async () => {
+    const store = new ConversationStore(testRoot)
+    const controller = new ConversationController(store,
+      (_conversationId, onChange) => new AgentRuntime(new NoteStore(testRoot), undefined, onChange))
+    await controller.initialize()
+    controller.beginShutdown()
+    await expect(controller.sendMessage('退出时发的消息')).rejects.toThrow('应用正在退出或重启')
+    await expect(controller.sendSystemMessage('退出时的系统消息')).rejects.toThrow('应用正在退出或重启')
+    // Nothing was queued or written to the timeline.
+    expect(controller.getSnapshot().timeline.some((entry) => entry.kind === 'user')).toBe(false)
+  })
+
+  it('keeps the displayed timeline after the idle runtime is disposed', async () => {
+    const previous = process.env.DESKTOP_PET_IDLE_DISPOSE_MS
+    process.env.DESKTOP_PET_IDLE_DISPOSE_MS = '120'
+    try {
+      const store = new ConversationStore(testRoot)
+      const controller = new ConversationController(store,
+        (_conversationId, onChange) => new AgentRuntime(new NoteStore(testRoot), {
+          respond: async () => ({ text: '答复' })
+        }, onChange))
+      await controller.initialize()
+      await controller.sendMessage('会闲置的消息')
+      await until(() => controller.getSnapshot().timeline.some((entry) => entry.kind === 'assistant'), 'reply')
+      await until(() => !controller.displayedRuntime(), 'idle runtime disposed')
+      // 闲置回收释放 runtime 后，快照要退回磁盘记录，不能变成空时间线。
+      const timeline = controller.getSnapshot().timeline
+      expect(timeline.some((entry) => entry.kind === 'user' && entry.text.includes('会闲置的消息'))).toBe(true)
+      expect(timeline.some((entry) => entry.kind === 'assistant')).toBe(true)
+    } finally {
+      if (previous === undefined) delete process.env.DESKTOP_PET_IDLE_DISPOSE_MS
+      else process.env.DESKTOP_PET_IDLE_DISPOSE_MS = previous
+    }
   })
 })

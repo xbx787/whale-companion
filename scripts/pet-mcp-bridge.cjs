@@ -64,8 +64,14 @@ const TOOLS = [
   },
   {
     name: 'conversations_list',
-    description: '列出本应用里的其他对话及其运行状态。仅在需要给另一个对话转达消息时使用；返回 id、标题、是否正在运行。',
-    inputSchema: { type: 'object', properties: {}, additionalProperties: false }
+    description: '列出本应用里的其他对话及其运行状态。默认不含已归档；需要恢复归档对话时把 includeArchived 设为 true。返回 id、标题、是否正在运行。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        includeArchived: { type: 'boolean', description: 'true 时连归档对话一起列出' }
+      },
+      additionalProperties: false
+    }
   },
   {
     name: 'conversations_send_message',
@@ -77,6 +83,94 @@ const TOOLS = [
         message: { type: 'string', description: '要转达的正文，最多 8000 字' }
       },
       required: ['target', 'message'],
+      additionalProperties: false
+    }
+  },
+  {
+    name: 'conversations_create',
+    description: '新建一个对话，和面板顶栏的「+」按钮同一个动作：新对话会成为当前对话。只在用户明确要求新建对话时使用。',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false }
+  },
+  {
+    name: 'conversations_rename',
+    description: '重命名一个对话，包括当前对话自己。target 用清单里的 id 或唯一标题。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        target: { type: 'string', description: '目标对话的 id 或唯一标题' },
+        title: { type: 'string', description: '新标题，最多 40 字' }
+      },
+      required: ['target', 'title'],
+      additionalProperties: false
+    }
+  },
+  {
+    name: 'conversations_set_pinned',
+    description: '置顶或取消置顶一个对话。置顶的对话排在左栏会话列表最前，不影响顶栏标签顺序。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        target: { type: 'string', description: '目标对话的 id 或唯一标题' },
+        pinned: { type: 'boolean', description: 'true 置顶，false 取消置顶' }
+      },
+      required: ['target', 'pinned'],
+      additionalProperties: false
+    }
+  },
+  {
+    name: 'conversations_move',
+    description: '调整一个对话在顶栏标签里的位置。position 用 first/last 移到最前或最后；用 before/after 时同时给 anchor 指定参照对话。只改标签顺序，不改左栏列表顺序。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        target: { type: 'string', description: '要移动的对话 id 或唯一标题' },
+        position: { type: 'string', enum: ['first', 'last', 'before', 'after'], description: '移动到的位置' },
+        anchor: { type: 'string', description: 'position 为 before/after 时的参照对话 id 或唯一标题' }
+      },
+      required: ['target', 'position'],
+      additionalProperties: false
+    }
+  },
+  {
+    name: 'conversations_archive',
+    description: '归档一个对话：记录保留，可从归档恢复。',
+    inputSchema: {
+      type: 'object',
+      properties: { target: { type: 'string', description: '目标对话的 id 或唯一标题' } },
+      required: ['target'],
+      additionalProperties: false
+    }
+  },
+  {
+    name: 'conversations_restore',
+    description: '把已归档的对话恢复出来。',
+    inputSchema: {
+      type: 'object',
+      properties: { target: { type: 'string', description: '目标对话的 id 或唯一标题' } },
+      required: ['target'],
+      additionalProperties: false
+    }
+  },
+  {
+    name: 'conversations_delete',
+    description: '永久删除一个对话，无法恢复。只在用户明确要求删除某个对话时使用。',
+    inputSchema: {
+      type: 'object',
+      properties: { target: { type: 'string', description: '目标对话的 id 或唯一标题' } },
+      required: ['target'],
+      additionalProperties: false
+    }
+  },
+  {
+    name: 'ocr',
+    description: '识别 PDF、Word、PowerPoint 或图片里的文字，按页返回。path 用本机绝对路径；默认 text_recognition，需要保留排版和坐标时用 rich_layout_recognition。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: '本机文件的绝对路径' },
+        purpose: { type: 'string', enum: ['text_recognition', 'rich_layout_recognition'], description: '识别方式' }
+      },
+      required: ['path'],
       additionalProperties: false
     }
   },

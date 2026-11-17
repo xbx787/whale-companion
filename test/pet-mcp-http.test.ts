@@ -64,7 +64,14 @@ describe('MCP over HTTP endpoint', () => {
     const bridge = new PetMcpBridge()
     bridge.setConversationBridge({
       list: () => [{ id: 'a', title: '开发1', running: false, archived: false }],
-      send: async () => ({ id: 'a', title: 'ok' })
+      send: async () => ({ id: 'a', title: 'ok' }),
+      create: async () => ({ id: 'new', title: '新对话' }),
+      rename: async (target, title) => ({ id: target, title }),
+      setPinned: async (target, pinned) => ({ id: target, title: '置顶状态', pinned }),
+      move: async (target, position) => ({ id: target, title: '移动结果', order: [position] }),
+      archive: async (target) => ({ id: target, title: '归档' }),
+      restore: async (target) => ({ id: target, title: '恢复' }),
+      remove: async (target) => ({ id: target, title: '删除' })
     })
     await bridge.start()
     cleanups.push(() => bridge.close())
@@ -76,7 +83,7 @@ describe('MCP over HTTP endpoint', () => {
     const result = reply.body.result as { content: Array<{ text: string }>; isError?: boolean }
     expect(result.isError).toBeUndefined()
     expect(JSON.parse(result.content[0].text)).toEqual({
-      conversations: [{ id: 'a', title: '开发1', running: false }]
+      conversations: [{ id: 'a', title: '开发1', running: false, archived: false }]
     })
   })
 

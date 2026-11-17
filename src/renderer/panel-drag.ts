@@ -45,11 +45,11 @@ export function beginWindowDrag(event: ReactPointerEvent<HTMLElement>, fromHeade
   window.addEventListener('pointerup', up)
 }
 
-/** 拖动中的尺寸预览：只记目标尺寸，窗口在松开鼠标时才变形；
- *  手柄和那圈 L 线先跟着鼠标走，让人看清楚窗口会变到哪。 */
+/** 拖动中的尺寸：窗口实时跟着鼠标变形，手柄固定在窗口左上角，所以它和
+ *  顶栏内容的相对位置始终不变；只按约一帧一次节流提交，避免 IPC 排队。 */
 export function movePanelResize({ event, sessionRef, direction, minWidth, minHeight, onEnd }: {
   event: ReactPointerEvent<HTMLDivElement>
-  sessionRef: { current: { pointerId: number; grip: HTMLDivElement; startScreenX: number; startScreenY: number; startW: number; startH: number; lastWidth: number; lastHeight: number } | null }
+  sessionRef: { current: { pointerId: number; grip: HTMLDivElement; startScreenX: number; startScreenY: number; startW: number; startH: number; lastSent: number; lastWidth: number; lastHeight: number } | null }
   direction: 'up' | 'down'
   minWidth: number
   minHeight: number
@@ -72,8 +72,10 @@ export function movePanelResize({ event, sessionRef, direction, minWidth, minHei
   const height = Math.round(Math.min(maxHeight, Math.max(minHeight, session.startH + heightDelta)))
   session.lastWidth = width
   session.lastHeight = height
-  const dx = Math.round(session.startW - width)
-  const dy = Math.round(direction === 'down' ? height - session.startH : session.startH - height)
-  session.grip.style.transform = `translate3d(${dx}px, ${dy}px, 0)`
+  const now = performance.now()
+  if (now - session.lastSent >= 16) {
+    session.lastSent = now
+    void petBridge().setPanelSize(width, height).catch(() => undefined)
+  }
   petBridge().resizeGhost({ x: event.screenX, y: event.screenY })
 }

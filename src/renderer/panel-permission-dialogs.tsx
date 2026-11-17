@@ -31,8 +31,18 @@ export function EvolveConfirmDialog({ open, phrase, text, onText, onCancel, onCo
   return <div className="panel-bypass-backdrop" onClick={onCancel}>
     <section className="panel-bypass panel-evolve-confirm" role="dialog" aria-modal="true" aria-labelledby="evolve-title" onClick={(event) => event.stopPropagation()}>
       <h3 id="evolve-title">开启「自我进化」？这是最高权限。</h3>
-      <p><strong>这不是普通的完全访问。</strong>开启后，我可以在没有逐条确认的情况下修改自己的源码、运行构建和测试、打包新版本、重启应用，并在重启后继续执行任务。</p>
-      <p><strong>错误的自修改可能让应用无法启动、丢失未保存的工作，或被新版本带回旧问题。</strong>命令超时、步骤上限和重启次数只是保护，不是回滚。请先提交代码或做好备份，并只在明确知道要改什么时开启。</p>
+      <p><strong>自我进化 = 完全访问 + 改自己的代码 + 打包重启。</strong>开启后，我不再逐条征求同意，也不会在动手前停下来问你。</p>
+      <div className="panel-evolve-roles">
+        <section className="panel-evolve-role">
+          <h4>你是这个项目的开发者</h4>
+          <p>关键词是<strong>「进化」</strong>。你说「进化到 N」，我就改代码、跑测试、打 N 版本、重启，并在重启后继续跑完剩下的任务；你说「别进化」，我就只做普通开发。改动留在当前 worktree，<strong><code>scripts/evolve-report.ps1</code> 会把 diff、测试结果和版本号整理成 PR 或 issue 草稿</strong>，GitHub 仓库里也放了对应的提交模板。</p>
+        </section>
+        <section className="panel-evolve-role is-caution">
+          <h4>如果你不参与开发</h4>
+          <p><strong>谨慎开启：这个模式在大多数情况下就等于完全访问。</strong>它还允许我修改自己的程序、打包和重启，改坏了应用可能直接打不开。<strong>你必须知道自己在干什么</strong>：说得出要改什么、改坏了怎么恢复，再开。</p>
+        </section>
+      </div>
+      <p><strong>错误的自修改可能让应用无法启动、丢失未保存的工作，或被新版本带回旧问题。</strong>命令超时、步骤上限和重启次数只是保护，不是回滚。请先提交代码或做好备份。</p>
       <p>随时切回其他审批模式即可停用。但已经启动的重启和已排队命令不会因为切换模式而取消。</p>
       <label className="panel-evolve-authorize">
         <span>必须手动输入下面的短语才能开启：<code>{phrase}</code></span>

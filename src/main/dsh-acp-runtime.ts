@@ -162,6 +162,14 @@ export class DshAcpRuntime {
     }
   }
 
+  /** 采样参数走进程环境：内核补丁在每次请求体里读这两个变量。改完要等
+   *  下一轮重启进程才生效，调用方负责关闭当前进程。 */
+  setSamplingEnvironment(patch: { temperature: number; topP: number }): void {
+    const env = this.settings.env ?? (this.settings.env = {})
+    env.DESKTOP_PET_TEMPERATURE = String(patch.temperature)
+    env.DESKTOP_PET_TOP_P = String(patch.topP)
+  }
+
   /** The sandbox preset is a process-level env var too. */
   setPermissionMode(mode: 'read-only' | 'workspace-write' | 'danger-full-access'): void {
     if (this.settings.permissionMode === mode) return

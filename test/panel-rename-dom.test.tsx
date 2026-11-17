@@ -116,4 +116,24 @@ describe('renaming a conversation from the library', () => {
     expect(host.querySelector('.panel-session-edit')).toBeNull()
     expect(renameConversation).not.toHaveBeenCalled()
   })
+
+  it('opens the library already editing when rename starts from a top tab', async () => {
+    await act(async () => root.render(<PanelBubble visible snapshot={snapshot()} error={null}
+      run={async (action) => { await action((window as unknown as { pet: PetAPI }).pet); return true }} />))
+    await act(async () => click(host.querySelector('.panel-expand-toggle')!))
+    const tab = host.querySelector<HTMLElement>('.panel-quick-tab')!
+    expect(tab).toBeTruthy()
+    await act(async () => {
+      tab.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 24, clientY: 18 }))
+    })
+    const renameItem = [...host.querySelectorAll<HTMLElement>('.tab-context-menu button')]
+      .find((button) => button.textContent?.includes('重命名'))!
+    expect(renameItem).toBeTruthy()
+    await act(async () => click(renameItem))
+    // openLibrary 里的 await 把状态推到微任务，先排空再断言。
+    await act(async () => { await Promise.resolve() })
+    expect(host.querySelector('.panel-library-drawer')).not.toBeNull()
+    // 关键：已经处于编辑态，不用再点一次行内的重命名按钮。
+    expect(host.querySelector('.panel-session-edit input')).not.toBeNull()
+  })
 })

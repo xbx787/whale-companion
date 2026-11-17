@@ -1,10 +1,18 @@
 import type { RefObject } from 'react'
 import type { EffortLevel, ModelProfile, PhoneLinkStatus } from '../shared/contracts'
+import { TEMPERATURE_RANGE, TOP_P_RANGE } from '../shared/contracts'
 import { EffortSlider } from './effort-slider'
+import { SamplingSlider } from './sampling-slider'
 import { GoalIcon, ModelIcon, PlanIcon, WebSearchIcon } from './panel-icons'
 
+/** 两档采样预设：严谨偏确定，活泼给一点变化。数字来自实测可用的组合。 */
+const SAMPLING_PRESETS = [
+  { id: 'strict', label: '严谨', temperature: 0.4, topP: 0.1 },
+  { id: 'lively', label: '活泼', temperature: 0.7, topP: 0.9 }
+] as const
+
 /** 输入区左下角的模型与上下文菜单：目标、计划、联网三个开关，手机端入口，模型列表和思考强度。 */
-export function ModelPicker({ wrapperRef, open, dsh, sideExpanded, goalOn, planOn, webOn, goalTitle, profiles, activeId, effort, phoneState, onOpenPhone, onToggle, onClose, onToggleGoal, onChoosePlan, onToggleWeb, onPickProfile, onManage, onOpenOnboarding, onEffort }: {
+export function ModelPicker({ wrapperRef, open, dsh, sideExpanded, goalOn, planOn, webOn, goalTitle, profiles, activeId, effort, temperature, topP, phoneState, onOpenPhone, onToggle, onClose, onToggleGoal, onChoosePlan, onToggleWeb, onPickProfile, onManage, onOpenOnboarding, onEffort, onSampling }: {
   wrapperRef: RefObject<HTMLDivElement | null>
   open: boolean
   dsh: boolean
@@ -16,6 +24,8 @@ export function ModelPicker({ wrapperRef, open, dsh, sideExpanded, goalOn, planO
   profiles: ModelProfile[]
   activeId?: string | null
   effort: EffortLevel
+  temperature: number
+  topP: number
   phoneState?: PhoneLinkStatus | null
   onOpenPhone?: () => void
   onToggle: () => void
@@ -27,6 +37,7 @@ export function ModelPicker({ wrapperRef, open, dsh, sideExpanded, goalOn, planO
   onManage: () => void
   onOpenOnboarding: () => void
   onEffort: (level: EffortLevel) => void
+  onSampling: (temperature: number, topP: number) => void
 }) {
   const enabled = profiles.filter((profile) => profile.enabled !== false)
   const phoneConnected = phoneState?.state === 'connected'
@@ -41,6 +52,21 @@ export function ModelPicker({ wrapperRef, open, dsh, sideExpanded, goalOn, planO
         <span className="panel-phone-entry-label">连接 DSH Go 手机端</span>
         <span className="panel-phone-entry-state">{phoneConnected ? '已连接' : '未连接'}</span>
       </button>}
+      <div className="panel-model-sampling">
+        <div className="panel-popover-heading">采样参数</div>
+        <div className="panel-sampling-presets" role="group" aria-label="采样预设">
+          {SAMPLING_PRESETS.map((preset) => {
+            const active = Math.abs(temperature - preset.temperature) < 0.001 && Math.abs(topP - preset.topP) < 0.001
+            return <button key={preset.id} type="button" className={`panel-sampling-preset${active ? ' is-active' : ''}`}
+              aria-pressed={active} disabled={sideExpanded || !dsh}
+              onClick={() => onSampling(preset.temperature, preset.topP)}>{preset.label}</button>
+          })}
+        </div>
+        <SamplingSlider label="Temperature" value={temperature} min={TEMPERATURE_RANGE.min} max={TEMPERATURE_RANGE.max} step={0.05}
+          disabled={sideExpanded || !dsh} onCommit={(next) => onSampling(next, topP)} />
+        <SamplingSlider label="Top P" value={topP} min={TOP_P_RANGE.min} max={TOP_P_RANGE.max} step={0.01}
+          disabled={sideExpanded || !dsh} onCommit={(next) => onSampling(temperature, next)} />
+      </div>
       <div className="panel-popover-modes">
         <div className="panel-popover-heading">模式</div>
         <button type="button" role="switch" aria-checked={goalOn} className={`panel-mode-toggle is-goal${goalOn ? ' is-on' : ''}`} disabled={sideExpanded || !dsh}

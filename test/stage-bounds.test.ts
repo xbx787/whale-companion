@@ -30,6 +30,14 @@ describe('computeStageBounds', () => {
     expect(next.height - AVATAR_STRIP).toBeGreaterThanOrEqual(BUBBLE_MIN_HEIGHT)
   })
 
+  it('never puts the expanded stage top above the work area for any avatar position', () => {
+    for (let y = -400; y <= 1200; y += 25) {
+      const avatar = { x: 200, y, width: 200, height: 220 }
+      const next = computeStageBounds(avatar, work, true)
+      expect(next.y).toBeGreaterThanOrEqual(work.y)
+    }
+  })
+
   it('never pushes the stage out of a short work area', () => {
     const short = { x: 0, y: 0, width: 1280, height: 700 }
     const start = { x: 300, y: 140, width: STAGE_WIDTH, height: STAGE_HEIGHT }

@@ -36,6 +36,38 @@ describe('persistent conversation library', () => {
     expect((await store.getState()).settings.panelAutoCollapseMinutes).toBe(5)
   })
 
+  it('persists sampling parameters and rejects values outside the ranges', async () => {
+    const store = new ConversationStore(testRoot)
+    expect((await store.getState()).settings.temperature).toBe(0.4)
+    expect((await store.getState()).settings.topP).toBe(0.01)
+    expect((await store.getState()).settings.statusDotMode).toBe('always')
+    const saved = await store.updateSettings({ temperature: 0.7, topP: 0.9, statusDotMode: 'float' })
+    expect(saved.temperature).toBe(0.7)
+    expect(saved.topP).toBe(0.9)
+    expect(saved.statusDotMode).toBe('float')
+    const reopened = await new ConversationStore(testRoot).getState()
+    expect(reopened.settings.temperature).toBe(0.7)
+    expect(reopened.settings.topP).toBe(0.9)
+    expect(reopened.settings.statusDotMode).toBe('float')
+    await expect(store.updateSettings({ temperature: 2.5 })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+    await expect(store.updateSettings({ topP: 0 })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+    await expect(store.updateSettings({ statusDotMode: 'bogus' as never })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+    expect((await store.getState()).settings.temperature).toBe(0.7)
+  })
+
+  it('persists window and avatar opacity', async () => {
+    const store = new ConversationStore(testRoot)
+    expect((await store.getState()).settings.windowOpacity).toBe(100)
+    const saved = await store.updateSettings({ windowOpacity: 80, avatarOpacity: 60 })
+    expect(saved.windowOpacity).toBe(80)
+    expect(saved.avatarOpacity).toBe(60)
+    const reopened = await new ConversationStore(testRoot).getState()
+    expect(reopened.settings.windowOpacity).toBe(80)
+    expect(reopened.settings.avatarOpacity).toBe(60)
+    await expect(store.updateSettings({ windowOpacity: 120 })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+    await expect(store.updateSettings({ avatarOpacity: -1 })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+  })
+
   it('applies a mixed batch in one write and reports every distinct skipped ID', async () => {
     const store = new ConversationStore(testRoot)
     const first = await store.createConversation('第一段')
@@ -295,6 +327,7 @@ describe('persistent conversation library', () => {
     // fall back to their defaults.
     expect((await migrated.getState()).settings).toEqual({
       visibleConversationTabs: 5, autoArchiveAfterDays: 0, effort: 'max',
+      temperature: 0.4, topP: 0.01, statusDotMode: 'always',
       modelProfiles: [], activeModelProfileId: null, enableAutoTitleGeneration: true,
       showMessageTimestamps: true, showSenderBadges: true, senderRouteStyle: 'chip', compactTimeline: false,
       userName: '主人', assistantName: '小鲸',

@@ -104,7 +104,7 @@ body.panel-theme-light.is-resizing-panel .panel-resize-grip::before{
 }
 /* 展开时会话库按钮紧贴手柄热区右缘。 */
 body.panel-theme-light .panel-bubble.is-expanded .panel-chat-header{ padding-left: 10px; }
-body.panel-theme-light .panel-window-action{ position: absolute; z-index: 20; top: 9px; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 9px; color: #03112d; background: transparent; }
+body.panel-theme-light .panel-window-action{ position: absolute; z-index: 20; top: 8px; display: grid; place-items: center; width: 29px; height: 29px; padding: 0; border: 0; border-radius: 9px; color: #03112d; background: transparent; }
 body.panel-theme-light .panel-expand-toggle{ right: 45px; }
 body.panel-theme-light .panel-window-close{ right: 13px; }
 body.panel-theme-light .panel-window-action:hover{ color: #000000; background: rgba(4, 29, 77, 0.18); }
@@ -127,6 +127,9 @@ body.panel-theme-light .panel-bubble::after{
   height: 8px;
   background: #bbccf3;
   clip-path: polygon(0 0, 100% 0, 50% 100%);
+  /* 尾巴也要有和面板同色的 1px 描边：clip-path 本身不带边框，用一层
+     贴着形状的阴影补出两条斜边和底边，不能只让斜边有线。 */
+  filter: drop-shadow(0 0 .6px rgba(0, 25, 71, 0.7));
   pointer-events: none;
 }
 /* 面板窗口里的尾巴跟着人物走：主进程把人物中心换算成相对窗口左缘的像素。 */
@@ -188,8 +191,8 @@ body.panel-theme-light .panel-side-meta .panel-side-paused{ margin-left: 0; }
 body.panel-theme-light .panel-side-intro{ margin: 2px 0 12px; padding: 0 2px; color: #193562; font-size: var(--text-xs); line-height: 1.45; }
 body.panel-theme-light .panel-history-loading{ margin: 12px 2px; color: #193562; font-size: var(--text-xs); line-height: 1.45; }
 
-body.panel-theme-light .panel-chat-header{ position: relative; z-index: 5; display: flex; align-items: center; gap: 6px; flex: none; min-width: 0; height: 46px; padding: 4px 113px 0 10px; border-bottom: 1px solid rgba(0, 24, 67, 0.14); }
-body.panel-theme-light .panel-library-toggle{ display: grid; place-items: center; flex: none; width: 28px; height: 28px; margin-bottom: 0; padding: 0; border: 0; border-radius: 9px; color: #000f2c; background: rgba(4, 29, 77, 0.09); }
+body.panel-theme-light .panel-chat-header{ position: relative; z-index: 5; display: flex; align-items: center; gap: 6px; flex: none; min-width: 0; height: 46px; padding: 0 113px 0 10px; border-bottom: 1px solid rgba(0, 24, 67, 0.14); }
+body.panel-theme-light .panel-library-toggle{ display: grid; place-items: center; flex: none; width: 29px; height: 29px; margin-bottom: 0; padding: 0; border: 0; border-radius: 9px; color: #000f2c; background: rgba(4, 29, 77, 0.09); }
 body.panel-theme-light .panel-library-toggle:hover{ color: #000000; background: rgba(4, 29, 77, 0.2); }
 body.panel-theme-light .panel-library-toggle svg{ width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
 body.panel-theme-light .panel-session-menu{ position: absolute; z-index: 6; top: 40px; left: 10px; display: grid; width: min(228px, calc(100vw - 24px)); max-height: max(240px, min(320px, calc(100vh - 120px))); padding: 6px; overflow-y: auto; border: 1px solid rgba(0, 22, 65, 0.31); border-radius: 11px; background: linear-gradient(155deg, rgba(138, 161, 213, 0.99), rgba(183, 199, 238, 0.99)); box-shadow: 0 10px 28px rgba(217, 226, 250, 0.42); scrollbar-width: thin; }
@@ -447,7 +450,7 @@ body.panel-theme-light .panel-quick-tabs{ display: flex; align-items: center; ga
 body.panel-theme-light .panel-quick-tabs::-webkit-scrollbar{ display: none; }
 /* 会话标签是悬浮的小圆角矩形：四周留出空隙，不再把侧边线接到栏底。
    当前会话只用背景和描边高亮，不再加顶部强调线。 */
-body.panel-theme-light .panel-quick-tab{ position: relative; display: flex; align-items: center; justify-content: center; gap: 5px; flex: 1 1 0; min-width: 0; max-width: 160px; height: 26px; padding: 0 20px 0 8px; overflow: hidden; border: 1px solid transparent; border-radius: 7px; color: #1f3051; background: rgba(3, 38, 100, 0.055); font-size: var(--text-sm) !important; white-space: nowrap; touch-action: none; animation: quick-tab-in .16s cubic-bezier(.22, .75, .25, 1) both; }
+body.panel-theme-light .panel-quick-tab{ position: relative; display: flex; align-items: center; justify-content: center; gap: 5px; flex: 1 1 0; min-width: 0; max-width: 160px; height: 29px; padding: 0 20px 0 8px; overflow: hidden; border: 1px solid transparent; border-radius: 7px; color: #1f3051; background: rgba(3, 38, 100, 0.055); font-size: var(--text-sm) !important; white-space: nowrap; touch-action: none; animation: quick-tab-in .16s cubic-bezier(.22, .75, .25, 1) both; }
 /* 新建的标签从窄到宽弹出；关闭时先收 180ms，再从标签条拿掉。 */
 @keyframes quick-tab-in { from { opacity: 0; transform: scaleX(.55) scaleY(.86); } to { opacity: 1; transform: none; } }
 @keyframes quick-tab-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: scaleX(.55) scaleY(.86); } }
@@ -461,7 +464,7 @@ body.panel-theme-light .panel-bubble.is-expanded .panel-quick-tab-close{ opacity
 body.panel-theme-light .panel-quick-tab-close:hover{ color: #000000; background: rgba(135, 0, 0, 0.3); }
 body.panel-theme-light .panel-quick-tab:hover{ color: #00040c; background: rgba(0, 25, 70, 0.14); }
 /* 加号没有按钮框，只留符号本身。 */
-body.panel-theme-light .panel-quick-tab-new{ flex: 0 0 26px; max-width: 26px; padding: 0; border-color: transparent; background: transparent; color: #091b3a; }
+body.panel-theme-light .panel-quick-tab-new{ flex: 0 0 29px; max-width: 29px; padding: 0; border-color: transparent; background: transparent; color: #091b3a; }
 body.panel-theme-light .panel-quick-tab-new:hover{ background: transparent; color: #000000; }
 body.panel-theme-light .panel-quick-tab-new:disabled, body.panel-theme-light .panel-quick-tab-new:disabled:hover{ color: #4a5d80; opacity: .55; cursor: not-allowed; }
 body.panel-theme-light .panel-quick-tab-new svg{ width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
@@ -469,7 +472,7 @@ body.panel-theme-light .panel-quick-tabs.is-dragging, body.panel-theme-light .pa
 body.panel-theme-light .panel-quick-tab.is-dragging{ opacity: .55; }
 body.panel-theme-light .panel-quick-tab.is-current{ border-color: rgba(0, 24, 67, 0.21); color: #00040c; background: rgba(0, 25, 70, 0.2); }
 body.panel-theme-light .panel-chat-header.is-numeric .panel-quick-tabs{ align-items: center; height: 29px; }
-body.panel-theme-light .panel-chat-header.is-numeric .panel-quick-tab{ flex: none; width: 25px; height: 25px; padding: 0; border: 0; border-radius: 6px; background: transparent; font-variant-numeric: tabular-nums; }
+body.panel-theme-light .panel-chat-header.is-numeric .panel-quick-tab{ flex: none; width: 29px; height: 29px; padding: 0; border: 0; border-radius: 6px; background: transparent; font-variant-numeric: tabular-nums; }
 body.panel-theme-light .panel-chat-header.is-numeric .panel-quick-tab:nth-child(n + 10){ width: 30px; }
 body.panel-theme-light .panel-chat-header.is-numeric .panel-quick-tab:hover, body.panel-theme-light .panel-chat-header.is-numeric .panel-quick-tab.is-current{ color: #00040c; background: rgba(0, 25, 70, 0.17); }
 body.panel-theme-light .panel-quick-tab:disabled{ cursor: default; }
@@ -495,7 +498,7 @@ body.panel-theme-light .panel-event{
 /* 带色块/来源标签的消息，正文整体下推给色块让位；头像要跟着降到同一行，
    否则会孤零零停在色块上方。 */
 body.panel-theme-light .panel-event:has(.panel-event-route) .panel-event-avatar, body.panel-theme-light .panel-event:has(.panel-event-tag-slot) .panel-event-avatar{
-  margin-top: calc(48px - var(--route-chip-h) - var(--route-gap));
+  margin-top: calc(56px - var(--route-chip-h) - var(--route-gap));
 }
 /* content-visibility 会连绘制一起裁剪，跨端消息上方的弧线正好伸出气泡，
    这条规则让它照常溢出显示；这类消息很少，不靠跳过它省渲染。 */
@@ -506,7 +509,7 @@ body.panel-theme-light .panel-event:has(.panel-event-route){ content-visibility:
 body.panel-theme-light .panel-event-user{ display: flex; flex-direction: row-reverse; align-items: flex-start; gap: 8px; width: fit-content; max-width: 88%; margin-left: auto; }
 /* 来源是别的对话或代理时，头像属于对方而不是主人，一律回到左边。 */
 body.panel-theme-light .panel-event-user.is-foreign{ flex-direction: row; margin-left: 0; }
-body.panel-theme-light .panel-event-user .panel-event-body{ min-width: 0; padding: 2px 10px 3px; border: 1px solid rgba(2, 25, 65, 0.18); border-radius: 12px 4px 12px 12px; background: rgba(13, 44, 101, 0.12); }
+body.panel-theme-light .panel-event-user .panel-event-body{ min-width: 0; padding: 2px 10px 3px; border: 1px solid rgba(2, 25, 65, 0.18); border-radius: 12px; background: rgba(13, 44, 101, 0.12); }
 /* 用户气泡收紧到半行留白：首段不再额外顶开，多段之间也只留半行。 */
 body.panel-theme-light .panel-event-user .panel-event-body p{ margin: 0; }
 body.panel-theme-light .panel-event-user .panel-event-body p + p{ margin-top: .5em; }
@@ -552,8 +555,9 @@ body.panel-theme-light .panel-event-body{
   min-width: 0;
   padding-top: 1px;
 }
-/* 色块挂在气泡外面上方：绝对定位，不占正文高度，用 :has 给上方留出空间。 */
-body.panel-theme-light .panel-event-body:has(.panel-event-route){ margin-top: 48px; }
+/* 色块挂在气泡外面上方：绝对定位，不占正文高度，用 :has 给上方留出空间。
+   56px 是“色块 35px + 间隙 8px + 顶部余量”：滚到顶时色块也不会贴住面板。 */
+body.panel-theme-light .panel-event-body:has(.panel-event-route){ margin-top: 56px; }
 body.panel-theme-light .panel-event-body p{ margin: 4px 0 0; color: #000612; font-size: var(--text-md); line-height: 1.58; white-space: pre-wrap; overflow-wrap: anywhere; }
 /* A system notice has no speaker: it reads as a quiet centered aside between
    messages — no avatar, no timestamp; hairline rules mark it instead. */
@@ -566,6 +570,12 @@ body.panel-theme-light .panel-event-system .panel-event-body p{ margin: 0; color
    warning text, so a failure never reads as an ordinary status note. */
 body.panel-theme-light .panel-event-system.is-error .panel-event-body::before, body.panel-theme-light .panel-event-system.is-error .panel-event-body::after{ background: linear-gradient(90deg, rgba(112, 11, 20, 0.46), rgba(112, 11, 20, 0.04)); }
 body.panel-theme-light .panel-event-system.is-error .panel-event-body p{ color: #ffb8bf; }
+/* 成功状态和工具完成共用同一套绿色：压缩完成不该混在普通灰色提示里。 */
+body.panel-theme-light .panel-event-system.is-success .panel-event-body::before, body.panel-theme-light .panel-event-system.is-success .panel-event-body::after{ background: linear-gradient(90deg, rgba(41, 127, 74, 0.46), rgba(41, 127, 74, 0.04)); }
+body.panel-theme-light .panel-event-system.is-success .panel-event-body p{ color: #80d6a1; }
+body.panel-theme-light .panel-event-system.is-success .panel-event-system-mark{ border-color: rgba(41, 127, 74, 0.62); color: #80d6a1; }
+/* 成功只给一个绿色状态点，不加对勾或文字。 */
+body.panel-theme-light .panel-event-system.is-success .panel-event-system-mark.is-dot{ width: 8px; height: 8px; border: 0; border-radius: 50%; background: #80d6a1; }
 body.panel-theme-light .panel-event-system-mark{ flex: none; display: grid; place-items: center; width: 14px; height: 14px; border: 1px solid rgba(112, 11, 20, 0.62); border-radius: 50%; color: #ffb8bf; font-size: var(--text-2xs); font-weight: 600; line-height: 1; }
 body.panel-theme-light .panel-event-retry{ flex: none; height: 22px; padding: 0 9px; border: 1px solid rgba(112, 11, 20, 0.38); border-radius: 999px; color: #2d0004; background: rgba(112, 11, 20, 0.1); font-size: var(--text-2xs); }
 body.panel-theme-light .panel-event-retry:hover{ background: rgba(112, 11, 20, 0.18); }
@@ -1085,9 +1095,12 @@ body.panel-theme-light .panel-permission-allow:disabled, body.panel-theme-light 
    停止按钮保留自己的按钮底。 */
 body.panel-theme-light .panel-composer{ position: relative; display: flex; flex: 1; flex-direction: column; gap: 5px; min-width: 0; min-height: 0; padding: 8px 0 0 2px; border: 0; border-top: 1px solid rgba(2, 25, 65, 0.22); background: transparent; animation: composer-appear .16s cubic-bezier(.22, .75, .25, 1) both; }
 body.panel-theme-light .panel-composer.is-closing{ pointer-events: none; animation: composer-dismiss .15s cubic-bezier(.55, 0, .85, .4) both; }
-body.panel-theme-light .panel-composer-collapse{ position: absolute; z-index: 2; top: 5px; right: 0; display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 7px; color: #162747; background: transparent; }
+body.panel-theme-light .panel-composer-collapse{ position: absolute; z-index: 2; top: 5px; right: 0; display: grid; place-items: center; width: 29px; height: 29px; padding: 0; border: 0; border-radius: 9px; color: #162747; background: transparent; }
 body.panel-theme-light .panel-composer-collapse:hover{ color: #000000; background: rgba(9, 35, 86, 0.16); }
 body.panel-theme-light .panel-composer-collapse svg{ width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
+/* 收起按钮现在和底部工具栏的按钮同尺寸，编辑器右侧要让出它的宽度，
+   否则首行文字会钻到 × 下面。 */
+body.panel-theme-light .panel-composer .composer-editor{ padding-right: 34px; }
 /* 这个弹出列表不显示滚动条：滚轮照常上下滚，横向溢出直接裁掉。 */
 body.panel-theme-light .panel-composer-suggestions{ position: absolute; z-index: 12; left: 0; bottom: calc(100% + 8px); display: grid; gap: 4px; width: 100%; max-height: min(52vh, 420px); padding: 6px; overflow-x: hidden; overflow-y: auto; border: 1px solid rgba(0, 22, 65, 0.29); border-radius: 11px; background: rgba(168, 188, 232, 0.98); box-shadow: 0 6px 20px rgba(217, 226, 250, 0.22); scrollbar-width: none; }
 body.panel-theme-light .panel-composer-suggestions::-webkit-scrollbar{ display: none; }
@@ -1154,7 +1167,7 @@ body.panel-theme-light .panel-bypass-full{ border-color: rgba(136, 71, 81, 0.55)
 body.panel-theme-light .panel-bypass-full h3{ color: #3c0f14; }
 body.panel-theme-light .panel-bypass-full .panel-bypass-confirm{ border-color: rgba(136, 71, 81, 0.75); color: #eed2d7; background: #5c262d; }
 body.panel-theme-light .panel-bypass-full .panel-bypass-confirm:hover{ background: #4c1920; }
-body.panel-theme-light .panel-bypass{ display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 370px; padding: 14px 15px 12px; border: 1px solid rgba(132, 88, 15, 0.5); border-radius: 14px; background: linear-gradient(155deg, rgba(163, 175, 215, 0.99), rgba(189, 203, 238, 0.99)); box-shadow: 0 16px 40px rgba(227, 234, 252, 0.55); }
+body.panel-theme-light .panel-bypass{ display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 370px; max-height: 100%; padding: 14px 15px 12px; overflow-y: auto; overscroll-behavior: contain; border: 1px solid rgba(132, 88, 15, 0.5); border-radius: 14px; background: linear-gradient(155deg, rgba(163, 175, 215, 0.99), rgba(189, 203, 238, 0.99)); box-shadow: 0 16px 40px rgba(227, 234, 252, 0.55); scrollbar-width: thin; }
 body.panel-theme-light .panel-bypass h3{ margin: 0; color: #382200; font-size: var(--text-md); font-weight: 650; }
 body.panel-theme-light .panel-bypass p{ margin: 0; color: #101e37; font-size: var(--text-sm); line-height: 1.6; }
 body.panel-theme-light .panel-bypass-actions{ display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
@@ -1166,6 +1179,15 @@ body.panel-theme-light .panel-bypass-confirm:hover{ background: #543608; }
 body.panel-theme-light .panel-evolve-confirm{ border-color: rgba(37, 0, 115, 0.5); }
 body.panel-theme-light .panel-evolve-confirm h3{ color: #0b0024; }
 body.panel-theme-light .panel-evolve-confirm p strong{ color: #100037; font-weight: 650; }
+/* 开发者与普通用户看到的风险不一样：分两块写，别让普通用户跳过权限说明。 */
+body.panel-theme-light .panel-evolve-roles{ display: grid; gap: 8px; }
+body.panel-theme-light .panel-evolve-role{ display: grid; gap: 3px; padding: 8px 10px; border: 1px solid rgba(37, 0, 115, 0.22); border-left: 3px solid rgba(37, 0, 115, 0.55); border-radius: 8px; background: rgba(37, 0, 115, 0.07); }
+body.panel-theme-light .panel-evolve-role h4{ margin: 0; color: #130043; font-size: var(--text-xs); font-weight: 650; }
+body.panel-theme-light .panel-evolve-role p{ font-size: var(--text-xs); line-height: 1.55; }
+body.panel-theme-light .panel-evolve-role code{ padding: 1px 4px; border-radius: 4px; color: #000000; background: rgba(37, 0, 115, 0.2); font-family: var(--font-mono); }
+body.panel-theme-light .panel-evolve-role.is-caution{ border-color: rgba(135, 65, 15, 0.3); border-left-color: rgba(135, 65, 15, 0.7); background: rgba(135, 65, 15, 0.07); }
+body.panel-theme-light .panel-evolve-role.is-caution h4{ color: #5c300a; }
+body.panel-theme-light .panel-evolve-role.is-caution p strong{ color: #472100; }
 body.panel-theme-light .panel-evolve-authorize{ display: grid; gap: 7px; margin: 10px 0 2px; color: #0d002f; font-size: var(--text-sm); line-height: 1.5; }
 body.panel-theme-light .panel-evolve-authorize code{ padding: 1px 5px; border-radius: 4px; color: #000000; background: rgba(37, 0, 115, 0.2); font-family: var(--font-mono); }
 body.panel-theme-light .panel-evolve-authorize input{ width: 100%; height: 34px; padding: 0 10px; border: 1px solid rgba(37, 0, 115, 0.45); border-radius: 8px; color: #000000; background: rgba(225, 217, 243, 0.35); outline: none; font: inherit; }
@@ -1249,6 +1271,22 @@ body.panel-theme-light .panel-goal-action.is-danger{ color: #5f0f19; }
 body.panel-theme-light .panel-goal-banner.is-paused{ opacity: .78; }
 /* 思考强度并进了「模型与上下文」弹窗：和模型列表同一块面板，用一条分隔线
    区分，不再单独占一个工具栏按钮。 */
+/* 采样参数：手机入口下方、模式上方；两个预设键 + 两条滑条，松手才提交。 */
+body.panel-theme-light .panel-model-sampling{ margin-bottom: 6px; padding: 2px 0 8px; border-bottom: 1px solid rgba(0, 22, 65, 0.16); }
+body.panel-theme-light .panel-sampling-presets{ display: flex; gap: 6px; padding: 0 8px 6px; }
+/* 预设键要压过 `.panel-model-menu button` 的透明底和零边框，所以带上菜单前缀。 */
+body.panel-theme-light .panel-model-menu .panel-sampling-presets .panel-sampling-preset{ flex: 1; justify-content: center; height: 26px; border: 1px solid rgba(0, 22, 65, 0.32); border-radius: 7px; color: #000d24; background: rgba(12, 47, 109, 0.16); font-size: var(--text-sm); cursor: pointer; }
+body.panel-theme-light .panel-model-menu .panel-sampling-presets .panel-sampling-preset:hover:not(:disabled){ background: rgba(12, 47, 109, 0.26); }
+body.panel-theme-light .panel-model-menu .panel-sampling-presets .panel-sampling-preset.is-active{ border-color: rgba(0, 60, 135, 0.72); color: #000000; background: rgba(0, 60, 135, 0.3); }
+body.panel-theme-light .panel-model-menu .panel-sampling-presets .panel-sampling-preset:disabled{ opacity: .45; cursor: default; }
+body.panel-theme-light .panel-sampling-row{ display: flex; align-items: center; gap: 8px; padding: 2px 8px 4px; }
+body.panel-theme-light .panel-sampling-label{ flex: none; width: 66px; color: #0a1b39; font-size: var(--text-xs); }
+body.panel-theme-light .panel-sampling-range{ flex: 1; min-width: 0; height: 18px; -webkit-appearance: none; appearance: none; background: transparent; }
+body.panel-theme-light .panel-sampling-range::-webkit-slider-runnable-track{ height: 6px; border-radius: 3px; background: rgba(0, 22, 65, 0.22); }
+body.panel-theme-light .panel-sampling-range::-webkit-slider-thumb{ -webkit-appearance: none; appearance: none; width: 14px; height: 14px; margin-top: -4px; border-radius: 50%; background: #003c87; box-shadow: 0 0 0 2px rgba(0, 60, 135, 0.28); }
+body.panel-theme-light .panel-sampling-range:disabled{ opacity: .45; }
+body.panel-theme-light .panel-sampling-number{ flex: none; width: 52px; height: 24px; padding: 0 4px; border: 1px solid rgba(0, 22, 65, 0.28); border-radius: 6px; color: #000712; background: rgba(205, 217, 245, 0.5); font-family: var(--font-ui); font-size: var(--text-sm); }
+
 body.panel-theme-light .panel-model-effort{ margin-top: 7px; padding-top: 8px; border-top: 1px solid rgba(0, 22, 65, 0.16); }
 body.panel-theme-light .panel-model-effort .panel-effort-row{ padding: 2px 8px 3px; }
 body.panel-theme-light .panel-effort-row{ display: flex; align-items: center; gap: 12px; padding: 2px 8px 4px; }
@@ -1336,8 +1374,11 @@ body.panel-theme-light .panel-live-label::before, body.panel-theme-light .panel-
 /* 另一个对话/代理注入的消息：来源徽章挂在气泡外面上方，右端用同一条
    四分之一圆弧连回气泡上边线。尺寸和字号与跨端色块完全一致。 */
 body.panel-theme-light .panel-event-tag-slot{ position: absolute; left: 0; bottom: calc(100% + var(--route-gap)); display: flex; align-items: center; }
-body.panel-theme-light .panel-event-body:has(.panel-event-tag-slot){ margin-top: 48px; }
+body.panel-theme-light .panel-event-body:has(.panel-event-tag-slot){ margin-top: 56px; }
 body.panel-theme-light .panel-event-sender{ display: inline-flex; align-items: center; height: var(--route-chip-h); padding: 4px 10px; border-radius: 9px; color: #573909; background: rgba(132, 88, 15, 0.16); font-size: var(--text-md); line-height: 1.45; }
+
+/* 停止/退出时还没开始产出的消息：明确写出来，不留一个「用时 00:00」的空回合。 */
+body.panel-theme-light .panel-event-halted{ display: inline-flex; align-items: center; margin-top: 6px; color: rgba(0, 5, 20, 0.55); font-size: var(--text-sm); line-height: 1.4; }
 
 /* 跨端/内部转发：来源框 → 目标框，两个圆角矩形各用一种色。
    弧线的两个端点不靠手写坐标，而是由这组变量和布局本身决定：
@@ -1385,16 +1426,19 @@ body.panel-theme-light .route-box{ box-sizing: border-box; display: inline-flex;
 body.panel-theme-light .route-box.is-pc{ color: #9f520d; background: rgba(159, 82, 13, 0.2); }
 body.panel-theme-light .route-box.is-pc-target{ color: #851a3f; background: rgba(133, 26, 63, 0.2); }
 body.panel-theme-light .route-box.is-phone{ color: #2c905c; background: rgba(44, 144, 92, 0.2); }
-body.panel-theme-light .route-arrow{ display: inline-flex; align-items: center; color: #041637; }
+body.panel-theme-light .route-arrow{ display: inline-flex; align-items: center; align-self: center; color: #000000; }
 body.panel-theme-light .route-arrow svg{ fill: currentColor; display: block; }
 
 /* 默认的传话样式：与输入框的 @ 引用同款——加粗、圆角、跟正文一样高，排在
    正文上方，中间保留右箭头。旧的双框卡片挂在 .panel-feed.is-route-card 下。 */
-body.panel-theme-light .panel-feed:not(.is-route-card) .panel-event-body:has(.panel-event-route){ display: flex; flex-direction: column; margin-top: 0; }
+/* 胶囊挂在正文上方，第一条消息的胶囊会顶到消息流上边缘；给它留出和胶囊
+   高度相当的空隙，滚到顶时也不会贴住面板。 */
+body.panel-theme-light .panel-feed:not(.is-route-card) .panel-event-body:has(.panel-event-route){ display: flex; flex-direction: column; margin-top: 0; padding-top: 16px; }
 body.panel-theme-light .panel-feed:not(.is-route-card) .panel-event-route{ position: static; left: auto; right: auto; bottom: auto; order: -1; width: auto; max-width: 100%; margin: 0 0 5px; gap: 6px; }
 body.panel-theme-light .panel-feed:not(.is-route-card) .panel-event-route .route-link{ display: none; }
 body.panel-theme-light .panel-feed:not(.is-route-card) .route-box{ height: auto; padding: 0 .45em; border-radius: .45em; font-size: inherit; font-weight: 600; line-height: 1.45; display: inline-flex; align-items: center; }
-body.panel-theme-light .panel-feed:not(.is-route-card) .route-arrow{ color: #002970; }
+/* 箭头和胶囊同高、在行内垂直居中；白色让它在两个色块之间清楚可见。 */
+body.panel-theme-light .panel-feed:not(.is-route-card) .route-arrow{ color: #000000; align-self: center; height: 1.45em; }
 
 /* 重启分割条：线—文字—线，表示上一段到此结束。 */
 body.panel-theme-light .panel-timeline-divider{ display: flex; align-items: center; gap: 10px; margin: 20px 0; color: #273e62; font-size: var(--text-xs); }
@@ -1456,7 +1500,7 @@ body.panel-theme-light .panel-right-goal-stop{ border-color: rgba(105, 15, 15, 0
 body.panel-theme-light .panel-right-empty{ margin: 0; color: #2b426c; font-size: var(--text-xs); }
 body.panel-theme-light .panel-right-empty.is-centered{ display: grid; place-items: center; min-height: 160px; text-align: center; }
 body.panel-theme-light .panel-right-preview-path{ margin: 0 0 6px; color: #2b426c; font-family: var(--font-mono); font-size: var(--text-xs); word-break: break-all; }
-body.panel-theme-light .panel-chat-header .panel-rail-toggle{ position: absolute; z-index: 20; top: 9px; right: 77px; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 9px; color: #000f2c; background: rgba(4, 29, 77, 0.09); }
+body.panel-theme-light .panel-chat-header .panel-rail-toggle{ position: absolute; z-index: 20; top: 8px; right: 77px; display: grid; place-items: center; width: 29px; height: 29px; padding: 0; border: 0; border-radius: 9px; color: #000f2c; background: rgba(4, 29, 77, 0.09); }
 body.panel-theme-light .panel-rail-toggle:hover{ color: #000000; background: rgba(4, 29, 77, 0.2); }
 body.panel-theme-light .panel-rail-toggle:disabled{ opacity: .35; cursor: default; }
 body.panel-theme-light .panel-rail-toggle svg{ width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }

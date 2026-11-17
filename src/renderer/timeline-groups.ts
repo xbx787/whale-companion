@@ -8,6 +8,7 @@ import type { TimelineEntry } from '../shared/contracts'
  */
 export function sameTimelineEntry(a: TimelineEntry, b: TimelineEntry): boolean {
   if (a === b) return true
+  if (a.halted !== b.halted) return false
   if (a.kind !== b.kind || a.text !== b.text || a.time !== b.time || a.endedAt !== b.endedAt) return false
   const left = a.tool
   const right = b.tool

@@ -57,6 +57,8 @@ export interface ModelClient {
   ): Promise<ModelReply>
   /** Clients that can control thinking depth implement this. */
   setEffort?(level: EffortLevel): void
+  /** Clients that can inject sampling parameters implement this. */
+  setSampling?(temperature: number, topP: number): void
   /** Clients that can plan-first implement this. */
   /** false means a cold query has not yet sent an SDK confirmation. */
   setPlanMode?(on: boolean): Promise<boolean | void> | boolean | void

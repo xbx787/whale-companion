@@ -62,6 +62,13 @@ $env:ASAR_ARCHIVE = Join-Path $releaseDir 'win-unpacked\resources\app.asar'
 if ($LASTEXITCODE -ne 0) { throw 'Packaged app verification failed.' }
 
 $unpacked = Join-Path $releaseDir 'win-unpacked'
+# electronDist 里如果混进测试用的 exe 副本，electron-builder 会原样复制进安装目录，
+# 每个副本约 235MB。安装目录顶层只保留主程序。
+foreach ($extraExe in Get-ChildItem -LiteralPath $unpacked -Filter '*.exe' -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -ne 'Whale Companion Preview.exe' }) {
+  Write-Warning "移除安装目录里的多余可执行文件：$($extraExe.Name)"
+  Remove-Item -LiteralPath $extraExe.FullName -Force
+}
 $exe = Join-Path $unpacked 'Whale Companion Preview.exe'
 $icon = Join-Path $unpacked 'resources\whale-tray-icon-pixel.ico'
 if (-not (Test-Path -LiteralPath $exe) -or -not (Test-Path -LiteralPath $icon)) {

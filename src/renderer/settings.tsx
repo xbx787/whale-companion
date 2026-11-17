@@ -941,6 +941,7 @@ export function SettingsPage() {
                     <div className="settings-library-copy">
                       <label>{item.name}{item.version && <span className="settings-library-version">v{item.version}</span>}{item.external && <span className="settings-library-version">本地已有</span>}</label>
                       {item.description && <p title={item.description}>{item.description}</p>}
+                      {item.source && <small className="settings-library-source">来源：{item.source}</small>}
                       {item.license && <small>许可证：{item.license}</small>}
                       {link && <button type="button" className="settings-library-link" onClick={() => { void window.whaleSettings.openExternal?.(link.url) }}>{link.label}</button>}
                       {libraryHealth[item.id] && <small className={libraryHealth[item.id].ok ? 'settings-library-health is-ok' : 'settings-library-health is-error'} role="status">{libraryHealth[item.id].message}</small>}
@@ -1066,21 +1067,12 @@ export function SettingsPage() {
           <div className="settings-model-actions"><button type="button" disabled={busy || !settings} onClick={openAddModel}>添加</button></div>
         </div>}
         {modelForm && <div className="settings-model-form">
-          <label>厂商
-            <select value={modelForm.providerId} disabled={busy} onChange={(event) => pickModelProvider(event.target.value)}>
-              {PROVIDER_CATALOG.map((provider) => <option key={provider.id} value={provider.id}>{provider.name}</option>)}
-              <option value="custom">自定义…</option>
+          <label>模型
+            <select value={modelForm.modelId} disabled={busy} onChange={(event) => { if (modelForm) setModelForm({ ...modelForm, modelId: event.target.value }) }}>
+              {PROVIDER_CATALOG[0].models.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}
             </select>
           </label>
-          {modelForm.providerId === 'custom'
-            ? <label>端点<input type="text" value={modelForm.baseUrl} spellCheck={false} placeholder="https://…/anthropic" disabled={busy} onChange={(event) => setModelForm({ ...modelForm, baseUrl: event.target.value })} /></label>
-            : <label>模型
-                <select value={modelForm.modelId} disabled={busy} onChange={(event) => { if (modelForm) setModelForm({ ...modelForm, modelId: event.target.value }) }}>
-                  {PROVIDER_CATALOG.find((item) => item.id === modelForm.providerId)?.models.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}
-                </select>
-              </label>}
-          {modelForm.providerId === 'custom' && <label>模型 ID<input type="text" value={modelForm.modelId} spellCheck={false} placeholder="厂商文档中的模型 ID" disabled={busy} onChange={(event) => setModelForm({ ...modelForm, modelId: event.target.value })} /></label>}
-          <label>API Key<input type="password" value={modelForm.apiKey} placeholder={settings?.modelProfiles.find((profile) => profile.id === modelForm.id)?.apiKeyConfigured ? '已保存，留空保持原密钥' : '粘贴该厂商的 API Key'} disabled={busy} onChange={(event) => setModelForm({ ...modelForm, apiKey: event.target.value })} /></label>
+          <label>API Key<input type="password" value={modelForm.apiKey} placeholder={settings?.modelProfiles.find((profile) => profile.id === modelForm.id)?.apiKeyConfigured ? '已保存，留空保持原密钥' : '粘贴 DeepSeek API Key'} disabled={busy} onChange={(event) => setModelForm({ ...modelForm, apiKey: event.target.value })} /></label>
           <label>显示名称<input type="text" maxLength={24} value={modelForm.name} disabled={busy} onChange={(event) => setModelForm({ ...modelForm, name: event.target.value })} /></label>
           <button type="button" className="settings-model-advanced" aria-expanded={modelForm.advanced} onClick={() => setModelForm({ ...modelForm, advanced: !modelForm.advanced })}>{modelForm.advanced ? '▾' : '▸'} 高级</button>
           {modelForm.advanced && <>
@@ -1112,6 +1104,18 @@ export function SettingsPage() {
       </section>}
       {tab === 'voice' && <SettingsVoiceSection api={window.whaleSettings} />}
       {tab === 'persona' && <section className="settings-section" role="tabpanel" id="settings-panel-persona" aria-labelledby="settings-tab-persona">
+        <h2 className="settings-group-heading">状态点</h2>
+        <div className="settings-row">
+          <div className="settings-copy"><label id="status-dot-mode-label">显示方式</label><p>关闭：不显示。浮动展开：每次出现时从上到下依次从角色内部浮出。常驻：一直显示在角色右上方。</p></div>
+          <div className="settings-segmented" role="radiogroup" aria-labelledby="status-dot-mode-label">
+            {([['off', '关闭'], ['float', '浮动展开'], ['always', '常驻']] as const).map(([value, label]) => {
+              const active = (settings?.statusDotMode ?? 'always') === value
+              return <button key={value} type="button" role="radio" aria-checked={active}
+                className={active ? 'is-active' : ''} disabled={!settings || busy}
+                onClick={() => { void update({ statusDotMode: value }) }}>{label}</button>
+            })}
+          </div>
+        </div>
         <h2 className="settings-group-heading">长期记忆</h2>
         <div className="settings-row">
           <div className="settings-copy"><label id="memory-switch-label">启用长期记忆</label><p>从完成的对话提取少量稳定事实；关闭后保留现有条目，但不会用于新对话。</p></div>

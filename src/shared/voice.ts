@@ -16,19 +16,13 @@ export interface VoicePreset {
 }
 
 export const VOICE_PRESETS: readonly VoicePreset[] = [
-  { id: 'claire', label: '温柔女声' },
-  { id: 'anna', label: '沉稳女声' },
-  { id: 'bella', label: '激情女声' },
-  { id: 'diana', label: '欢快女声' },
-  { id: 'alex', label: '沉稳男声' },
-  { id: 'benjamin', label: '低沉男声' },
-  { id: 'charles', label: '磁性男声' },
-  { id: 'david', label: '欢快男声' }
+  { id: 'stella', label: '海星（女声）' },
+  { id: 'tide', label: '暗潮（男声）' }
 ]
 
 export type VoicePresetId = string
 
-export const DEFAULT_VOICE: VoicePresetId = 'claire'
+export const DEFAULT_VOICE: VoicePresetId = 'stella'
 export const DEFAULT_SPEECH_SPEED = 1
 export const SPEECH_SPEED_MIN = 0.5
 export const SPEECH_SPEED_MAX = 2

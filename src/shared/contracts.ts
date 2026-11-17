@@ -37,6 +37,21 @@ export function isAgentKernelKind(value: unknown): value is AgentKernelKind {
  *  Their docs map medium→high, xhigh→high, so we offer only real stops. */
 export type EffortLevel = 'off' | 'low' | 'high' | 'max'
 
+/** 采样参数默认值：写进 DSH 请求体的 temperature / top_p。
+ *  0.4 + 0.01 是 0.0.166 起沿用的保守组合；菜单里的「严谨」「活泼」预设
+ *  就是这两组数的快捷方式。 */
+export const DEFAULT_TEMPERATURE = 0.4
+export const DEFAULT_TOP_P = 0.01
+/** 采样参数可调范围，设置校验和菜单滑条共用。 */
+export const TEMPERATURE_RANGE = { min: 0, max: 2 } as const
+export const TOP_P_RANGE = { min: 0.01, max: 1 } as const
+
+/** 角色右上角状态点的显示方式：关闭、浮动展开（逐个从角色内部浮出）、常驻。 */
+export type StatusDotMode = 'off' | 'float' | 'always'
+export const DEFAULT_STATUS_DOT_MODE: StatusDotMode = 'always'
+
+
+
 /** Overall UI size: one step up from "small" (the shipped look) is "medium",
  *  then "large". Every window derives its type scale from this. */
 export type UiSize = 'small' | 'medium' | 'large'
@@ -97,7 +112,7 @@ export interface TimelineEntry {
   text: string
   /** System notices only: `error` renders as a warning, apart from the
    *  ordinary muted notice line. */
-  tone?: 'error'
+  tone?: 'error' | 'success'
   /** 失败的系统消息可带上一轮用户原文，面板据此显示“重试”。 */
   retryText?: string
   /** 系统事件的小标签，例如“上下文压缩”“重启恢复”。 */
@@ -113,6 +128,9 @@ export interface TimelineEntry {
   /** A restart boundary: render as a line with the text in the middle and
    *  start a new segment instead of showing a user bubble. */
   divider?: boolean
+  /** 这一轮在模型开始产出之前就被停止/退出打断了：消息留在时间线上，但
+   *  没有回答。面板据此写明“没有发出”，不再留下一个「用时 00:00」的空回合。 */
+  halted?: boolean
   /** Image attachments the message carried, so the panel can show the pictures
    *  themselves instead of a file list. */
   images?: Array<{ name: string; path: string }>
@@ -267,6 +285,8 @@ export interface ConversationSettings {
   /** 采样参数：内核补丁会写进请求体，设置页可调。 */
   temperature?: number
   topP?: number
+  /** 角色右上角状态点：关闭 / 浮动展开 / 常驻。 */
+  statusDotMode?: StatusDotMode
   /** Named Anthropic-compatible endpoints the model menu can switch between. */
   modelProfiles: ModelProfile[]
   /** The profile in use; null falls back to the launch environment. */
@@ -901,6 +921,8 @@ export interface PetAPI {
   setAvatarBox(box: AvatarBox): Promise<void>
   setModelMode(mode: ModelMode): Promise<void>
   setEffort(level: EffortLevel): Promise<void>
+  /** 采样参数：下一次模型回合会重启引擎进程让新值生效。 */
+  setSampling(temperature: number, topP: number): Promise<void>
   /** Turns web search/fetch on or off for every new turn. */
   setWebSearchEnabled(on: boolean): Promise<void>
   /** Sets the auto-compaction threshold (50–90 percent). */

@@ -31,29 +31,5 @@ export const PROVIDER_CATALOG: CatalogProvider[] = [
       { id: 'deepseek-chat', name: 'DeepSeek Chat' },
       { id: 'deepseek-reasoner', name: 'DeepSeek Reasoner（推理）' }
     ]
-  },
-  {
-    id: 'kimi',
-    name: 'Kimi（月之暗面）',
-    baseUrl: 'https://api.moonshot.cn/anthropic',
-    smallModel: 'kimi-k2.5',
-    models: [
-      { id: 'kimi-k3', name: 'Kimi K3' },
-      { id: 'kimi-k2.7-code-highspeed', name: 'Kimi K2.7 Code 高速' },
-      { id: 'kimi-k2.7-code', name: 'Kimi K2.7 Code' },
-      { id: 'kimi-k2.6', name: 'Kimi K2.6' },
-      { id: 'kimi-k2.5', name: 'Kimi K2.5' }
-    ]
-  },
-  {
-    id: 'zhipu',
-    name: '智谱 GLM',
-    baseUrl: 'https://open.bigmodel.cn/api/anthropic',
-    smallModel: 'glm-4.5-air',
-    models: [
-      { id: 'glm-4.6', name: 'GLM-4.6（旗舰）' },
-      { id: 'glm-4.5', name: 'GLM-4.5' },
-      { id: 'glm-4.5-air', name: 'GLM-4.5 Air（轻量）' }
-    ]
   }
 ]

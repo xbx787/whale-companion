@@ -24,7 +24,7 @@ describe('VoiceConfigStore', () => {
     const store = new VoiceConfigStore(testRoot, codec, {})
     const view = await store.publicView()
     expect(view.keyConfigured).toBe(false)
-    expect(view.voice).toBe('claire')
+    expect(view.voice).toBe('stella')
     expect(view.speed).toBe(1)
     expect(view.autoSpeak).toBe(true)
     expect(view.loadError).toBe(false)
@@ -32,7 +32,7 @@ describe('VoiceConfigStore', () => {
 
   it('encrypts the key on disk and reads it back', async () => {
     const store = new VoiceConfigStore(testRoot, codec, {})
-    await store.save({ apiKey: 'sk-secret-value', voice: 'anna', speed: 1.25, autoSpeak: false })
+    await store.save({ apiKey: 'sk-secret-value', voice: 'stella', speed: 1.25, autoSpeak: false })
     const raw = await fs.readFile(path.join(testRoot, 'voice.json'), 'utf8')
     expect(raw).not.toContain('sk-secret-value')
     expect(raw).toContain('safe-storage:v1:')
@@ -40,7 +40,7 @@ describe('VoiceConfigStore', () => {
     const reopened = new VoiceConfigStore(testRoot, codec, {})
     expect(await reopened.apiKey()).toEqual({ key: 'sk-secret-value', source: 'stored' })
     const view = await reopened.publicView()
-    expect(view.voice).toBe('anna')
+    expect(view.voice).toBe('stella')
     expect(view.speed).toBe(1.25)
     expect(view.autoSpeak).toBe(false)
   })
@@ -48,7 +48,7 @@ describe('VoiceConfigStore', () => {
   it('reports a cross-device ciphertext instead of crashing', async () => {
     await fs.mkdir(testRoot, { recursive: true })
     await fs.writeFile(path.join(testRoot, 'voice.json'), JSON.stringify({
-      version: 1, apiKey: 'safe-storage:v1:AAAA', voice: 'claire', speed: 1, autoSpeak: true
+      version: 1, apiKey: 'safe-storage:v1:AAAA', voice: 'stella', speed: 1, autoSpeak: true
     }))
     const store = new VoiceConfigStore(testRoot, {
       encrypt: codec.encrypt,
@@ -65,7 +65,7 @@ describe('VoiceConfigStore', () => {
     const store = new VoiceConfigStore(testRoot, codec, {})
     const view = await store.publicView()
     expect(view.loadError).toBe(true)
-    expect(view.voice).toBe('claire')
+    expect(view.voice).toBe('stella')
     expect(await fs.readFile(path.join(testRoot, 'voice.json'), 'utf8')).toBe('{not json')
   })
 

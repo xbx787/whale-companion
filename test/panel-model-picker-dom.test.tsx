@@ -23,7 +23,8 @@ afterEach(async () => {
   container = undefined
 })
 
-async function mount(activeId: string, onPickProfile: (id: string) => void = () => undefined): Promise<HTMLDivElement> {
+async function mount(activeId: string, onPickProfile: (id: string) => void = () => undefined,
+  sampling: { temperature?: number; topP?: number; onSampling?: (temperature: number, topP: number) => void } = {}): Promise<HTMLDivElement> {
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
@@ -39,6 +40,8 @@ async function mount(activeId: string, onPickProfile: (id: string) => void = () 
     profiles={profiles}
     activeId={activeId}
     effort="max"
+    temperature={sampling.temperature ?? 0.4}
+    topP={sampling.topP ?? 0.01}
     onToggle={() => undefined}
     onClose={() => undefined}
     onToggleGoal={() => undefined}
@@ -48,6 +51,7 @@ async function mount(activeId: string, onPickProfile: (id: string) => void = () 
     onManage={() => undefined}
     onOpenOnboarding={() => undefined}
     onEffort={() => undefined}
+    onSampling={sampling.onSampling ?? (() => undefined)}
   />))
   return container
 }
@@ -70,5 +74,28 @@ describe('ModelPicker', () => {
       view.querySelectorAll('.panel-model-pick')[1].dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
     expect(picked).toEqual(['b'])
+  })
+
+  it('applies the strict and lively sampling presets', async () => {
+    const calls: Array<[number, number]> = []
+    const view = await mount('a', () => undefined, { onSampling: (temperature, topP) => { calls.push([temperature, topP]) } })
+    const buttons = [...view.querySelectorAll<HTMLButtonElement>('.panel-sampling-preset')]
+    expect(buttons.map((button) => button.textContent)).toEqual(['严谨', '活泼'])
+    await act(async () => buttons[0].click())
+    await act(async () => buttons[1].click())
+    expect(calls).toEqual([[0.4, 0.1], [0.7, 0.9]])
+  })
+
+  it('commits a typed sampling number on blur', async () => {
+    const calls: Array<[number, number]> = []
+    const view = await mount('a', () => undefined, { onSampling: (temperature, topP) => { calls.push([temperature, topP]) } })
+    const box = view.querySelector<HTMLInputElement>('input[aria-label="Temperature 数值"]')!
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!
+    await act(async () => {
+      setter.call(box, '1.2')
+      box.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await act(async () => { box.dispatchEvent(new FocusEvent('focusout', { bubbles: true })) })
+    expect(calls).toContainEqual([1.2, 0.01])
   })
 })

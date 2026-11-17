@@ -7,7 +7,7 @@ import { isEffortLevel } from '../shared/effort'
 import { containsSensitiveData } from './memory-service'
 import { protectProfiles, restoreProfiles, type SecretCodec } from './secret-storage'
 import type { AgentGoal, ApprovalMode, AvatarSize, ConversationBatchAction, ConversationBatchResult, ConversationLibraryState, ConversationSummary, ContextUsageSnapshot, EffortLevel, ModelMode, ModelProfile, PanelPlacement, PanelTheme, SubagentTask, TaskStatus, TimelineEntry, UserAttachment, ConversationSettings, UiSize } from '../shared/contracts'
-import { AUTO_COMPACT_DEFAULT_PERCENT, PANEL_AUTO_COLLAPSE_DEFAULT_MINUTES, PANEL_MIN_HEIGHT, PANEL_MIN_WIDTH, normalizeAgentKernelKind, normalizeModelMode, isAutoCompactPercent, isAvatarRenderer, isPanelAutoCollapseMinutes, isPeekInterval, isRoastBurstLimit, isRoastIdlePause, isRoastInterval } from '../shared/contracts'
+import { AUTO_COMPACT_DEFAULT_PERCENT, DEFAULT_STATUS_DOT_MODE, DEFAULT_TEMPERATURE, DEFAULT_TOP_P, PANEL_AUTO_COLLAPSE_DEFAULT_MINUTES, PANEL_MIN_HEIGHT, PANEL_MIN_WIDTH, TEMPERATURE_RANGE, TOP_P_RANGE, normalizeAgentKernelKind, normalizeModelMode, isAutoCompactPercent, isAvatarRenderer, isPanelAutoCollapseMinutes, isPeekInterval, isRoastBurstLimit, isRoastIdlePause, isRoastInterval } from '../shared/contracts'
 import { isPersonaId } from '../shared/personas'
 import { DEFAULT_SKILL_MARKET_SOURCES, isSkillMarketSourceId } from '../shared/skill-market'
 
@@ -285,7 +285,7 @@ function isPanelTheme(value: unknown): value is PanelTheme {
 }
 
 function readExtendedSettings(settings: Record<string, unknown>): Pick<ConversationSettings,
-  'modelProfiles' | 'activeModelProfileId' | 'enableAutoTitleGeneration' | 'showMessageTimestamps' |
+  'temperature' | 'topP' | 'statusDotMode' | 'modelProfiles' | 'activeModelProfileId' | 'enableAutoTitleGeneration' | 'showMessageTimestamps' |
   'showSenderBadges' | 'senderRouteStyle' | 'compactTimeline' |
   'userName' | 'assistantName' | 'userAvatar' | 'assistantAvatar' | 'tabOrder' |
   'goalMaxIterations' | 'goalMaxMinutes' | 'memoryEnabled' | 'panelSize' | 'panelPlacement' | 'panelTheme' | 'uiSize' | 'avatarSize' | 'avatarRenderer' | 'webSearchEnabled' | 'personaId' | 'agentKernel' | 'autoCompactPercent' |
@@ -302,6 +302,12 @@ function readExtendedSettings(settings: Record<string, unknown>): Pick<Conversat
     ? settings.activeModelProfileId : null
   const panelSize = readPanelSize(settings.panelSize)
   return {
+    temperature: typeof settings.temperature === 'number'
+      ? Math.min(TEMPERATURE_RANGE.max, Math.max(TEMPERATURE_RANGE.min, settings.temperature)) : DEFAULT_TEMPERATURE,
+    topP: typeof settings.topP === 'number'
+      ? Math.min(TOP_P_RANGE.max, Math.max(TOP_P_RANGE.min, settings.topP)) : DEFAULT_TOP_P,
+    statusDotMode: settings.statusDotMode === 'off' || settings.statusDotMode === 'float'
+      ? settings.statusDotMode : DEFAULT_STATUS_DOT_MODE,
     modelProfiles: profiles,
     activeModelProfileId,
     enableAutoTitleGeneration: settings.enableAutoTitleGeneration !== false,
@@ -429,8 +435,6 @@ function parseIndex(raw: string): { settings: ConversationSettings; activeConver
       visibleConversationTabs: Number(settings.visibleConversationTabs),
       autoArchiveAfterDays: settings.autoArchiveAfterDays,
       effort: isEffortLevel(settings.effort) ? settings.effort : 'max',
-    temperature: typeof settings.temperature === 'number' ? Math.min(2, Math.max(0, settings.temperature)) : 0.4,
-    topP: typeof settings.topP === 'number' ? Math.min(1, Math.max(0.01, settings.topP)) : 0.01,
       ...readExtendedSettings(settings)
     },
     activeConversationId: value.activeConversationId,
@@ -479,9 +483,7 @@ function parseLibrary(raw: string): { library: PersistedLibrary; migrated: boole
         ? { visibleConversationTabs: Math.min(MAX_VISIBLE_TABS, Number(settings.maxActiveConversations)), autoArchiveAfterDays: 0, effort: 'max',
             ...readExtendedSettings(settings) }
         : { visibleConversationTabs: Number(settings.visibleConversationTabs), autoArchiveAfterDays: settings.autoArchiveAfterDays as ConversationSettings['autoArchiveAfterDays'],
-            effort: isEffortLevel(settings.effort) ? settings.effort : 'max',
-    temperature: typeof settings.temperature === 'number' ? Math.min(2, Math.max(0, settings.temperature)) : 0.4,
-    topP: typeof settings.topP === 'number' ? Math.min(1, Math.max(0.01, settings.topP)) : 0.01, ...readExtendedSettings(settings) },
+            effort: isEffortLevel(settings.effort) ? settings.effort : 'max', ...readExtendedSettings(settings) },
       activeConversationId: value.activeConversationId as string | null,
       conversations: records.map(completeRecord)
     },
@@ -720,6 +722,8 @@ export class ConversationStore {
 
     if (!settings) {
       settings = { visibleConversationTabs: DEFAULT_VISIBLE_TABS, autoArchiveAfterDays: 0, effort: 'max',
+        temperature: DEFAULT_TEMPERATURE, topP: DEFAULT_TOP_P, statusDotMode: DEFAULT_STATUS_DOT_MODE,
+        windowOpacity: 100, avatarOpacity: 100,
         modelProfiles: [], activeModelProfileId: null, enableAutoTitleGeneration: true, showMessageTimestamps: true,
         showSenderBadges: true, senderRouteStyle: 'chip', compactTimeline: false,
         userName: '主人', assistantName: '小鲸', userAvatar: null, assistantAvatar: null, tabOrder: [],
@@ -1037,13 +1041,16 @@ export class ConversationStore {
     const tabs = patch.visibleConversationTabs
     const autoArchive = patch.autoArchiveAfterDays
     const effort = patch.effort
+    const temperature = patch.temperature
+    const topP = patch.topP
+    const statusDotMode = patch.statusDotMode
     const modelProfiles = patch.modelProfiles
     const activeModelProfileId = patch.activeModelProfileId
     const { goalMaxIterations, goalMaxMinutes, memoryEnabled } = patch
     const { enableAutoTitleGeneration, showMessageTimestamps, userName, assistantName, userAvatar, assistantAvatar, panelSize, panelPlacement, panelTheme, uiSize, avatarSize, avatarRenderer, toolRowDetail, personaId, agentKernel, autoCompactPercent,
       panelAutoCollapseMinutes, roastEnabled, roastIntervalMinutes, roastIdlePauseMinutes, roastBurstLimit, roastPrompt, eyeEnabled, eyeIntervalSeconds,
       outputStyle, appendSystemPrompt, autoScroll, expandFileEditsByDefault, sessionSort, titleLocale,
-      titleModel, loadUserSettings, hiddenTabIds } = patch
+      titleModel, loadUserSettings, hiddenTabIds, windowOpacity, avatarOpacity } = patch
     if (tabs !== undefined && (!Number.isInteger(tabs) || tabs < 1 || tabs > MAX_VISIBLE_TABS)) {
       throw new ConversationStoreError('INVALID_INPUT', `快捷切换显示数量应为 1–${MAX_VISIBLE_TABS}。`)
     }
@@ -1052,6 +1059,22 @@ export class ConversationStore {
     }
     if (effort !== undefined && !isEffortLevel(effort)) {
       throw new ConversationStoreError('INVALID_INPUT', '思考强度只能是关闭、低、高或最大。')
+    }
+    if (temperature !== undefined && (typeof temperature !== 'number' || !Number.isFinite(temperature) ||
+        temperature < TEMPERATURE_RANGE.min || temperature > TEMPERATURE_RANGE.max)) {
+      throw new ConversationStoreError('INVALID_INPUT', 'Temperature 应为 0 到 2 之间的数字。')
+    }
+    if (topP !== undefined && (typeof topP !== 'number' || !Number.isFinite(topP) ||
+        topP < TOP_P_RANGE.min || topP > TOP_P_RANGE.max)) {
+      throw new ConversationStoreError('INVALID_INPUT', 'Top P 应为 0.01 到 1 之间的数字。')
+    }
+    if (statusDotMode !== undefined && statusDotMode !== 'off' && statusDotMode !== 'float' && statusDotMode !== 'always') {
+      throw new ConversationStoreError('INVALID_INPUT', '状态点模式无效。')
+    }
+    for (const [name, value] of [['窗口', windowOpacity], ['人物', avatarOpacity]] as const) {
+      if (value !== undefined && (!Number.isInteger(value) || value < 0 || value > 100)) {
+        throw new ConversationStoreError('INVALID_INPUT', `${name}不透明度应为 0 到 100 的整数。`)
+      }
     }
     if (modelProfiles !== undefined && !(Array.isArray(modelProfiles) && modelProfiles.every(isModelProfile))) {
       throw new ConversationStoreError('INVALID_INPUT', '模型配置格式无效。')
@@ -1154,6 +1177,11 @@ export class ConversationStore {
       if (tabs !== undefined) draft.settings.visibleConversationTabs = tabs
       if (autoArchive !== undefined) draft.settings.autoArchiveAfterDays = autoArchive
       if (effort !== undefined) draft.settings.effort = effort
+      if (temperature !== undefined) draft.settings.temperature = temperature
+      if (topP !== undefined) draft.settings.topP = topP
+      if (statusDotMode !== undefined) draft.settings.statusDotMode = statusDotMode
+      if (windowOpacity !== undefined) draft.settings.windowOpacity = windowOpacity
+      if (avatarOpacity !== undefined) draft.settings.avatarOpacity = avatarOpacity
       if (goalMaxIterations !== undefined) draft.settings.goalMaxIterations = goalMaxIterations
       if (goalMaxMinutes !== undefined) draft.settings.goalMaxMinutes = goalMaxMinutes
       if (agentKernel !== undefined) draft.settings.agentKernel = normalizeAgentKernelKind(agentKernel) ?? 'dsh'

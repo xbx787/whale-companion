@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SettingsPage } from '../src/renderer/settings'
 import type { SettingsAPI } from '../src/preload/settings'
 import type { ConversationSettings } from '../src/shared/contracts'
-import { defaultVoiceSettings, voiceApiDefaults } from './voice-api-defaults'
+import { voiceApiDefaults } from './voice-api-defaults'
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -65,33 +65,12 @@ async function mount(api: SettingsAPI): Promise<void> {
 }
 
 describe('settings voice page', () => {
-  it('shows the key form and the document-to-audio section', async () => {
+  it('shows the official voice controls and the document-to-audio section', async () => {
     await mount(bridge())
-    expect(container!.textContent).toContain('SiliconFlow API Key')
-    expect(container!.textContent).toContain('测试连接')
+    expect(container!.textContent).toContain('语音服务')
+    expect(container!.textContent).toContain('朗读音色')
+    expect(container!.textContent).toContain('海星')
     expect(container!.textContent).toContain('文档转音频')
-    expect(container!.textContent).toContain('温柔女声')
-    expect(container!.querySelector('input[type="password"]')).not.toBeNull()
-  })
-
-  it('saves a typed key through the bridge', async () => {
-    const save = vi.fn(async () => defaultVoiceSettings)
-    await mount(bridge({ voiceSave: save }))
-    const input = container!.querySelector<HTMLInputElement>('input[type="password"]')!
-    await act(async () => {
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'sk-test')
-      input.dispatchEvent(new Event('input', { bubbles: true }))
-    })
-    await act(async () => click('保存 Key'))
-    expect(save).toHaveBeenCalledWith({ apiKey: 'sk-test' })
-  })
-
-  it('tests the connection without a saved key', async () => {
-    const test = vi.fn(async () => ({ ok: true, message: '连接成功，语音合成可用。' }))
-    await mount(bridge({ voiceTest: test }))
-    await act(async () => click('测试连接'))
-    expect(test).toHaveBeenCalledTimes(1)
-    expect(container!.textContent).toContain('连接成功')
   })
 
   it('picks a document and starts conversion', async () => {

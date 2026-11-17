@@ -118,18 +118,18 @@ export function navRowAt(clientY: number, trackTop: number, count: number): numb
  * itself is one track translated as a whole, so the marks, their numbers and
  * the progress line keep their relative positions and slide together.
  */
-export function TimelineNav({ marks, onJump, windowSize = NAV_WINDOW_WIDE, baseWidth = 8.8, progressId }: { marks: NavMark[]; onJump: (id: string) => void; windowSize?: number; baseWidth?: number; progressId?: string | null }) {
+export function TimelineNav({ marks, onJump, windowSize = NAV_WINDOW_WIDE, baseWidth = 8.8, progressId, follow = true }: { marks: NavMark[]; onJump: (id: string) => void; windowSize?: number; baseWidth?: number; progressId?: string | null; follow?: boolean }) {
   const [expanded, setExpanded] = useState(false);
   const [active, setActive] = useState<number | null>(null);
   const [start, setStart] = useState(() => Math.max(0, marks.length - windowSize));
   const startRef = useRef(start);
   startRef.current = start;
-  // A window-size change re-anchors the rail to the newest marks: a start
-  // that was legal for the old size can point far away for the new one.
+  // 跟随底部：进入对话、或对话框滚回底部时，窗口也回到最新刻度；
+  // 用户往上翻（follow=false）时保持当前位置，不抢他的视野。
   useEffect(() => {
+    if (!follow) return;
     setStart(Math.max(0, marks.length - windowSize));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [windowSize]);
+  }, [follow, marks.length, windowSize]);
   const navRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<number | null>(null);
   const pendingRef = useRef<{ start: number; clientY: number } | null>(null);
@@ -171,11 +171,15 @@ export function TimelineNav({ marks, onJump, windowSize = NAV_WINDOW_WIDE, baseW
   const visibleCount = expanded ? Math.min(windowSize, marks.length) : Math.min(NAV_RESTING, marks.length);
   const maxStart = Math.max(0, marks.length - visibleCount);
   const from = expanded ? Math.min(Math.max(0, start), maxStart) : 0;
-  // 收起态只渲染最后三条：轨道里留着第四条会让遮罩边缘隐约多出一根。
-  const rows = expanded ? marks : marks.slice(-Math.min(NAV_RESTING, marks.length));
-  const rowOffset = expanded ? 0 : Math.max(0, marks.length - rows.length);
+  // 展开时只渲染窗口内的行。整段对话可能有几千条，全部塞进 DOM 再靠 mask
+  // 裁掉，内容一多就会卡顿、行距和进度线也开始错位。
+  const rows = expanded
+    ? marks.slice(from, from + visibleCount)
+    : marks.slice(-Math.min(NAV_RESTING, marks.length));
+  const rowOffset = expanded ? from : Math.max(0, marks.length - rows.length);
   const latestId = marks[marks.length - 1]?.id;
-  const progressIndex = expanded && progressId ? marks.findIndex((mark) => mark.id === progressId) : -1;
+  const progressAbsolute = expanded && progressId ? marks.findIndex((mark) => mark.id === progressId) : -1;
+  const progressIndex = progressAbsolute >= from && progressAbsolute < from + visibleCount ? progressAbsolute - from : -1;
   const activeMark = expanded && active !== null ? marks[active] : null;
   return <>
     <div
@@ -189,11 +193,11 @@ export function TimelineNav({ marks, onJump, windowSize = NAV_WINDOW_WIDE, baseW
         const rect = navRef.current?.getBoundingClientRect();
         if (!rect) return;
         const row = Math.floor((event.clientY - rect.top - NAV_PAD) / NAV_STEP);
-        const mark = rows[from + row];
+        const mark = rows[row];
         if (mark) onJump(mark.id);
       }}
     >
-      <div className="panel-nav-track" style={{ transform: `translateY(${-from * NAV_STEP}px)` }}>
+      <div className="panel-nav-track">
         {rows.map((mark, index) => {
           const absolute = rowOffset + index;
           const boost = expanded && active !== null ? navBoost(Math.abs(absolute - active)) : 0;

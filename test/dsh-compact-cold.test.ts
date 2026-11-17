@@ -5,6 +5,7 @@ import { DshAcpAgentClient } from '../src/main/dsh-acp-agent'
 function fakeRuntime(overrides: Record<string, unknown> = {}) {
   return {
     generation: 1,
+    start: vi.fn(async () => undefined),
     resumeSession: vi.fn(async (id: string) => ({ sessionId: id })),
     newSession: vi.fn(async () => ({ sessionId: 'fresh' })),
     compact: vi.fn(async () => ({ shadowed: 3 })),
@@ -30,6 +31,8 @@ describe('DshAcpAgentClient cold compact', () => {
     const runtime = fakeRuntime()
     const agent = coldAgent(runtime)
     const usage = await agent.compact('saved-session')
+    // 启动后第一次操作就是压缩时，必须先等 ACP 握手完成。
+    expect(runtime.start).toHaveBeenCalled()
     expect(runtime.resumeSession).toHaveBeenCalledWith('saved-session', 'C:/work')
     expect(runtime.compact).toHaveBeenCalledWith('saved-session')
     expect(usage.compactionOutcome).toBe('compacted')

@@ -12,13 +12,15 @@
  *  with `mcp__pet__`.
  */
 import { randomBytes } from 'node:crypto'
+import { readFile } from 'node:fs/promises'
+import path from 'node:path'
 import { readFeatureFlags } from './feature-flags'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import type { ConversationBridge } from './conversation-tools'
 import type { EvolveBridge } from './evolve-tools'
 import type { AskAnswers, AskQuestion } from '../shared/contracts'
 import { parseAskQuestions } from './ask-questions'
-import { deepseekFetch, deepseekSearch } from './deepseek-tools'
+import { deepseekFetch, deepseekOcr, deepseekSearch } from './deepseek-tools'
 import { appendMemoryNote } from './memory-document'
 import { WinMcpClient } from './win-mcp-client'
 
@@ -40,8 +42,14 @@ const MAX_BODY_BYTES = 1_000_000
 export const PET_MCP_TOOLS: PetMcpToolDefinition[] = [
   {
     name: 'conversations_list',
-    description: '列出本应用里的其他对话及其运行状态。仅在需要给另一个对话转达消息时使用；返回 id、标题、是否正在运行。',
-    inputSchema: { type: 'object', properties: {}, additionalProperties: false }
+    description: '列出本应用里的其他对话及其运行状态。默认不含已归档；需要恢复归档对话时把 includeArchived 设为 true。返回 id、标题、是否正在运行。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        includeArchived: { type: 'boolean', description: 'true 时连归档对话一起列出' }
+      },
+      additionalProperties: false
+    }
   },
   {
     name: 'conversations_send_message',
@@ -53,6 +61,94 @@ export const PET_MCP_TOOLS: PetMcpToolDefinition[] = [
         message: { type: 'string', description: '要转达的正文，最多 8000 字' }
       },
       required: ['target', 'message'],
+      additionalProperties: false
+    }
+  },
+  {
+    name: 'conversations_create',
+    description: '新建一个对话，和面板顶栏的「+」按钮同一个动作：新对话会成为当前对话。只在用户明确要求新建对话时使用。',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false }
+  },
+  {
+    name: 'conversations_rename',
+    description: '重命名一个对话，包括当前对话自己。target 用清单里的 id 或唯一标题。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        target: { type: 'string', description: '目标对话的 id 或唯一标题' },
+        title: { type: 'string', description: '新标题，最多 40 字' }
+      },
+      required: ['target', 'title'],
+      additionalProperties: false
+    }
+  },
+  {
+    name: 'conversations_set_pinned',
+    description: '置顶或取消置顶一个对话。置顶的对话排在左栏会话列表最前，不影响顶栏标签顺序。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        target: { type: 'string', description: '目标对话的 id 或唯一标题' },
+        pinned: { type: 'boolean', description: 'true 置顶，false 取消置顶' }
+      },
+      required: ['target', 'pinned'],
+      additionalProperties: false
+    }
+  },
+  {
+    name: 'conversations_move',
+    description: '调整一个对话在顶栏标签里的位置。position 用 first/last 移到最前或最后；用 before/after 时同时给 anchor 指定参照对话。只改标签顺序，不改左栏列表顺序。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        target: { type: 'string', description: '要移动的对话 id 或唯一标题' },
+        position: { type: 'string', enum: ['first', 'last', 'before', 'after'], description: '移动到的位置' },
+        anchor: { type: 'string', description: 'position 为 before/after 时的参照对话 id 或唯一标题' }
+      },
+      required: ['target', 'position'],
+      additionalProperties: false
+    }
+  },
+  {
+    name: 'conversations_archive',
+    description: '归档一个对话：记录保留，可从归档恢复。',
+    inputSchema: {
+      type: 'object',
+      properties: { target: { type: 'string', description: '目标对话的 id 或唯一标题' } },
+      required: ['target'],
+      additionalProperties: false
+    }
+  },
+  {
+    name: 'conversations_restore',
+    description: '把已归档的对话恢复出来。',
+    inputSchema: {
+      type: 'object',
+      properties: { target: { type: 'string', description: '目标对话的 id 或唯一标题' } },
+      required: ['target'],
+      additionalProperties: false
+    }
+  },
+  {
+    name: 'conversations_delete',
+    description: '永久删除一个对话，无法恢复。只在用户明确要求删除某个对话时使用。',
+    inputSchema: {
+      type: 'object',
+      properties: { target: { type: 'string', description: '目标对话的 id 或唯一标题' } },
+      required: ['target'],
+      additionalProperties: false
+    }
+  },
+  {
+    name: 'ocr',
+    description: '识别 PDF、Word、PowerPoint 或图片里的文字，按页返回。path 用本机绝对路径；默认 text_recognition，需要保留排版和坐标时用 rich_layout_recognition。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: '本机文件的绝对路径' },
+        purpose: { type: 'string', enum: ['text_recognition', 'rich_layout_recognition'], description: '识别方式' }
+      },
+      required: ['path'],
       additionalProperties: false
     }
   },
@@ -520,11 +616,72 @@ export class PetMcpBridge {
     }
     if (tool === 'conversations_list') {
       if (!this.conversationBridge) return fail('对话通道尚未就绪。')
+      const includeArchived = args.includeArchived === true
       return ok({
         conversations: this.conversationBridge.list()
-          .filter((target) => !target.archived)
-          .map((target) => ({ id: target.id, title: target.title, running: target.running }))
+          .filter((target) => includeArchived || !target.archived)
+          .map((target) => ({ id: target.id, title: target.title, running: target.running, archived: target.archived }))
       })
+    }
+    if (tool === 'conversations_create') {
+      if (!this.conversationBridge) return fail('对话通道尚未就绪。')
+      const created = await this.conversationBridge.create()
+      return ok({ created: true, conversationId: created.id, title: created.title })
+    }
+    if (tool === 'conversations_rename') {
+      if (!this.conversationBridge) return fail('对话通道尚未就绪。')
+      const target = text(args.target).trim()
+      const title = text(args.title).trim().slice(0, 40)
+      if (!target) return fail('缺少目标对话。')
+      if (!title) return fail('标题不能为空。')
+      const renamed = await this.conversationBridge.rename(target, title)
+      return ok({ renamed: true, conversationId: renamed.id, title: renamed.title })
+    }
+    if (tool === 'conversations_set_pinned') {
+      if (!this.conversationBridge) return fail('对话通道尚未就绪。')
+      const target = text(args.target).trim()
+      if (!target) return fail('缺少目标对话。')
+      if (typeof args.pinned !== 'boolean') return fail('pinned 必须是布尔值。')
+      const result = await this.conversationBridge.setPinned(target, args.pinned)
+      return ok({ pinned: result.pinned, conversationId: result.id, title: result.title })
+    }
+    if (tool === 'conversations_move') {
+      if (!this.conversationBridge) return fail('对话通道尚未就绪。')
+      const target = text(args.target).trim()
+      if (!target) return fail('缺少目标对话。')
+      const position = args.position
+      if (position !== 'first' && position !== 'last' && position !== 'before' && position !== 'after') {
+        return fail('position 只能是 first、last、before 或 after。')
+      }
+      const anchor = text(args.anchor).trim()
+      if ((position === 'before' || position === 'after') && !anchor) {
+        return fail('移到 before/after 时需要提供 anchor。')
+      }
+      const moved = await this.conversationBridge.move(target, position, anchor || undefined)
+      return ok({ moved: true, conversationId: moved.id, title: moved.title, order: moved.order })
+    }
+    if (tool === 'conversations_archive' || tool === 'conversations_restore' || tool === 'conversations_delete') {
+      if (!this.conversationBridge) return fail('对话通道尚未就绪。')
+      const target = text(args.target).trim()
+      if (!target) return fail('缺少目标对话。')
+      const action = tool === 'conversations_archive' ? this.conversationBridge.archive
+        : tool === 'conversations_restore' ? this.conversationBridge.restore
+          : this.conversationBridge.remove
+      const result = await action(target)
+      return ok({ [tool.slice('conversations_'.length)]: true, conversationId: result.id, title: result.title })
+    }
+    if (tool === 'ocr') {
+      if (!this.deepseekKey) return fail('未配置 DeepSeek API Key，无法使用 OCR。')
+      const filePath = text(args.path).trim()
+      if (!filePath) return fail('缺少文件路径。')
+      const purpose = args.purpose === 'rich_layout_recognition' ? 'rich_layout_recognition' as const : 'text_recognition' as const
+      try {
+        const buffer = await readFile(filePath)
+        const result = await deepseekOcr(buffer, path.basename(filePath), purpose, this.deepseekKey)
+        return ok({ pageCount: result.pageCount, pages: result.pages })
+      } catch (error) {
+        return fail(error instanceof Error ? error.message : 'OCR 失败。')
+      }
     }
     if (tool === 'conversations_send_message') {
       if (!this.conversationBridge) return fail('对话通道尚未就绪。')

@@ -26,7 +26,14 @@ function conversationBridge(): ConversationBridge {
     send: async (target, message) => {
       if (target !== 'a') throw new Error('找不到目标对话。')
       return { id: 'a', title: `已送达：${message}` }
-    }
+    },
+    create: async () => ({ id: 'new', title: '新对话' }),
+    rename: async (target, title) => ({ id: target, title }),
+    setPinned: async (target, pinned) => ({ id: target, title: '置顶状态', pinned }),
+    move: async (target, position, anchor) => ({ id: target, title: '移动结果', order: [target, position, anchor ?? ''] }),
+    archive: async (target) => ({ id: target, title: '归档' }),
+    restore: async (target) => ({ id: target, title: '恢复' }),
+    remove: async (target) => ({ id: target, title: '删除' })
   }
 }
 
@@ -67,12 +74,37 @@ describe('PetMcpBridge', () => {
     const payload = JSON.parse(listed.body.content![0].text) as { conversations: Array<{ id: string }> }
     expect(payload.conversations.map((row) => row.id)).toEqual(['a'])
 
+    const withArchived = await call(bridge, 'conversations_list', { includeArchived: true })
+    const archivedPayload = JSON.parse(withArchived.body.content![0].text) as { conversations: Array<{ id: string }> }
+    expect(archivedPayload.conversations.map((row) => row.id)).toEqual(['a', 'old'])
+
     const sent = await call(bridge, 'conversations_send_message', { target: 'a', message: '你好' })
     expect(sent.body.isError).toBeUndefined()
     expect(sent.body.content![0].text).toContain('已送达：你好')
 
     const missing = await call(bridge, 'conversations_send_message', { target: 'nope', message: '嗨' })
     expect(missing.body.isError).toBe(true)
+  })
+
+  it('pins and moves conversations through the bridge', async () => {
+    const bridge = new PetMcpBridge()
+    bridge.setConversationBridge(conversationBridge())
+    await bridge.start()
+    cleanups.push(() => bridge.close())
+
+    const pinned = await call(bridge, 'conversations_set_pinned', { target: 'a', pinned: true })
+    expect(pinned.body.isError).toBeUndefined()
+    expect(pinned.body.content![0].text).toContain('"pinned": true')
+
+    const moved = await call(bridge, 'conversations_move', { target: 'a', position: 'before', anchor: 'b' })
+    expect(moved.body.isError).toBeUndefined()
+    expect(moved.body.content![0].text).toContain('"moved": true')
+
+    const badPosition = await call(bridge, 'conversations_move', { target: 'a', position: 'middle' })
+    expect(badPosition.body.isError).toBe(true)
+
+    const missingAnchor = await call(bridge, 'conversations_move', { target: 'a', position: 'before' })
+    expect(missingAnchor.body.isError).toBe(true)
   })
 
   it('rejects a wrong token and unknown tools', async () => {

@@ -16,7 +16,8 @@ body.avatar-window { -webkit-user-select: none; user-select: none; }
 .avatar-stage {
   --avatar-accent: 122 190 246;
   --avatar-dot-x: 88%;
-  --avatar-dot-y: 9%;
+  /* 像素而不是百分比：百分比随窗口高度重解析，拖动后点会整体上下漂。 */
+  --avatar-dot-y: 19.8px;
   --avatar-face-x: 50%;
   --avatar-face-y: 35%;
   --avatar-breath-duration: 4.8s;
@@ -33,6 +34,10 @@ body.avatar-window { -webkit-user-select: none; user-select: none; }
 .avatar-hit-target {
   opacity: var(--avatar-opacity, 1);
   position: absolute;
+  /* 人物图片盖在状态点（z-index 8）上面：浮动展开时点从身体内部往外浮，
+     经过角色轮廓的那一段要被角色挡住，才像从身体里长出来；最终落点在
+     右上角外部，不受影响。 */
+  z-index: 9;
   /* 以当前人设基础立绘计算一次几何：表情切换不改按钮宽高。
      中心固定在距右边 88px；上下各 6px 留给视觉层的轻微运动。 */
   right: calc(88px - var(--avatar-w, 116.5px) / 2);
@@ -66,16 +71,16 @@ body.avatar-window { -webkit-user-select: none; user-select: none; }
 .avatar-status-dots { display: contents; }
 /* 固定宽高 + 整设备像素取整：对话数变化时点不能被压成椭圆，圆边也不会
    被 125% 缩放抹糊。translate 让 right/top 落成点的中心。 */
-.avatar-status-dot { position: absolute; right: var(--avatar-dot-right, 0px); top: var(--avatar-dot-top, 0px); transform: translate(50%, -50%); width: var(--avatar-dot-size, 7px); height: var(--avatar-dot-size, 7px); border-radius: 50%; background: #86b3f2; opacity: .88; }
-.avatar-status-dot.is-busy { background: #f3c36f; opacity: 1; box-shadow: 0 0 4px 1px rgba(243, 195, 111, .6); }
-.avatar-status-dot.is-waiting { background: #d18bff; opacity: 1; box-shadow: 0 0 7px 2.5px rgba(199, 125, 255, .9); }
-.avatar-status-dot.is-done { background: #8ce3ae; opacity: 1; box-shadow: 0 0 4px 1px rgba(140, 227, 174, .55); }
-.avatar-status-dot.is-failed { background: #f48790; opacity: 1; box-shadow: 0 0 4px 1px rgba(244, 135, 144, .65); }
-.avatar-status-dot.is-cancelled { background: #9aa7bd; opacity: 1; box-shadow: 0 0 4px 1px rgba(154, 167, 189, .45); }
+.avatar-status-dot { position: absolute; right: var(--avatar-dot-right, 0px); top: var(--avatar-dot-top, 0px); transform: translate(50%, -50%); width: var(--avatar-dot-size, 7px); height: var(--avatar-dot-size, 7px); border-radius: 50%; background: #86b3f2; --dot-opacity: .88; opacity: var(--dot-opacity); }
+.avatar-status-dot.is-busy { background: #f3c36f; --dot-opacity: 1; box-shadow: 0 0 4px 1px rgba(243, 195, 111, .6); }
+.avatar-status-dot.is-waiting { background: #d18bff; --dot-opacity: 1; box-shadow: 0 0 7px 2.5px rgba(199, 125, 255, .9); }
+.avatar-status-dot.is-done { background: #8ce3ae; --dot-opacity: 1; box-shadow: 0 0 4px 1px rgba(140, 227, 174, .55); }
+.avatar-status-dot.is-failed { background: #f48790; --dot-opacity: 1; box-shadow: 0 0 4px 1px rgba(244, 135, 144, .65); }
+.avatar-status-dot.is-cancelled { background: #9aa7bd; --dot-opacity: 1; box-shadow: 0 0 4px 1px rgba(154, 167, 189, .45); }
 /* 当前会话不加环也不提亮，所有同状态点颜色必须完全一致。 */
-.avatar-status-dot.is-current { opacity: 1; }
+.avatar-status-dot.is-current { --dot-opacity: 1; }
 /* 不足五个对话时的空槽：只留一圈细边，五个点的位置保持不变。 */
-.avatar-status-dot.is-empty { background: transparent; border: 1px solid rgba(150, 190, 245, .5); opacity: .55; }
+.avatar-status-dot.is-empty { background: transparent; border: 1px solid rgba(150, 190, 245, .5); --dot-opacity: .55; }
 /* 只呼吸透明度，不改尺寸：几个对话点必须始终等大。 */
 @keyframes avatar-task-pulse {
   0%, 100% { opacity: 1; }
@@ -85,6 +90,26 @@ body.avatar-window { -webkit-user-select: none; user-select: none; }
   .avatar-status-dot.is-pulsing.is-busy { animation: avatar-task-pulse 2s ease-in-out infinite; }
 /* 等待用户回答：同一呼吸曲线，周期 0.5 秒。 */
 .avatar-status-dot.is-pulsing.is-waiting { animation: avatar-task-pulse .5s ease-in-out infinite; }
+}
+/* 浮动展开：点从角色内部（左下方向）浮到弧线位置；收起是它的逆过程。
+   透明度终点读 --dot-opacity，动画不会把空槽的 .55 或默认的 .88 顶成 1。 */
+@keyframes avatar-dot-float-in {
+  from { opacity: 0; transform: translate(50%, -50%) translate(-24px, 28px) scale(.35); }
+  to { opacity: var(--dot-opacity, 1); transform: translate(50%, -50%) translate(0, 0) scale(1); }
+}
+.avatar-status-dot.is-floating {
+  animation: avatar-dot-float-in .42s cubic-bezier(.22, .75, .25, 1) backwards;
+}
+@keyframes avatar-dot-float-out {
+  from { opacity: var(--dot-opacity, 1); transform: translate(50%, -50%) translate(0, 0) scale(1); }
+  to { opacity: 0; transform: translate(50%, -50%) translate(-24px, 28px) scale(.35); }
+}
+.avatar-status-dot.is-floating-out {
+  animation: avatar-dot-float-out .3s cubic-bezier(.4, 0, .7, .2) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .avatar-status-dot.is-floating { animation: none; }
+  .avatar-status-dot.is-floating-out { animation: none; }
 }
 /* All visual layers sit inside the immutable hit target. Each channel owns a
    separate transform so breathing, task, voice, idle and one-shot motion can

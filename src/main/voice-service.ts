@@ -3,6 +3,7 @@ import path from 'node:path'
 import type { VoiceConfig, VoiceJobProgress, VoiceSettingsPatch, VoiceSettingsPublic } from '../shared/contracts'
 import { MAX_TTS_INPUT_CHARS, TTS_MODEL, clampSpeechSpeed, isSpeechSpeed, isVoicePresetId, siliconFlowVoiceName } from '../shared/voice'
 import { transcribeAudio as defaultTranscribe } from './asr-server'
+import { deepseekAsr, deepseekTts } from './deepseek-tools'
 import { readDocumentForSpeech, convertDocumentToAudio } from './document-audio'
 import type { SecretCodec } from './secret-storage'
 import { VoiceCache } from './voice-cache'
@@ -17,6 +18,8 @@ export interface VoiceServiceOptions {
   synthesizeImpl?: typeof defaultSynthesize
   transcribeImpl?: typeof defaultTranscribe
   now?: () => Date
+  /** 官方 DeepSeek key：有值时语音优先走官方 /v1/tools/tts、/v1/tools/asr。 */
+  deepseekKey?: () => string | undefined
 }
 
 interface DocumentJob {
@@ -56,6 +59,7 @@ export class VoiceService {
   private readonly onJobProgress: (progress: VoiceJobProgress) => void
   private readonly synthesizeImpl: typeof defaultSynthesize
   private readonly transcribeImpl: typeof defaultTranscribe
+  private readonly deepseekKey: (() => string | undefined) | undefined
   private readonly now: () => Date
   readonly audioRoot: string
 
@@ -66,6 +70,7 @@ export class VoiceService {
     this.onJobProgress = options.onJobProgress ?? (() => undefined)
     this.synthesizeImpl = options.synthesizeImpl ?? defaultSynthesize
     this.transcribeImpl = options.transcribeImpl ?? defaultTranscribe
+    this.deepseekKey = options.deepseekKey
     this.now = options.now ?? (() => new Date())
   }
 
@@ -97,64 +102,38 @@ export class VoiceService {
   }
 
   async transcribe(input: { bytes: number[]; mimeType: string }): Promise<{ text: string }> {
-    const key = await this.store.apiKey()
-    if (!key.key) throw new Error('未配置 SiliconFlow API Key，请到设置 → 语音里填写。')
-    const runtime = await this.store.runtime()
-    return this.transcribeImpl({
-      bytes: input.bytes,
-      mimeType: input.mimeType,
-      apiKey: key.key,
-      model: runtime.sttModel,
-      baseUrl: runtime.baseUrl
-    })
+    // 只用官方 ASR：它只收 16 位 PCM WAV 或 Ogg Opus。
+    const officialKey = this.deepseekKey?.()
+    if (!officialKey) throw new Error('未配置 DeepSeek Key，无法转写。')
+    if (!/wav|ogg|opus/i.test(input.mimeType)) throw new Error('录音格式需要 WAV 或 Ogg Opus。')
+    const result = await this.limiter.run(() => deepseekAsr(Buffer.from(input.bytes), 'recording.wav', officialKey))
+    return { text: result.text }
   }
 
   async synthesize(input: { text: string; voice?: string; speed?: number }): Promise<{
     audioBase64: string
-    mimeType: 'audio/mpeg'
+    mimeType: 'audio/mpeg' | 'audio/wav'
     cached: boolean
   }> {
     const text = input.text.trim()
     if (!text) throw new Error('没有可朗读的文字。')
     if (text.length > MAX_TTS_INPUT_CHARS) throw new Error('单段语音最多 300 字。')
-    const key = await this.store.apiKey()
-    if (!key.key) throw new Error('未配置 SiliconFlow API Key，请到设置 → 语音里填写。')
-    const runtime = await this.store.runtime()
-    const voice = isVoicePresetId(input.voice) ? input.voice : runtime.voice
-    const speed = isSpeechSpeed(input.speed) ? clampSpeechSpeed(input.speed) : runtime.speed
-    const voiceName = siliconFlowVoiceName(voice)
-    const cacheKey = this.cache.keyFor({ model: TTS_MODEL, voice: voiceName, speed, format: 'mp3', text })
-
-    const hit = await this.cache.read(cacheKey)
-    if (hit) return { audioBase64: hit.toString('base64'), mimeType: 'audio/mpeg', cached: true }
-
-    const result = await this.limiter.run(() => this.synthesizeImpl({
-      text,
-      apiKey: key.key!,
-      baseUrl: runtime.baseUrl,
-      model: TTS_MODEL,
-      voice: voiceName,
-      speed
-    }))
-    await this.cache.write(cacheKey, result.bytes)
-    return { audioBase64: result.bytes.toString('base64'), mimeType: 'audio/mpeg', cached: false }
+    // 只用官方 TTS：整段合成，直接返回 wav。
+    const officialKey = this.deepseekKey?.()
+    if (!officialKey) throw new Error('未配置 DeepSeek Key，无法朗读。请先在设置里填写。')
+    const officialCache = this.cache.keyFor({ model: 'deepseek-tts', voice: 'stella', speed: 1, format: 'wav', text })
+    const officialHit = await this.cache.read(officialCache)
+    if (officialHit) return { audioBase64: officialHit.toString('base64'), mimeType: 'audio/wav', cached: true }
+    const synthesized = await this.limiter.run(() => deepseekTts(text, officialKey, { voiceId: 'stella', format: 'wav' }))
+    await this.cache.write(officialCache, synthesized.bytes)
+    return { audioBase64: synthesized.bytes.toString('base64'), mimeType: 'audio/wav', cached: false }
   }
 
-  async testConnection(input: { apiKey?: string; voice?: string; speed?: number } = {}): Promise<{ ok: boolean; message: string }> {
+  async testConnection(): Promise<{ ok: boolean; message: string }> {
     try {
-      const stored = await this.store.apiKey()
-      const apiKey = input.apiKey?.trim() || stored.key
-      if (!apiKey) return { ok: false, message: '还没有填写 SiliconFlow API Key。' }
-      const runtime = await this.store.runtime()
-      await this.synthesizeImpl({
-        text: '你好，我是小鲸。',
-        apiKey,
-        baseUrl: runtime.baseUrl,
-        model: TTS_MODEL,
-        voice: siliconFlowVoiceName(isVoicePresetId(input.voice) ? input.voice : runtime.voice),
-        speed: isSpeechSpeed(input.speed) ? input.speed : runtime.speed,
-        timeoutMs: 30_000
-      })
+      const key = this.deepseekKey?.()
+      if (!key) return { ok: false, message: '还没有配置 DeepSeek Key。' }
+      await this.limiter.run(() => deepseekTts('你好，我是小鲸。', key, { voiceId: 'stella', format: 'wav' }))
       return { ok: true, message: '连接成功，语音合成可用。' }
     } catch (error) {
       return { ok: false, message: error instanceof Error ? error.message : '连接失败。' }
@@ -163,9 +142,7 @@ export class VoiceService {
 
   async startDocumentJob(filePath: string): Promise<{ jobId: string; total: number }> {
     const document = await readDocumentForSpeech(filePath)
-    const key = await this.store.apiKey()
-    if (!key.key) throw new Error('未配置 SiliconFlow API Key，请到设置 → 语音里填写。')
-    const runtime = await this.store.runtime()
+    if (!this.deepseekKey?.()) throw new Error('未配置 DeepSeek Key，无法转换文档。')
     const jobId = randomUUID()
     const controller = new AbortController()
     const progress: VoiceJobProgress = {
@@ -182,28 +159,14 @@ export class VoiceService {
           name: document.name,
           segments: document.segments,
           audioRoot: this.audioRoot,
-          voice: isVoicePresetId(runtime.voice) ? runtime.voice : 'claire',
-          speed: runtime.speed,
+          voice: 'stella',
+          speed: 1,
           signal: controller.signal,
           now: this.now(),
-          synthesize: (text, signal) => this.limiter.run(async () => {
-            const cacheKey = this.cache.keyFor({
-              model: TTS_MODEL, voice: siliconFlowVoiceName(runtime.voice), speed: runtime.speed, format: 'mp3', text
-            })
-            const hit = await this.cache.read(cacheKey)
-            if (hit) return hit
-            const synthesized = await this.synthesizeImpl({
-              text,
-              apiKey: key.key!,
-              baseUrl: runtime.baseUrl,
-              model: TTS_MODEL,
-              voice: siliconFlowVoiceName(runtime.voice),
-              speed: runtime.speed,
-              signal
-            })
-            await this.cache.write(cacheKey, synthesized.bytes)
-            return synthesized.bytes
-          }),
+          synthesize: async (text) => {
+            const synthesized = await this.synthesize({ text })
+            return Buffer.from(synthesized.audioBase64, 'base64')
+          },
           onProgress: (next) => {
             job.outputDir = next.outputDir ?? job.outputDir
             job.progress = next

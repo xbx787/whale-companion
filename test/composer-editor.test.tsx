@@ -99,4 +99,19 @@ describe('ComposerEditor', () => {
     expect(view.querySelector('.composer-editor')!.textContent).toContain('新内容')
     expect(view.querySelector('.composer-mention')).not.toBeNull()
   })
+
+  it('clears the DOM synchronously so a second Enter cannot resend the same text', async () => {
+    const { view, handle } = await mount('会重复发送的一句')
+    expect(handle!.getValue()).toBe('会重复发送的一句')
+    // 不经过 React 渲染，直接读 DOM：发送后紧接着的那次回车必须看到空值。
+    handle!.clear()
+    expect(handle!.getValue()).toBe('')
+    expect(view.querySelector('.composer-editor')!.textContent).toBe('')
+  })
+
+  it('treats a leftover line break as empty so the placeholder comes back', async () => {
+    // contenteditable 删光后常残留一个 <br>，读出来是 "\n"；这不算有内容。
+    const { view } = await mount('\n')
+    expect(view.querySelector('.composer-editor')!.getAttribute('data-empty')).toBe('true')
+  })
 })

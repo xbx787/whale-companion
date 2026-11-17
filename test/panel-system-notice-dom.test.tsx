@@ -27,7 +27,7 @@ function snapshot(): AppSnapshot {
     timeline: [
       { id: 'user-1', kind: 'user', text: '开始', time: '2026-10-13T00:00:00.000Z' },
       { id: 'assistant-1', kind: 'assistant', text: '原来的回答', time: '2026-10-13T00:01:00.000Z' },
-      { id: 'compact-1', kind: 'system', text: '上下文已压缩，可以继续当前对话。', time: '2026-10-13T00:02:00.000Z' },
+      { id: 'compact-1', kind: 'system', text: '上下文已压缩，可以继续当前对话。', tone: 'success', time: '2026-10-13T00:02:00.000Z' },
       { id: 'error-1', kind: 'system', text: '模型请求失败。', tone: 'error', time: '2026-10-13T00:03:00.000Z' }
     ],
     conversationLibrary: { settings, activeConversationId: 'a', conversations: [conversation] },
@@ -74,10 +74,15 @@ describe('system notices keep their own row', () => {
     expect(turn.querySelector('.panel-event-system')).toBeNull()
 
     const notices = [...host.querySelectorAll('.panel-event-system')]
-    expect(notices.map((node) => node.textContent)).toEqual([
+    expect(notices.map((node) => node.querySelector('p')?.textContent)).toEqual([
       '上下文已压缩，可以继续当前对话。',
-      '!模型请求失败。'
+      '模型请求失败。'
     ])
+
+    // 压缩成功和工具完成同色：绿色状态点，不加对勾或文字。
+    expect(notices[0].classList.contains('is-success')).toBe(true)
+    expect(notices[0].querySelector('.panel-event-system-mark')?.classList.contains('is-dot')).toBe(true)
+    expect(notices[0].querySelector('.panel-event-system-mark')?.textContent).toBe('')
 
     const failed = notices[1]
     expect(failed.classList.contains('is-error')).toBe(true)

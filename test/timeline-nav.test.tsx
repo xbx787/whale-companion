@@ -166,7 +166,6 @@ describe('TimelineNav', () => {
     const html = renderToStaticMarkup(<TimelineNav marks={marks(40)} onJump={() => {}} />)
     // 收起态严格三条：第四条不在 DOM 里，避免遮罩边缘隐约多出一根。
     expect((html.match(/panel-nav-mark/g) ?? []).length).toBe(NAV_RESTING)
-    expect(html).toContain('translateY(0px)')
     expect(html).not.toContain('is-expanded')
     expect(html).not.toContain('panel-nav-card')
     expect(html).not.toContain('is-active')

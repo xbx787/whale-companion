@@ -110,7 +110,7 @@ body.is-resizing-panel .panel-resize-grip::before {
 }
 /* 展开时会话库按钮紧贴手柄热区右缘。 */
 .panel-bubble.is-expanded .panel-chat-header { padding-left: 10px; }
-.panel-window-action { position: absolute; z-index: 20; top: 9px; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 9px; color: #d2e0fc; background: transparent; }
+.panel-window-action { position: absolute; z-index: 20; top: 8px; display: grid; place-items: center; width: 29px; height: 29px; padding: 0; border: 0; border-radius: 9px; color: #d2e0fc; background: transparent; }
 .panel-expand-toggle { right: 45px; }
 .panel-window-close { right: 13px; }
 .panel-window-action:hover { color: #fff; background: rgba(178, 203, 251, .18); }
@@ -133,6 +133,9 @@ body.is-resizing-panel .panel-resize-grip::before {
   height: 8px;
   background: #0c1d44;
   clip-path: polygon(0 0, 100% 0, 50% 100%);
+  /* 尾巴也要有和面板同色的 1px 描边：clip-path 本身不带边框，用一层
+     贴着形状的阴影补出两条斜边和底边，不能只让斜边有线。 */
+  filter: drop-shadow(0 0 .6px rgba(184, 209, 255, .7));
   pointer-events: none;
 }
 /* 面板窗口里的尾巴跟着人物走：主进程把人物中心换算成相对窗口左缘的像素。 */
@@ -198,8 +201,8 @@ body.panel-placement-right .panel-bubble::after { display: none; }
 .panel-side-intro { margin: 2px 0 12px; padding: 0 2px; color: #9db9e6; font-size: var(--text-xs); line-height: 1.45; }
 .panel-history-loading { margin: 12px 2px; color: #9db9e6; font-size: var(--text-xs); line-height: 1.45; }
 
-.panel-chat-header { position: relative; z-index: 5; display: flex; align-items: center; gap: 6px; flex: none; min-width: 0; height: 46px; padding: 4px 113px 0 10px; border-bottom: 1px solid rgba(188, 212, 255, .14); }
-.panel-library-toggle { display: grid; place-items: center; flex: none; width: 28px; height: 28px; margin-bottom: 0; padding: 0; border: 0; border-radius: 9px; color: #d3e2ff; background: rgba(178, 203, 251, .09); }
+.panel-chat-header { position: relative; z-index: 5; display: flex; align-items: center; gap: 6px; flex: none; min-width: 0; height: 46px; padding: 0 113px 0 10px; border-bottom: 1px solid rgba(188, 212, 255, .14); }
+.panel-library-toggle { display: grid; place-items: center; flex: none; width: 29px; height: 29px; margin-bottom: 0; padding: 0; border: 0; border-radius: 9px; color: #d3e2ff; background: rgba(178, 203, 251, .09); }
 .panel-library-toggle:hover { color: #fff; background: rgba(178, 203, 251, .2); }
 .panel-library-toggle svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
 .panel-session-menu { position: absolute; z-index: 6; top: 40px; left: 10px; display: grid; width: min(228px, calc(100vw - 24px)); max-height: max(240px, min(320px, calc(100vh - 120px))); padding: 6px; overflow-y: auto; border: 1px solid rgba(190, 212, 255, .31); border-radius: 11px; background: linear-gradient(155deg, rgba(42, 65, 117, .99), rgba(17, 33, 72, .99)); box-shadow: 0 10px 28px rgba(5, 14, 38, .42); scrollbar-width: thin; }
@@ -458,7 +461,7 @@ body.panel-placement-right .panel-bubble::after { display: none; }
 .panel-quick-tabs::-webkit-scrollbar { display: none; }
 /* 会话标签是悬浮的小圆角矩形：四周留出空隙，不再把侧边线接到栏底。
    当前会话只用背景和描边高亮，不再加顶部强调线。 */
-.panel-quick-tab { position: relative; display: flex; align-items: center; justify-content: center; gap: 5px; flex: 1 1 0; min-width: 0; max-width: 160px; height: 26px; padding: 0 20px 0 8px; overflow: hidden; border: 1px solid transparent; border-radius: 7px; color: #aebfe0; background: rgba(155, 190, 252, .055); font-size: var(--text-sm) !important; white-space: nowrap; touch-action: none; animation: quick-tab-in .16s cubic-bezier(.22, .75, .25, 1) both; }
+.panel-quick-tab { position: relative; display: flex; align-items: center; justify-content: center; gap: 5px; flex: 1 1 0; min-width: 0; max-width: 160px; height: 29px; padding: 0 20px 0 8px; overflow: hidden; border: 1px solid transparent; border-radius: 7px; color: #aebfe0; background: rgba(155, 190, 252, .055); font-size: var(--text-sm) !important; white-space: nowrap; touch-action: none; animation: quick-tab-in .16s cubic-bezier(.22, .75, .25, 1) both; }
 /* 新建的标签从窄到宽弹出；关闭时先收 180ms，再从标签条拿掉。 */
 @keyframes quick-tab-in { from { opacity: 0; transform: scaleX(.55) scaleY(.86); } to { opacity: 1; transform: none; } }
 @keyframes quick-tab-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: scaleX(.55) scaleY(.86); } }
@@ -472,7 +475,7 @@ body.panel-placement-right .panel-bubble::after { display: none; }
 .panel-quick-tab-close:hover { color: #fff; background: rgba(255, 120, 120, .3); }
 .panel-quick-tab:hover { color: #f3f7ff; background: rgba(185, 210, 255, .14); }
 /* 加号没有按钮框，只留符号本身。 */
-.panel-quick-tab-new { flex: 0 0 26px; max-width: 26px; padding: 0; border-color: transparent; background: transparent; color: #c5d7f6; }
+.panel-quick-tab-new { flex: 0 0 29px; max-width: 29px; padding: 0; border-color: transparent; background: transparent; color: #c5d7f6; }
 .panel-quick-tab-new:hover { background: transparent; color: #fff; }
 .panel-quick-tab-new:disabled, .panel-quick-tab-new:disabled:hover { color: #7f92b5; opacity: .55; cursor: not-allowed; }
 .panel-quick-tab-new svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
@@ -480,7 +483,7 @@ body.panel-placement-right .panel-bubble::after { display: none; }
 .panel-quick-tab.is-dragging { opacity: .55; }
 .panel-quick-tab.is-current { border-color: rgba(188, 212, 255, .21); color: #f3f7ff; background: rgba(185, 210, 255, .20); }
 .panel-chat-header.is-numeric .panel-quick-tabs { align-items: center; height: 29px; }
-.panel-chat-header.is-numeric .panel-quick-tab { flex: none; width: 25px; height: 25px; padding: 0; border: 0; border-radius: 6px; background: transparent; font-variant-numeric: tabular-nums; }
+.panel-chat-header.is-numeric .panel-quick-tab { flex: none; width: 29px; height: 29px; padding: 0; border: 0; border-radius: 6px; background: transparent; font-variant-numeric: tabular-nums; }
 .panel-chat-header.is-numeric .panel-quick-tab:nth-child(n + 10) { width: 30px; }
 .panel-chat-header.is-numeric .panel-quick-tab:hover, .panel-chat-header.is-numeric .panel-quick-tab.is-current { color: #f3f7ff; background: rgba(185, 210, 255, .17); }
 .panel-quick-tab:disabled { cursor: default; }
@@ -507,7 +510,7 @@ body.panel-placement-right .panel-bubble::after { display: none; }
    否则会孤零零停在色块上方。 */
 .panel-event:has(.panel-event-route) .panel-event-avatar,
 .panel-event:has(.panel-event-tag-slot) .panel-event-avatar {
-  margin-top: calc(48px - var(--route-chip-h) - var(--route-gap));
+  margin-top: calc(56px - var(--route-chip-h) - var(--route-gap));
 }
 /* content-visibility 会连绘制一起裁剪，跨端消息上方的弧线正好伸出气泡，
    这条规则让它照常溢出显示；这类消息很少，不靠跳过它省渲染。 */
@@ -518,7 +521,7 @@ body.panel-placement-right .panel-bubble::after { display: none; }
 .panel-event-user { display: flex; flex-direction: row-reverse; align-items: flex-start; gap: 8px; width: fit-content; max-width: 88%; margin-left: auto; }
 /* 来源是别的对话或代理时，头像属于对方而不是主人，一律回到左边。 */
 .panel-event-user.is-foreign { flex-direction: row; margin-left: 0; }
-.panel-event-user .panel-event-body { min-width: 0; padding: 2px 10px 3px; border: 1px solid rgba(190, 213, 253, .18); border-radius: 12px 4px 12px 12px; background: rgba(154, 185, 242, .12); }
+.panel-event-user .panel-event-body { min-width: 0; padding: 2px 10px 3px; border: 1px solid rgba(190, 213, 253, .18); border-radius: 12px; background: rgba(154, 185, 242, .12); }
 /* 用户气泡收紧到半行留白：首段不再额外顶开，多段之间也只留半行。 */
 .panel-event-user .panel-event-body p { margin: 0; }
 .panel-event-user .panel-event-body p + p { margin-top: .5em; }
@@ -564,8 +567,9 @@ body.panel-placement-right .panel-bubble::after { display: none; }
   min-width: 0;
   padding-top: 1px;
 }
-/* 色块挂在气泡外面上方：绝对定位，不占正文高度，用 :has 给上方留出空间。 */
-.panel-event-body:has(.panel-event-route) { margin-top: 48px; }
+/* 色块挂在气泡外面上方：绝对定位，不占正文高度，用 :has 给上方留出空间。
+   56px 是“色块 35px + 间隙 8px + 顶部余量”：滚到顶时色块也不会贴住面板。 */
+.panel-event-body:has(.panel-event-route) { margin-top: 56px; }
 .panel-event-body p { margin: 4px 0 0; color: #edf3ff; font-size: var(--text-md); line-height: 1.58; white-space: pre-wrap; overflow-wrap: anywhere; }
 /* A system notice has no speaker: it reads as a quiet centered aside between
    messages — no avatar, no timestamp; hairline rules mark it instead. */
@@ -578,6 +582,12 @@ body.panel-placement-right .panel-bubble::after { display: none; }
    warning text, so a failure never reads as an ordinary status note. */
 .panel-event-system.is-error .panel-event-body::before, .panel-event-system.is-error .panel-event-body::after { background: linear-gradient(90deg, rgba(244, 143, 152, .46), rgba(244, 143, 152, .04)); }
 .panel-event-system.is-error .panel-event-body p { color: #ffb8bf; }
+/* 成功状态和工具完成共用同一套绿色：压缩完成不该混在普通灰色提示里。 */
+.panel-event-system.is-success .panel-event-body::before, .panel-event-system.is-success .panel-event-body::after { background: linear-gradient(90deg, rgba(128, 214, 161, .46), rgba(128, 214, 161, .04)); }
+.panel-event-system.is-success .panel-event-body p { color: #80d6a1; }
+.panel-event-system.is-success .panel-event-system-mark { border-color: rgba(128, 214, 161, .62); color: #80d6a1; }
+/* 成功只给一个绿色状态点，不加对勾或文字。 */
+.panel-event-system.is-success .panel-event-system-mark.is-dot { width: 8px; height: 8px; border: 0; border-radius: 50%; background: #80d6a1; }
 .panel-event-system-mark { flex: none; display: grid; place-items: center; width: 14px; height: 14px; border: 1px solid rgba(244, 143, 152, .62); border-radius: 50%; color: #ffb8bf; font-size: var(--text-2xs); font-weight: 600; line-height: 1; }
 .panel-event-retry { flex: none; height: 22px; padding: 0 9px; border: 1px solid rgba(244, 143, 152, .38); border-radius: 999px; color: #ffd2d6; background: rgba(244, 143, 152, .10); font-size: var(--text-2xs); }
 .panel-event-retry:hover { background: rgba(244, 143, 152, .18); }
@@ -1097,9 +1107,12 @@ img.panel-markdown-image { display: inline-block; vertical-align: top; width: ca
    停止按钮保留自己的按钮底。 */
 .panel-composer { position: relative; display: flex; flex: 1; flex-direction: column; gap: 5px; min-width: 0; min-height: 0; padding: 8px 0 0 2px; border: 0; border-top: 1px solid rgba(190, 213, 253, .22); background: transparent; animation: composer-appear .16s cubic-bezier(.22, .75, .25, 1) both; }
 .panel-composer.is-closing { pointer-events: none; animation: composer-dismiss .15s cubic-bezier(.55, 0, .85, .4) both; }
-.panel-composer-collapse { position: absolute; z-index: 2; top: 5px; right: 0; display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 7px; color: #b8c9e9; background: transparent; }
+.panel-composer-collapse { position: absolute; z-index: 2; top: 5px; right: 0; display: grid; place-items: center; width: 29px; height: 29px; padding: 0; border: 0; border-radius: 9px; color: #b8c9e9; background: transparent; }
 .panel-composer-collapse:hover { color: #fff; background: rgba(169, 195, 246, .16); }
 .panel-composer-collapse svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
+/* 收起按钮现在和底部工具栏的按钮同尺寸，编辑器右侧要让出它的宽度，
+   否则首行文字会钻到 × 下面。 */
+.panel-composer .composer-editor { padding-right: 34px; }
 /* 这个弹出列表不显示滚动条：滚轮照常上下滚，横向溢出直接裁掉。 */
 .panel-composer-suggestions { position: absolute; z-index: 12; left: 0; bottom: calc(100% + 8px); display: grid; gap: 4px; width: 100%; max-height: min(52vh, 420px); padding: 6px; overflow-x: hidden; overflow-y: auto; border: 1px solid rgba(190, 212, 255, .29); border-radius: 11px; background: rgba(23, 43, 87, .98); box-shadow: 0 6px 20px rgba(5, 14, 38, .22); scrollbar-width: none; }
 .panel-composer-suggestions::-webkit-scrollbar { display: none; }
@@ -1166,7 +1179,7 @@ img.panel-markdown-image { display: inline-block; vertical-align: top; width: ca
 .panel-bypass-full h3 { color: #f0c3c8; }
 .panel-bypass-full .panel-bypass-confirm { border-color: rgba(184, 119, 129, .75); color: #2d1116; background: #d9a3aa; }
 .panel-bypass-full .panel-bypass-confirm:hover { background: #e6b3ba; }
-.panel-bypass { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 370px; padding: 14px 15px 12px; border: 1px solid rgba(240, 196, 123, .5); border-radius: 14px; background: linear-gradient(155deg, rgba(40, 52, 92, .99), rgba(17, 31, 66, .99)); box-shadow: 0 16px 40px rgba(3, 10, 28, .55); }
+.panel-bypass { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 370px; max-height: 100%; padding: 14px 15px 12px; overflow-y: auto; overscroll-behavior: contain; border: 1px solid rgba(240, 196, 123, .5); border-radius: 14px; background: linear-gradient(155deg, rgba(40, 52, 92, .99), rgba(17, 31, 66, .99)); box-shadow: 0 16px 40px rgba(3, 10, 28, .55); scrollbar-width: thin; }
 .panel-bypass h3 { margin: 0; color: #ffe9c7; font-size: var(--text-md); font-weight: 650; }
 .panel-bypass p { margin: 0; color: #c8d6ef; font-size: var(--text-sm); line-height: 1.6; }
 .panel-bypass-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
@@ -1178,6 +1191,15 @@ img.panel-markdown-image { display: inline-block; vertical-align: top; width: ca
 .panel-evolve-confirm { border-color: rgba(177, 140, 255, .5); }
 .panel-evolve-confirm h3 { color: #e6dbff; }
 .panel-evolve-confirm p strong { color: #d8c8ff; font-weight: 650; }
+/* 开发者与普通用户看到的风险不一样：分两块写，别让普通用户跳过权限说明。 */
+.panel-evolve-roles { display: grid; gap: 8px; }
+.panel-evolve-role { display: grid; gap: 3px; padding: 8px 10px; border: 1px solid rgba(177, 140, 255, .22); border-left: 3px solid rgba(177, 140, 255, .55); border-radius: 8px; background: rgba(177, 140, 255, .07); }
+.panel-evolve-role h4 { margin: 0; color: #cfbcff; font-size: var(--text-xs); font-weight: 650; }
+.panel-evolve-role p { font-size: var(--text-xs); line-height: 1.55; }
+.panel-evolve-role code { padding: 1px 4px; border-radius: 4px; color: #fff; background: rgba(177, 140, 255, .2); font-family: var(--font-mono); }
+.panel-evolve-role.is-caution { border-color: rgba(240, 170, 120, .3); border-left-color: rgba(240, 170, 120, .7); background: rgba(240, 170, 120, .07); }
+.panel-evolve-role.is-caution h4 { color: #f5c9a3; }
+.panel-evolve-role.is-caution p strong { color: #ffd9b8; }
 .panel-evolve-authorize { display: grid; gap: 7px; margin: 10px 0 2px; color: #ddd0ff; font-size: var(--text-sm); line-height: 1.5; }
 .panel-evolve-authorize code { padding: 1px 5px; border-radius: 4px; color: #fff; background: rgba(177, 140, 255, .2); font-family: var(--font-mono); }
 .panel-evolve-authorize input { width: 100%; height: 34px; padding: 0 10px; border: 1px solid rgba(177, 140, 255, .45); border-radius: 8px; color: #fff; background: rgba(20, 12, 38, .35); outline: none; font: inherit; }
@@ -1266,6 +1288,22 @@ img.panel-markdown-image { display: inline-block; vertical-align: top; width: ca
 .panel-goal-banner.is-paused { opacity: .78; }
 /* 思考强度并进了「模型与上下文」弹窗：和模型列表同一块面板，用一条分隔线
    区分，不再单独占一个工具栏按钮。 */
+/* 采样参数：手机入口下方、模式上方；两个预设键 + 两条滑条，松手才提交。 */
+.panel-model-sampling { margin-bottom: 6px; padding: 2px 0 8px; border-bottom: 1px solid rgba(190, 212, 255, .16); }
+.panel-sampling-presets { display: flex; gap: 6px; padding: 0 8px 6px; }
+/* 预设键要压过 `.panel-model-menu button` 的透明底和零边框，所以带上菜单前缀。 */
+.panel-model-menu .panel-sampling-presets .panel-sampling-preset { flex: 1; justify-content: center; height: 26px; border: 1px solid rgba(190, 212, 255, .32); border-radius: 7px; color: #dbe8ff; background: rgba(146, 181, 243, .16); font-size: var(--text-sm); cursor: pointer; }
+.panel-model-menu .panel-sampling-presets .panel-sampling-preset:hover:not(:disabled) { background: rgba(146, 181, 243, .26); }
+.panel-model-menu .panel-sampling-presets .panel-sampling-preset.is-active { border-color: rgba(120, 180, 255, .72); color: #fff; background: rgba(120, 180, 255, .3); }
+.panel-model-menu .panel-sampling-presets .panel-sampling-preset:disabled { opacity: .45; cursor: default; }
+.panel-sampling-row { display: flex; align-items: center; gap: 8px; padding: 2px 8px 4px; }
+.panel-sampling-label { flex: none; width: 66px; color: #c6d7f5; font-size: var(--text-xs); }
+.panel-sampling-range { flex: 1; min-width: 0; height: 18px; -webkit-appearance: none; appearance: none; background: transparent; }
+.panel-sampling-range::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: rgba(190, 212, 255, .22); }
+.panel-sampling-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; margin-top: -4px; border-radius: 50%; background: #78b4ff; box-shadow: 0 0 0 2px rgba(120, 180, 255, .28); }
+.panel-sampling-range:disabled { opacity: .45; }
+.panel-sampling-number { flex: none; width: 52px; height: 24px; padding: 0 4px; border: 1px solid rgba(190, 212, 255, .28); border-radius: 6px; color: #edf4ff; background: rgba(10, 22, 50, .5); font-family: var(--font-ui); font-size: var(--text-sm); }
+
 .panel-model-effort { margin-top: 7px; padding-top: 8px; border-top: 1px solid rgba(190, 212, 255, .16); }
 .panel-model-effort .panel-effort-row { padding: 2px 8px 3px; }
 .panel-effort-row { display: flex; align-items: center; gap: 12px; padding: 2px 8px 4px; }
@@ -1353,8 +1391,11 @@ img.panel-markdown-image { display: inline-block; vertical-align: top; width: ca
 /* 另一个对话/代理注入的消息：来源徽章挂在气泡外面上方，右端用同一条
    四分之一圆弧连回气泡上边线。尺寸和字号与跨端色块完全一致。 */
 .panel-event-tag-slot { position: absolute; left: 0; bottom: calc(100% + var(--route-gap)); display: flex; align-items: center; }
-.panel-event-body:has(.panel-event-tag-slot) { margin-top: 48px; }
+.panel-event-body:has(.panel-event-tag-slot) { margin-top: 56px; }
 .panel-event-sender { display: inline-flex; align-items: center; height: var(--route-chip-h); padding: 4px 10px; border-radius: 9px; color: #f6d8a8; background: rgba(240, 196, 123, .16); font-size: var(--text-md); line-height: 1.45; }
+
+/* 停止/退出时还没开始产出的消息：明确写出来，不留一个「用时 00:00」的空回合。 */
+.panel-event-halted { display: inline-flex; align-items: center; margin-top: 6px; color: rgba(235, 240, 255, .55); font-size: var(--text-sm); line-height: 1.4; }
 
 /* 跨端/内部转发：来源框 → 目标框，两个圆角矩形各用一种色。
    弧线的两个端点不靠手写坐标，而是由这组变量和布局本身决定：
@@ -1402,16 +1443,19 @@ img.panel-markdown-image { display: inline-block; vertical-align: top; width: ca
 .route-box.is-pc { color: #f2a560; background: rgba(242, 165, 96, .2); }
 .route-box.is-pc-target { color: #e57a9f; background: rgba(229, 122, 159, .2); }
 .route-box.is-phone { color: #6fd39f; background: rgba(111, 211, 159, .2); }
-.route-arrow { display: inline-flex; align-items: center; color: #c8dafb; }
+.route-arrow { display: inline-flex; align-items: center; align-self: center; color: #fff; }
 .route-arrow svg { fill: currentColor; display: block; }
 
 /* 默认的传话样式：与输入框的 @ 引用同款——加粗、圆角、跟正文一样高，排在
    正文上方，中间保留右箭头。旧的双框卡片挂在 .panel-feed.is-route-card 下。 */
-.panel-feed:not(.is-route-card) .panel-event-body:has(.panel-event-route) { display: flex; flex-direction: column; margin-top: 0; }
+/* 胶囊挂在正文上方，第一条消息的胶囊会顶到消息流上边缘；给它留出和胶囊
+   高度相当的空隙，滚到顶时也不会贴住面板。 */
+.panel-feed:not(.is-route-card) .panel-event-body:has(.panel-event-route) { display: flex; flex-direction: column; margin-top: 0; padding-top: 16px; }
 .panel-feed:not(.is-route-card) .panel-event-route { position: static; left: auto; right: auto; bottom: auto; order: -1; width: auto; max-width: 100%; margin: 0 0 5px; gap: 6px; }
 .panel-feed:not(.is-route-card) .panel-event-route .route-link { display: none; }
 .panel-feed:not(.is-route-card) .route-box { height: auto; padding: 0 .45em; border-radius: .45em; font-size: inherit; font-weight: 600; line-height: 1.45; display: inline-flex; align-items: center; }
-.panel-feed:not(.is-route-card) .route-arrow { color: #8fb8ff; }
+/* 箭头和胶囊同高、在行内垂直居中；白色让它在两个色块之间清楚可见。 */
+.panel-feed:not(.is-route-card) .route-arrow { color: #fff; align-self: center; height: 1.45em; }
 
 /* 重启分割条：线—文字—线，表示上一段到此结束。 */
 .panel-timeline-divider { display: flex; align-items: center; gap: 10px; margin: 20px 0; color: #9db4d8; font-size: var(--text-xs); }
@@ -1473,7 +1517,7 @@ img.panel-markdown-image { display: inline-block; vertical-align: top; width: ca
 .panel-right-empty { margin: 0; color: #93aad4; font-size: var(--text-xs); }
 .panel-right-empty.is-centered { display: grid; place-items: center; min-height: 160px; text-align: center; }
 .panel-right-preview-path { margin: 0 0 6px; color: #93aad4; font-family: var(--font-mono); font-size: var(--text-xs); word-break: break-all; }
-.panel-chat-header .panel-rail-toggle { position: absolute; z-index: 20; top: 9px; right: 77px; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 9px; color: #d3e2ff; background: rgba(178, 203, 251, .09); }
+.panel-chat-header .panel-rail-toggle { position: absolute; z-index: 20; top: 8px; right: 77px; display: grid; place-items: center; width: 29px; height: 29px; padding: 0; border: 0; border-radius: 9px; color: #d3e2ff; background: rgba(178, 203, 251, .09); }
 .panel-rail-toggle:hover { color: #fff; background: rgba(178, 203, 251, .2); }
 .panel-rail-toggle:disabled { opacity: .35; cursor: default; }
 .panel-rail-toggle svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }

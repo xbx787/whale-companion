@@ -1237,3 +1237,67 @@ describe('error notices on restore', () => {
     expect(kept.map((entry) => entry.id)).toEqual(['e3', 'e4', 'e5', 'e6', 'e7'])
   })
 })
+
+describe('halted turns', () => {
+  it('marks the user message when a turn is stopped before any output', async () => {
+    let entered = (): void => {}
+    const started = new Promise<void>((resolve) => { entered = resolve })
+    const runtime = new AgentRuntime(new NoteStore(testRoot), undefined, undefined, {
+      respond: async () => {
+        entered()
+        return new Promise<ModelReply>(() => {})
+      }
+    })
+    void runtime.sendMessage('这条没有发出')
+    await started
+    runtime.stop(undefined, true)
+    const user = runtime.getSnapshot().timeline.find((entry) => entry.kind === 'user')
+    expect(user?.halted).toBe(true)
+  })
+
+  it('leaves a turn that already produced output to the normal stop path', async () => {
+    let entered = (): void => {}
+    const started = new Promise<void>((resolve) => { entered = resolve })
+    const runtime = new AgentRuntime(new NoteStore(testRoot), undefined, undefined, {
+      respond: async (_history, _signal, progress) => {
+        progress?.('已经开始回答')
+        entered()
+        return new Promise<ModelReply>(() => {})
+      }
+    })
+    void runtime.sendMessage('这条已经开始')
+    await started
+    runtime.stop(undefined, true)
+    const user = runtime.getSnapshot().timeline.find((entry) => entry.kind === 'user')
+    expect(user?.halted).toBeUndefined()
+  })
+
+  it('shows a retryable notice when the model finishes with no output', async () => {
+    const runtime = new AgentRuntime(new NoteStore(testRoot), undefined, undefined, {
+      respond: async () => ({ text: '' })
+    })
+    await runtime.sendMessage('空回复')
+    const notice = runtime.getSnapshot().timeline.find((entry) => entry.kind === 'system')
+    expect(notice?.text).toContain('没有返回内容')
+    expect(notice?.retryText).toBe('空回复')
+  })
+
+  it('inserts a late external message at its timestamp instead of appending it', () => {
+    vi.useFakeTimers()
+    try {
+      const runtime = new AgentRuntime(new NoteStore(testRoot), undefined)
+      const from = { name: '开发5', badge: '5' }
+      vi.setSystemTime(new Date('2026-01-01T10:00:00.000Z'))
+      runtime.appendExternalMessage(from, 'first')
+      vi.setSystemTime(new Date('2026-01-01T10:05:00.000Z'))
+      runtime.appendExternalMessage(from, 'second')
+      // 转达消息晚到，但时间戳夹在两条已有消息中间：必须插回原位，
+      // 不能追加到末尾，否则分组会把它塞进后面的 turn，看起来像记录错乱。
+      vi.setSystemTime(new Date('2026-01-01T10:02:00.000Z'))
+      runtime.appendExternalMessage(from, 'late')
+      expect(runtime.getSnapshot().timeline.map((entry) => entry.text)).toEqual(['first', 'late', 'second'])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})

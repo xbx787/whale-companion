@@ -1,0 +1,42 @@
+name: 功能建议
+description: 希望新增或调整的行为
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        先写清楚要解决的问题，再写方案。方案可以不止一个。
+  - type: textarea
+    id: problem
+    attributes:
+      label: 现在哪里不顺手
+      description: 具体到操作步骤和你期望的结果。
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 你希望怎么改
+      description: 如果有多个方案，写清各自的取舍。
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: 涉及范围
+      options:
+        - 对话与审批
+        - 自我进化与打包
+        - 界面与外观
+        - MCP 与 skill
+        - 语音
+        - 其他
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 考虑过的替代方案
+    validations:
+      required: false

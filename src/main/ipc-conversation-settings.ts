@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron'
-import { isApprovalMode, isAutoCompactPercent, normalizeModelMode } from '../shared/contracts'
+import { isApprovalMode, isAutoCompactPercent, normalizeModelMode, TEMPERATURE_RANGE, TOP_P_RANGE } from '../shared/contracts'
 import { isEffortLevel } from '../shared/effort'
 import type { ConversationSettingsIpcDeps } from './index'
 
@@ -21,6 +21,17 @@ export function registerConversationSettingsIpc(deps: ConversationSettingsIpcDep
     if (!deps.trusted(event)) throw new Error('无效的界面请求。')
     if (!isEffortLevel(level)) throw new Error('思考强度无效。')
     await deps.activeController().updateSettings({ effort: level })
+  })
+  ipcMain.handle('pet:set-sampling', async (event, temperature: unknown, topP: unknown) => {
+    if (!deps.trusted(event)) throw new Error('无效的界面请求。')
+    if (typeof temperature !== 'number' || !Number.isFinite(temperature) ||
+        temperature < TEMPERATURE_RANGE.min || temperature > TEMPERATURE_RANGE.max) {
+      throw new Error('Temperature 应为 0 到 2 之间的数字。')
+    }
+    if (typeof topP !== 'number' || !Number.isFinite(topP) || topP < TOP_P_RANGE.min || topP > TOP_P_RANGE.max) {
+      throw new Error('Top P 应为 0.01 到 1 之间的数字。')
+    }
+    await deps.activeController().updateSettings({ temperature, topP })
   })
   ipcMain.handle('pet:set-web-search', async (event, on: unknown) => {
     if (!deps.trusted(event)) throw new Error('无效的界面请求。')

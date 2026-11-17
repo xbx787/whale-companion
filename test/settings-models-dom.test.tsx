@@ -11,7 +11,7 @@ import type { ConversationSettings, ModelProfile } from '../src/shared/contracts
 
 const profiles: ModelProfile[] = [
   { id: 'p1', name: '一号', baseUrl: 'https://api.deepseek.com/anthropic', apiKey: 'sk-1', model: 'deepseek-flash', enabled: true },
-  { id: 'p2', name: '二号', baseUrl: 'https://api.moonshot.cn/anthropic', apiKey: 'sk-2', apiKeyConfigured: true, model: 'Kimi-K3', enabled: true }
+  { id: 'p2', name: '二号', baseUrl: 'https://api.deepseek.com/anthropic', apiKey: 'sk-2', apiKeyConfigured: true, model: 'deepseek-chat', enabled: true }
 ]
 
 const settings: ConversationSettings = {
@@ -81,7 +81,7 @@ describe('settings model profiles', () => {
   })
 
   it('发现模型后可以用搜索过滤并点选模型 ID', async () => {
-    const discover = vi.fn(async () => ({ ok: true, models: ['Kimi-K3', 'Kimi-K2.5'], message: '发现 2 个模型。' }))
+    const discover = vi.fn(async () => ({ ok: true, models: ['deepseek-chat', 'deepseek-reasoner'], message: '发现 2 个模型。' }))
     await mount(bridge({ discoverModels: discover }))
     const second = [...container!.querySelectorAll('.settings-row')].find((row) => row.textContent?.includes('二号'))!
     const edit = [...second.querySelectorAll('button')].find((button) => button.textContent === '编辑')!
@@ -92,12 +92,12 @@ describe('settings model profiles', () => {
     const search = container!.querySelector<HTMLInputElement>('input[aria-label="搜索已发现的模型"]')!
     const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!
     await act(async () => {
-      setter.call(search, 'K2')
+      setter.call(search, 'reasoner')
       search.dispatchEvent(new Event('input', { bubbles: true }))
     })
     const chips = [...container!.querySelectorAll<HTMLButtonElement>('.settings-model-discovered button')]
-    expect(chips.map((chip) => chip.textContent)).toEqual(['Kimi-K2.5'])
+    expect(chips.map((chip) => chip.textContent)).toEqual(['deepseek-reasoner'])
     await act(async () => chips[0].click())
-    expect(container!.querySelector<HTMLInputElement>('input[placeholder="厂商文档中的模型 ID"]')?.value).toBe('Kimi-K2.5')
+    expect(container!.querySelector<HTMLSelectElement>('.settings-model-form select')?.value).toBe('deepseek-reasoner')
   })
 })

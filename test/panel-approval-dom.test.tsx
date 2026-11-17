@@ -160,6 +160,11 @@ describe('the approval-mode control', () => {
     const warning = host.querySelector('.panel-bypass')
     expect(warning?.textContent).toContain('开启「自我进化」')
     expect(warning?.textContent).toContain('重启')
+    // 开发者和普通用户看到的风险说明必须分开写全。
+    expect(warning?.textContent).toContain('你是这个项目的开发者')
+    expect(warning?.textContent).toContain('关键词是「进化」')
+    expect(warning?.textContent).toContain('大多数情况下就等于完全访问')
+    expect(warning?.textContent).toContain('你必须知道自己在干什么')
     const confirm = host.querySelector<HTMLButtonElement>('.panel-bypass-confirm')!
     expect(confirm.disabled).toBe(true)
     const input = host.querySelector<HTMLInputElement>('.panel-evolve-authorize input')!

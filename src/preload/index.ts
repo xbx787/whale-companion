@@ -176,6 +176,7 @@ const api: PetAPI = {
   setAvatarBox: (box) => ipcRenderer.invoke('pet:set-avatar-box', box),
   setModelMode: (mode) => ipcRenderer.invoke('pet:set-model-mode', mode),
   setEffort: (level) => ipcRenderer.invoke('pet:set-effort', level),
+  setSampling: (temperature, topP) => ipcRenderer.invoke('pet:set-sampling', temperature, topP),
   setWebSearchEnabled: (on) => ipcRenderer.invoke('pet:set-web-search', on),
   setAutoCompactPercent: (percent) => ipcRenderer.invoke('pet:set-auto-compact-percent', percent),
   setPlanMode: (on) => ipcRenderer.invoke('pet:set-plan-mode', on),

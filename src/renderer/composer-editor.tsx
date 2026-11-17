@@ -39,6 +39,9 @@ export interface ComposerEditorHandle {
   focus(): void
   element(): HTMLDivElement | null
   getValue(): string
+  /** 同步清空编辑器。发送后立刻调用，不等 React 的下一帧——否则连按回车
+   *  会读到上一帧的旧文本，把同一条消息再发一遍。 */
+  clear(): void
   getCaret(): number
   setCaret(offset: number): void
   replaceRange(start: number, end: number, text: string): void
@@ -203,6 +206,12 @@ export const ComposerEditor = forwardRef(function ComposerEditor({
     focus: () => rootRef.current?.focus(),
     element: () => rootRef.current,
     getValue: () => rootRef.current ? readDoc(rootRef.current) : '',
+    clear: () => {
+      const root = rootRef.current
+      if (!root) return
+      renderDoc(root, '')
+      lastValueRef.current = ''
+    },
     getCaret: () => rootRef.current ? caretOffset(rootRef.current) : 0,
     setCaret: (offset: number) => {
       const root = rootRef.current
@@ -242,7 +251,9 @@ export const ComposerEditor = forwardRef(function ComposerEditor({
     }
   }), [onChange])
 
-  const empty = value.length === 0
+  // contenteditable 清空后浏览器常留下一个占位 <br>，readDoc 会把它读成
+  // "\n"；按 length 判断空会让占位文字再也不回来。只按可见内容判断。
+  const empty = value.trim().length === 0
 
   return <div
     ref={rootRef}

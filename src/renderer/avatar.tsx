@@ -110,6 +110,17 @@ function Avatar() {
   const [portraitBox, setPortraitBox] = useState<AvatarBox | null>(null);
   /** 每次点击/拖动结束都重挂人物与状态点，按当前窗口重新算一次位置。 */
   const [renderEpoch, setRenderEpoch] = useState(0);
+  /** 浮动展开：鼠标停在角色上时状态点才依次浮出，移开依次缩回。 */
+  const [dotsVisible, setDotsVisible] = useState(false);
+  const [dotsLeaving, setDotsLeaving] = useState(false);
+  const dotsLeaveTimer = useRef<number | undefined>(undefined);
+  /** 收起过程中鼠标又移进来：先让收起播完，结束后再重新展开。 */
+  const pendingEnter = useRef(false);
+  /** 鼠标是否停在人物上；紫色点消失后用它判断要不要立刻收起。 */
+  const hoveredRef = useRef(false);
+  useEffect(() => () => {
+    window.clearTimeout(dotsLeaveTimer.current);
+  }, []);
   const gestureRef = useRef<HTMLDivElement | null>(null);
   const entryRef = useRef<HTMLDivElement | null>(null);
   const idleRef = useRef<HTMLDivElement | null>(null);
@@ -202,6 +213,8 @@ function Avatar() {
     snapshot?.conversationLibrary?.settings.tabOrder ?? []
   );
   const currentConversationId = snapshot?.conversationLibrary?.activeConversationId ?? snapshot?.conversationId;
+  /** 状态点显示方式：关闭、浮动展开（逐个从角色内部浮出）、常驻。 */
+  const statusDotMode = snapshot?.conversationLibrary?.settings.statusDotMode ?? 'always';
   // 点数 = 未归档会话数；其中只有顶部真正打开成标签的那些点带颜色，其余空心。
   const hiddenTabIds = snapshot?.conversationLibrary?.settings.hiddenTabIds ?? [];
   const openTabIds = new Set(
@@ -215,6 +228,25 @@ function Avatar() {
   // 打开成标签的会话按顶部标签顺序排在前面，未打开的会话全部沉到最后。
   // 这样新拉出来的标签不会插在空心点中间，拿走一个也不会让顺序重排。
   const dotConversations = orderStatusDots(statusConversations, openTabIds);
+  /** 有紫色点（等待用户回应）时，浮动展开也强制保持展开，直到它消失。 */
+  const hasWaiting = dotConversations.some((item) => taskDot(item.taskStatus)?.tone === 'waiting');
+  const prevWaiting = useRef(false);
+  useEffect(() => {
+    if (hasWaiting) {
+      // 紫色点出现：不管鼠标在哪都强制展开。
+      setDotsVisible(true);
+      setDotsLeaving(false);
+    } else if (prevWaiting.current && !hoveredRef.current) {
+      // 紫色点刚消失、鼠标也不在人物上：按正常收起流程缩回去。
+      setDotsLeaving(true);
+      window.clearTimeout(dotsLeaveTimer.current);
+      dotsLeaveTimer.current = window.setTimeout(() => {
+        setDotsVisible(false);
+        setDotsLeaving(false);
+      }, 800);
+    }
+    prevWaiting.current = hasWaiting;
+  }, [hasWaiting]);
   const [unseenFinished, setUnseenFinished] = useState<ReadonlySet<string>>(() => new Set());
   const previousStatuses = useRef(new Map<string, string>());
   useEffect(() => {
@@ -582,7 +614,10 @@ function Avatar() {
       style={{
         '--avatar-accent': personaRig.motion.accent,
         '--avatar-dot-x': `${personaRig.motion.statusAnchor.x * 100}%`,
-        '--avatar-dot-y': `${personaRig.motion.statusAnchor.y * 100}%`,
+        // 纵向锚点跟着人物可见框走，而不是钉死在窗口顶部：窗口尺寸或缩放
+        // 一变，角色会在窗口里上下移动，钉死的点就会“飘”到头顶上方。
+        // 19.8 / 12.6 是可见框顶部到点锚点的固定偏移，保持原视觉位置。
+        '--avatar-dot-y': `${portraitBox ? portraitBox.y - 12.6 : 19.8}px`,
         '--avatar-dot-size': `${snapDot(7)}px`,
         '--avatar-face-x': `${personaRig.motion.faceAnchor.x * 100}%`,
         '--avatar-face-y': `${personaRig.motion.faceAnchor.y * 100}%`
@@ -593,7 +628,6 @@ function Avatar() {
         className="avatar-hit-target"
         type="button"
         aria-label="桌面角色，单击切换聊天气泡，拖动可移动位置"
-        title="左键拖动，中键余额/吐槽，右键设置"
         onMouseDown={(event) => {
           // Chromium starts Windows middle-button autoscroll on mousedown.
           // Cancelling auxclick alone is too late and can swallow later drags.
@@ -602,11 +636,37 @@ function Avatar() {
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerEnter={(event) => {
+          hoveredRef.current = true;
+          if (dotsLeaving) {
+            // 正在收起：不打断，记下来，等收完再展开。
+            pendingEnter.current = true;
+          } else {
+            window.clearTimeout(dotsLeaveTimer.current);
+            setDotsVisible(true);
+          }
           if (useLive2D && !reducedMotion && !pointer.current) {
             setLive2dPointer({ clientX: event.clientX, clientY: event.clientY });
           }
         }}
-        onPointerLeave={() => setLive2dPointer(null)}
+        onPointerLeave={() => {
+          hoveredRef.current = false;
+          pendingEnter.current = false;
+          // 紫色点还在时不收起：强制展开要一直保持到用户回应。
+          if (dotsVisible && !dotsLeaving && !hasWaiting) {
+            setDotsLeaving(true);
+            window.clearTimeout(dotsLeaveTimer.current);
+            // 最后一个点缩回（最长延迟 + 时长）后再卸载，否则收起动画会被打断。
+            dotsLeaveTimer.current = window.setTimeout(() => {
+              setDotsVisible(false);
+              setDotsLeaving(false);
+              if (pendingEnter.current) {
+                pendingEnter.current = false;
+                setDotsVisible(true);
+              }
+            }, 800);
+          }
+          setLive2dPointer(null);
+        }}
         onPointerUp={(event) => finishPointer(event)}
         onPointerCancel={(event) => finishPointer(event, true)}
         onLostPointerCapture={(event) => finishPointer(event, true)}
@@ -651,20 +711,24 @@ function Avatar() {
       </button>
       {/* 状态条必须是舞台的直接子元素。放进按钮里会相对按钮（人物大小）
           定位，点会落到头发中间，而不是窗口右上角。 */}
-      {statusConversations.length > 0 && <span className="avatar-status-strip" aria-hidden="true">
+      {statusDotMode !== 'off' && (statusDotMode !== 'float' || dotsVisible || hasWaiting) && statusConversations.length > 0 && <span className="avatar-status-strip" aria-hidden="true">
         <span className="avatar-status-dots">
           {Array.from({ length: statusSlots }, (_, index) => {
             // 半径随人物大小缩放：人物越大，弧线仍贴着头部。
             const angle = (STATUS_ARC_START_DEG + STATUS_ARC_ROTATION_DEG + STATUS_ARC_STEP_DEG * index) * Math.PI / 180;
             const arcRight = statusRadius - statusRadius * Math.cos(angle);
             const arcTop = statusRadius + statusRadius * Math.sin(angle) - STATUS_ARC_CENTER_LIFT;
+            // 浮动展开从上到下依次延迟；收起反过来，从下到上依次缩回。
+            const dotDelay = dotsLeaving ? (statusSlots - 1 - index) * 50 : index * 70;
             const style = {
               '--avatar-dot-right': `${arcRight.toFixed(2)}px`,
-              '--avatar-dot-top': `${arcTop.toFixed(2)}px`
+              '--avatar-dot-top': `${arcTop.toFixed(2)}px`,
+              ...(statusDotMode === 'float' ? { animationDelay: `${dotDelay}ms` } : {})
             } as CSSProperties;
+            const floating = statusDotMode === 'float' ? (dotsLeaving && !hasWaiting ? ' is-floating-out' : ' is-floating') : '';
             const item = dotConversations[index];
             // 没打开成标签的会话留一个空心点，点数仍按未归档数排。
-            if (!item || !openTabIds.has(item.id)) return <i key={`empty-${index}`} className="avatar-status-dot is-empty" style={style} />;
+            if (!item || !openTabIds.has(item.id)) return <i key={`empty-${index}`} className={`avatar-status-dot is-empty${floating}`} style={style} />;
             // 完成/失败/取消都保留颜色；未读只影响是否闪，不再把绿/红藏成蓝色。
             const unread = unseenFinished.has(item.id);
             const state = item.taskStatus === 'cancelled'
@@ -675,7 +739,7 @@ function Avatar() {
                   ? { tone: 'failed', pulse: false }
                   : taskDot(item.taskStatus);
             return <i key={item.id}
-              className={`avatar-status-dot${state ? ` is-${state.tone}` : ''}${state?.pulse ? ' is-pulsing' : ''}${item.id === currentConversationId ? ' is-current' : ''}`}
+              className={`avatar-status-dot${state ? ` is-${state.tone}` : ''}${state?.pulse ? ' is-pulsing' : ''}${item.id === currentConversationId ? ' is-current' : ''}${floating}`}
               style={style} />;
           })}
         </span>

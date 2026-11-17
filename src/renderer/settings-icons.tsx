@@ -20,7 +20,8 @@ const PATHS: Record<string, string[]> = {
   layout: ['M4 4h12v12H4z', 'M4 8h12M9 8v8'],
   puzzle: ['M4 4h5v3a2 2 0 1 0 0 4v3H4z', 'M11 4h5v6h-3a2 2 0 1 0-4 0H11z'],
   phone: ['M6 3h8v14H6z', 'M9 14.5h2'],
-  info: ['M10 4a6 6 0 1 0 0 12 6 6 0 0 0 0-12Z', 'M10 9v4M10 6.5h.01']
+  info: ['M10 4a6 6 0 1 0 0 12 6 6 0 0 0 0-12Z', 'M10 9v4M10 6.5h.01'],
+  doc: ['M6 3.5h5.5L14.5 6.5v10H6z', 'M11.5 3.5v3h3', 'M8 10h4M8 12.5h4']
 }
 
 export function SettingsIcon({ name }: { name: string }) {

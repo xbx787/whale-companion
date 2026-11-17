@@ -6,7 +6,7 @@ export interface VoiceCacheKeyInput {
   model: string
   voice: string
   speed: number
-  format: 'mp3'
+  format: 'mp3' | 'wav'
   text: string
 }
 

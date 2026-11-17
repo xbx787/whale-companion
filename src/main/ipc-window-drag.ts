@@ -6,7 +6,8 @@ import type { WindowDragIpcDeps } from './index'
 export function registerWindowDragIpc(deps: WindowDragIpcDeps): void {
   ipcMain.handle('pet:begin-drag', (event, cursor: unknown) => {
     if ((event.sender.id !== deps.avatarWindow?.webContents.id && event.sender.id !== deps.panelWindow?.webContents.id) || !deps.avatarWindow || !deps.isScreenPoint(cursor)) return
-    deps.dragOrigin = { cursor, bounds: deps.avatarWindow.getBounds() }
+    const content = deps.avatarWindow.getContentBounds()
+    deps.dragOrigin = { cursor, bounds: deps.avatarWindow.getBounds(), content: { width: content.width, height: content.height } }
     deps.avatarDragging = true
   })
   ipcMain.handle('pet:drag-move', (event, current: unknown) => {
@@ -25,8 +26,15 @@ export function registerWindowDragIpc(deps: WindowDragIpcDeps): void {
     // 窗口底部允许伸出工作区，幅度正好等于人物脚底到窗口底的透明余量。
     const BOTTOM_SLACK = AVATAR_BOTTOM_SLACK[deps.currentAvatarSize] ?? 60
     const nextY = Math.min(Math.max(y, work.y), Math.max(work.y, work.y + work.height - height + BOTTOM_SLACK))
-    deps.avatarWindow.setBounds({ x: nextX, y: nextY, width, height })
-    deps.syncBalancePosition()
+    // 只挪位置，不碰尺寸。setBounds 每次把宽高一起写回，在透明、不可缩放的
+    // 窗口上会被 DPI 取整反复放大（拖十几次窗口涨 20 多像素），角色在窗口里
+    // 下移，状态点就“往上跑”。setPosition 只改位置，但 Windows 在 125% 缩放下
+    // 仍会按物理像素重算高度；移动后把开始拖动时的内容尺寸写回去，尺寸才稳。
+    deps.avatarWindow.setPosition(nextX, nextY)
+    deps.avatarWindow.setContentSize(deps.dragOrigin.content.width, deps.dragOrigin.content.height)
+    // 拖的是人物窗口，但面板挂在同一个舞台上。拖动中就把舞台和面板一起
+    // 重算，松手时不会出现“面板还停在旧位置、然后突然跳过去”的观感。
+    deps.syncStageBounds()
   })
   ipcMain.handle('pet:end-drag', (event) => {
     if (deps.trusted(event)) {

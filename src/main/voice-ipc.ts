@@ -129,11 +129,7 @@ export function registerVoiceIpc(deps: VoiceIpcDeps): void {
     if (input.apiKey !== undefined && (typeof input.apiKey !== 'string' || input.apiKey.length > 512)) invalid()
     if (input.voice !== undefined && !isVoicePresetId(input.voice)) invalid()
     if (input.speed !== undefined && !isSpeechSpeed(input.speed)) invalid()
-    return service.testConnection({
-      ...(typeof input.apiKey === 'string' && input.apiKey.trim() ? { apiKey: input.apiKey.trim() } : {}),
-      ...(input.voice === undefined ? {} : { voice: input.voice as string }),
-      ...(input.speed === undefined ? {} : { speed: input.speed as number })
-    })
+    return service.testConnection()
   })
 
   ipcMain.handle('pet:settings:voice:pick-document', (event) => {

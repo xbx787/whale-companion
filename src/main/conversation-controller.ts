@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { AgentCapabilities, AppSnapshot, ApprovalMode, AskAnswers, ContextUsageSnapshot, ConversationBatchAction, ConversationBatchResult, ModelMode, ModelProfile, PhoneMessageRecord, TimelineEntry, UserAttachment } from '../shared/contracts'
-import { AUTO_COMPACT_DEFAULT_PERCENT, PANEL_AUTO_COLLAPSE_DEFAULT_MINUTES, normalizeApprovalMode, normalizeModelMode } from '../shared/contracts'
+import { AUTO_COMPACT_DEFAULT_PERCENT, DEFAULT_TEMPERATURE, DEFAULT_TOP_P, PANEL_AUTO_COLLAPSE_DEFAULT_MINUTES, normalizeApprovalMode, normalizeModelMode } from '../shared/contracts'
 import { DEEPSEEK_ANTHROPIC_BASE_URL, DEEPSEEK_DEFAULT_MODEL } from './deepseek-endpoint'
 import { deleteTurnEntries, type AgentRuntime } from './agent-runtime'
 import type { DialogueLine } from './deepseek'
@@ -131,6 +131,9 @@ export class ConversationController {
   private onRuntimeConfigurationChange?: (conversationId?: string) => void
   private isSideBusy: (conversationId: string) => boolean = () => false
   private displayEpoch = 0
+  /** 退出/重启流程已经开始：不再接受新消息。否则消息只进了内存，回合被
+   *  stopAll 静默打断，界面上就剩一条没有回答的用户消息。 */
+  private closing = false
 
   constructor(
     private readonly store: ConversationStore,
@@ -246,6 +249,12 @@ export class ConversationController {
       [...this.pending.values()].every((queue) => queue.length === 0)
   }
 
+  /** 退出/重启前调用：此后到达的发送立刻失败，渲染层会恢复草稿并提示，
+   *  不会留下一条永远等不到回答的消息。 */
+  beginShutdown(): void {
+    this.closing = true
+  }
+
   /** 除 exceptId 之外，是否还有对话在跑：回合、排队消息、临时会话或 drain。
    *  重启请示用它判断“还有没有别人的任务”，不把请求者自己的回合算成别人。 */
   hasRunningWorkExcept(exceptId?: string): boolean {
@@ -326,6 +335,7 @@ export class ConversationController {
     if (this.library) {
       runtime.setIdentity({ userName: this.library.settings.userName, assistantName: this.library.settings.assistantName })
       runtime.setEffort(this.library.settings.effort)
+      runtime.setSampling(this.library.settings.temperature ?? DEFAULT_TEMPERATURE, this.library.settings.topP ?? DEFAULT_TOP_P)
       runtime.setWebSearch(this.library.settings.webSearchEnabled !== false)
       runtime.setPersona(this.library.settings.personaId ?? 'xiaojing')
       runtime.setAutoCompactPercent(this.library.settings.autoCompactPercent ?? AUTO_COMPACT_DEFAULT_PERCENT)
@@ -343,7 +353,42 @@ export class ConversationController {
     // conversations MCP tools.
     runtime.setConversationBridge({
       list: () => this.listConversationTargets(),
-      send: (target, text, sourceId) => this.sendToConversation(target, text, sourceId)
+      send: (target, text, sourceId) => this.sendToConversation(target, text, sourceId),
+      // 和面板「+」同一个动作：新建空会话并切过去。
+      create: async () => {
+        const record = await this.createConversation()
+        return { id: record.id, title: record.title }
+      },
+      rename: async (target, title) => {
+        const record = await this.renameConversation(this.resolveConversation(target).id, title)
+        return { id: record.id, title: record.title }
+      },
+      setPinned: async (target, pinned) => {
+        const record = this.resolveConversation(target)
+        const state = await this.setConversationPinned(record.id, pinned)
+        const updated = state.conversations.find((item) => item.id === record.id)
+        return {
+          id: record.id,
+          title: updated?.title ?? record.title,
+          pinned: updated?.pinnedAt !== null && updated?.pinnedAt !== undefined
+        }
+      },
+      move: (target, position, anchor) => this.moveConversationTab(target, position, anchor),
+      archive: async (target) => {
+        const record = this.resolveConversation(target)
+        await this.archiveConversation(record.id)
+        return { id: record.id, title: record.title }
+      },
+      restore: async (target) => {
+        const record = this.resolveConversation(target)
+        await this.restoreConversation(record.id)
+        return { id: record.id, title: record.title }
+      },
+      remove: async (target) => {
+        const record = this.resolveConversation(target)
+        await this.deleteConversation(record.id)
+        return { id: record.id, title: record.title }
+      }
     })
     // A conversation keeps the entries added with @ across restarts.
     if (this.resolveLibraries && rec.activeLibraries?.length) {
@@ -512,7 +557,9 @@ export class ConversationController {
     await runtime.dispose().catch(() => undefined)
     // 释放的是当前显示的会话时，快照必须立刻退回磁盘记录：有 runtime 时
     // displayedRecord 是 null，不补这一下，面板会读到空时间线，像是对话被清空。
-    if (this.activeId === id && !this.displayedRecord) {
+    // 不能只在 displayedRecord 为空时补：它可能还停在上一个切走的会话上，
+    // 那样当前会话的快照仍然会读到 null 记录、时间线全空。
+    if (this.activeId === id) {
       this.displayedRecord = await this.store.getConversation(id).catch(() => null)
     }
     this.emit()
@@ -583,6 +630,7 @@ export class ConversationController {
     // Model clients track the current depth; setting it repeatedly is a no-op.
     for (const runtime of this.runtimes.values()) {
       runtime.setEffort(this.library.settings.effort)
+      runtime.setSampling(this.library.settings.temperature ?? DEFAULT_TEMPERATURE, this.library.settings.topP ?? DEFAULT_TOP_P)
       runtime.setWebSearch(this.library.settings.webSearchEnabled !== false)
       runtime.setPersona(this.library.settings.personaId ?? 'xiaojing')
       runtime.setAutoCompactPercent(this.library.settings.autoCompactPercent ?? AUTO_COMPACT_DEFAULT_PERCENT)
@@ -721,6 +769,7 @@ export class ConversationController {
   /** 系统提示不冒充用户：进模型上下文和时间线，但不出用户头像和发言框。 */
   async sendSystemMessage(text: string, conversationId?: string): Promise<void> {
     await this.initialize()
+    if (this.closing) throw new ConversationStoreError('INVALID_INPUT', '应用正在退出或重启，这条系统消息没有发出。')
     const id = conversationId ?? this.activeId
     if (!id) throw new ConversationStoreError('NOT_FOUND', '这个对话可能已被删除或归档。回会话库看看，或新建一个。')
     const target = await this.store.getConversation(id)
@@ -732,6 +781,7 @@ export class ConversationController {
   async sendMessage(text: string, attachments: UserAttachment[] = [], strategy: SendStrategy = 'queue', conversationId?: string, divider = false,
     sender?: TimelineEntry['sender']): Promise<PendingMessage> {
     await this.initialize()
+    if (this.closing) throw new ConversationStoreError('INVALID_INPUT', '应用正在退出或重启，这条消息没有发出。请等重启完成后再发。')
     const id = conversationId ?? this.activeId
     if (!id) throw new ConversationStoreError('NOT_FOUND', '这个对话可能已被删除或归档。回会话库看看，或新建一个。')
     if (strategy !== 'queue' && strategy !== 'steer') {
@@ -764,6 +814,8 @@ export class ConversationController {
       ...(sessionContext ? { sessionContext } : {})
     }
     return this.serialize(async () => {
+      // initialize 和排进串行队列之间可能已经开始退出；在真正入队前再确认一次。
+      if (this.closing) throw new ConversationStoreError('INVALID_INPUT', '应用正在退出或重启，这条消息没有发出。请等重启完成后再发。')
       // A slow @ reference can finish after a bulk archive/delete. Check the
       // destination inside the same controller operation that queues the turn.
       const target = await this.store.getConversation(id)
@@ -1056,6 +1108,16 @@ export class ConversationController {
     return null
   }
 
+  /** 启动后预热当前对话的内核进程，避免第一次发言等冷启动。 */
+  async warmup(): Promise<void> {
+    const id = this.activeId
+    if (!id) return
+    const record = await this.store.getConversation(id)
+    if (!record) return
+    const runtime = await this.ensureRuntime(id, record)
+    await runtime.warmup()
+  }
+
   async createConversation(title = '新对话'): Promise<ConversationRecord> {
     await this.initialize()
     return this.serialize(async () => {
@@ -1258,6 +1320,12 @@ export class ConversationController {
           if (patch.loadUserSettings !== undefined) runtime.setLoadUserSettings(patch.loadUserSettings)
         }
       }
+      // 采样参数是进程级环境变量：先告诉每个 runtime，下一轮由它重启进程。
+      if (patch.temperature !== undefined || patch.topP !== undefined) {
+        for (const runtime of this.runtimes.values()) {
+          runtime.setSampling(settings.temperature ?? DEFAULT_TEMPERATURE, settings.topP ?? DEFAULT_TOP_P)
+        }
+      }
       await this.refreshLibrary()
       // 阈值改小要立刻生效：已有 runtime 的空闲计时还按旧值排着，重排一次。
       if (patch.panelAutoCollapseMinutes !== undefined) {
@@ -1286,6 +1354,48 @@ export class ConversationController {
       await this.store.setTabOrder(ids)
       await this.refreshLibrary()
       return structuredClone(this.library!)
+    })
+  }
+
+  /** 调整顶栏标签顺序；左栏列表仍按置顶和最近活动排，两者互不覆盖。 */
+  async moveConversationTab(
+    target: string,
+    position: 'first' | 'last' | 'before' | 'after',
+    anchor?: string
+  ): Promise<{ id: string; title: string; order: string[] }> {
+    await this.initialize()
+    return this.serialize(async () => {
+      const library = this.library
+      if (!library) throw new ConversationStoreError('NOT_FOUND', '会话库尚未就绪。')
+      const record = this.resolveConversation(target)
+      if (record.archivedAt !== null) {
+        throw new ConversationStoreError('ARCHIVED_CONVERSATION', '请先恢复归档会话。')
+      }
+      const order = [...library.settings.tabOrder]
+      for (const item of library.conversations) {
+        if (!order.includes(item.id)) order.push(item.id)
+      }
+      const current = order.indexOf(record.id)
+      if (current >= 0) order.splice(current, 1)
+      let insertAt: number
+      if (position === 'first') insertAt = 0
+      else if (position === 'last') insertAt = order.length
+      else {
+        if (!anchor) throw new ConversationStoreError('INVALID_INPUT', '移到 before/after 时需要指定参照对话。')
+        const anchorIndex = order.indexOf(this.resolveConversation(anchor).id)
+        if (anchorIndex < 0) throw new ConversationStoreError('NOT_FOUND', '参照对话不在标签顺序里。')
+        insertAt = position === 'before' ? anchorIndex : anchorIndex + 1
+      }
+      order.splice(insertAt, 0, record.id)
+      const state = await this.store.setTabOrder(order)
+      await this.refreshLibrary()
+      const titles = new Map(state.conversations.map((item) => [item.id, item.title]))
+      const visible = new Set(state.conversations.filter((item) => item.archivedAt === null).map((item) => item.id))
+      return {
+        id: record.id,
+        title: record.title,
+        order: order.filter((id) => visible.has(id)).map((id) => titles.get(id) ?? id)
+      }
     })
   }
 
@@ -1622,6 +1732,16 @@ export class ConversationController {
   /** One conversation handing a message to another. The body carries its
    *  source, so the receiving model and the reader both know where it came
    *  from. A small rate limit stops two models from volleying forever. */
+  /** 按 id 或唯一标题找会话；重命名/归档这些工具共用。 */
+  private resolveConversation(target: string): ConversationSummary {
+    const library = this.library
+    if (!library) throw new ConversationStoreError('NOT_FOUND', '会话库尚未就绪。')
+    const matches = library.conversations.filter((item) => item.id === target || item.title === target)
+    if (matches.length === 0) throw new ConversationStoreError('NOT_FOUND', '找不到目标对话。')
+    if (matches.length > 1) throw new ConversationStoreError('INVALID_INPUT', '对话标题不唯一，请改用 id。')
+    return matches[0]
+  }
+
   async sendToConversation(target: string, text: string, sourceConversationId?: string): Promise<{ id: string; title: string }> {
     await this.initialize()
     const library = this.library

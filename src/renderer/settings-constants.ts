@@ -42,7 +42,7 @@ export const SETTINGS_TABS: ReadonlyArray<{ id: SettingsTab; label: string }> = 
 
 /** 设置页的两级导航：左栏是带图标的大标题，顶部是当前大标题下的小标题。
  *  两组图标分开定义，同一个图标不会同时出现在左右两处。 */
-export type SettingsGroupId = 'chat' | 'model' | 'persona' | 'appearance' | 'system'
+export type SettingsGroupId = 'chat' | 'model' | 'persona' | 'appearance' | 'system' | 'about'
 
 export interface SettingsGroup {
   id: SettingsGroupId
@@ -78,9 +78,12 @@ export const SETTINGS_GROUPS: ReadonlyArray<SettingsGroup> = [
     id: 'system', label: '系统', icon: 'gear',
     items: [
       { id: 'libraries', label: '插件库', icon: 'puzzle' },
-      { id: 'phone', label: 'DSH Go 连接', icon: 'phone' },
-      { id: 'about', label: '关于', icon: 'info' }
+      { id: 'phone', label: 'DSH Go 连接', icon: 'phone' }
     ]
+  },
+  {
+    id: 'about', label: '关于', icon: 'info',
+    items: [{ id: 'about', label: '关于', icon: 'doc' }]
   }
 ]
 

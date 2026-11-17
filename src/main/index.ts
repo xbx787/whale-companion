@@ -1,6 +1,6 @@
-import { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeImage, Notification, screen, shell, Tray } from 'electron'
+import { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeImage, Notification, powerMonitor, screen, shell, Tray } from 'electron'
 import { appendFileSync, existsSync, mkdirSync, promises as fsp, readdirSync, writeFileSync } from 'node:fs'
-import { execFile, spawn } from 'node:child_process'
+import { execFile, execFileSync, spawn } from 'node:child_process'
 import { homedir } from 'node:os'
 import path from 'node:path'
 import { AgentRuntime } from './agent-runtime'
@@ -18,6 +18,7 @@ import { seedMemoryDocument } from './memory-document'
 import { BUBBLE_BOTTOM, computeStageBounds, STAGE_HEIGHT, STAGE_WIDTH, TRIANGLE_ROOM } from './stage-bounds'
 import { runSelfTest } from './self-test'
 import { readFeatureFlags } from './feature-flags'
+import { resolveDataRoot } from './data-root'
 import { startInputActivity, stopInputActivity } from './input-activity'
 import { EvolveStore } from './evolve-store'
 import type { EvolveBridge } from './evolve-tools'
@@ -79,7 +80,7 @@ import { attachmentPreviewPath, prepareDroppedFile, readImagePreview, searchWork
 import { findSourceProjectRoot, isUsableWorkspace, isWritableWorkspace, readSavedWorkspace, resolveAgentWorkspace, writeSavedWorkspace } from './workspace-root'
 import { isEffortLevel } from '../shared/effort'
 import type { AgentKernelKind, AvatarSize, BubbleLayout, AppCommandOption, ConversationSettings, PanelDirection, PanelPlacement, UiSize, UserAttachment } from '../shared/contracts'
-import { normalizeAgentKernelKind, normalizeModelMode, isApprovalMode, isAutoCompactPercent, isAvatarRenderer, isPanelAutoCollapseMinutes, isPeekInterval, isRoastBurstLimit, isRoastIdlePause, isRoastInterval, PANEL_MIN_HEIGHT, PANEL_MIN_WIDTH } from '../shared/contracts'
+import { normalizeAgentKernelKind, normalizeModelMode, isApprovalMode, isAutoCompactPercent, isAvatarRenderer, isPanelAutoCollapseMinutes, isPeekInterval, isRoastBurstLimit, isRoastIdlePause, isRoastInterval, PANEL_MIN_HEIGHT, PANEL_MIN_WIDTH, TEMPERATURE_RANGE, TOP_P_RANGE } from '../shared/contracts'
 import { isPersonaId } from '../shared/personas'
 import { approvalAnchor, approvalCardHeight, approvalCardHtml, approvalCardWidth, approvalPointerLeft, placeApprovalCard, type ApprovalRect } from './approval-card'
 import { probeProviderHealth } from './provider-health'
@@ -91,9 +92,14 @@ const dataProjectRoot = findSourceProjectRoot(projectRoot) ?? projectRoot
 // 隔离冒烟测试/便携数据目录：显式指定时不再使用项目下的 data/。
 app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion')
 const dataRootOverride = process.env.DESKTOP_PET_DATA?.trim()
-const dataRoot = dataRootOverride && path.isAbsolute(dataRootOverride)
-  ? dataRootOverride
-  : path.join(dataProjectRoot, 'data')
+// 装到 Program Files 这类只读位置时，data 目录建不出来会让应用直接启动失败。
+// 已有可写目录的行为不变；建不出来才退回 %APPDATA%\小鲸\data。
+const dataRoot = resolveDataRoot({
+  preferred: path.join(dataProjectRoot, 'data'),
+  fallback: path.join(app.getPath('appData'), '小鲸', 'data'),
+  override: dataRootOverride,
+  onFallback: (fallback) => console.warn(`[data] 安装目录不可写，数据改存到 ${fallback}`)
+})
 const userHome = homedir()
 const updateService = new UpdateService(dataRoot)
 const voiceModel = new VoiceModelStore(dataRoot)
@@ -110,8 +116,19 @@ mkdirSync(path.join(dataRoot, 'claude'), { recursive: true })
 // 长期记忆文档：写在这里的约定每轮都跟着消息进模型，新开的对话也一样。
 seedMemoryDocument(dataRoot)
 setPersonaDirectory(path.join(dataRoot, 'persona'))
+// 系统里显示的应用名。userData 路径已显式 setPath，改名不会挪数据目录。
+app.setName('小鲸')
+console.log('[identity] app.getName() =', app.getName())
 app.setPath('userData', userDataDirectory)
-if (process.platform === 'win32') app.setAppUserModelId('local.desktop.resident.agent')
+if (process.platform === 'win32') {
+  app.setAppUserModelId('local.desktop.resident.agent')
+  // 任务管理器的“应用”分组按 AUMID 的 DisplayName 取名；只设 exe 的
+  // FileDescription 不够，不注册这里就会一直显示 Electron。
+  try {
+    execFileSync('reg', ['add', 'HKCU\\Software\\Classes\\AppUserModelId\\local.desktop.resident.agent',
+      '/v', 'DisplayName', '/t', 'REG_SZ', '/d', '小鲸', '/f'], { stdio: 'ignore' })
+  } catch { /* 注册失败不影响启动 */ }
+}
 
 /** 窗口标题是任务管理器里区分用途的唯一标识：页面自带的 <title> 不许覆盖。 */
 function lockWindowTitle(win: BrowserWindow, title: string): void {
@@ -350,7 +367,7 @@ let currentAvatarSize: AvatarSize = 'small'
 /** 渲染器上报的可见人物矩形，按右/下偏移保存——窗口缩放时命中形状跟着
  *  右下角走，不会在拖动过程中错位。 */
 let avatarBox: { right: number; bottom: number; width: number; height: number } | undefined
-let dragOrigin: { cursor: Electron.Point; bounds: Electron.Rectangle } | undefined
+let dragOrigin: { cursor: Electron.Point; bounds: Electron.Rectangle; content: { width: number; height: number } } | undefined
 let avatarDragging = false
 let shapeShrinkTimer: NodeJS.Timeout | undefined
 let rendererAvatarState: import('../shared/contracts').AvatarState | undefined
@@ -463,7 +480,10 @@ function applyPointerShape(): void {
     : null
   if (panel) {
     const cut = { x: panel.x - bounds.x, y: panel.y - bounds.y, width: panel.width, height: panel.height }
-    shapes = shapes.flatMap((rect) => subtractRect(rect, cut))
+    // 只裁人物矩形。右上角的状态点区域要原样保留：面板底边稍微压到点区时，
+    // 一起裁会把最上面那个点切掉一块，看起来像被窗口挡住。
+    const [avatarRect, dotsRect] = shapes
+    shapes = dotsRect ? [...subtractRect(avatarRect, cut), dotsRect] : subtractRect(avatarRect, cut)
   }
   win.setShape(shapes.length ? shapes : [{ x: 0, y: 0, width: 1, height: 1 }])
 }
@@ -569,7 +589,6 @@ function syncStageBounds(): void {
   const win = avatarWindow
   if (!win || win.isDestroyed()) return
   const avatar = win.getBounds()
-  const bottom = avatar.y + avatar.height
   const focus = avatarFocusPoint(avatar)
   const work = screen.getDisplayNearestPoint(focus).workArea
   const direction: PanelDirection = panelPlacement === 'bottom' ? 'down' : 'up'
@@ -586,6 +605,7 @@ function syncStageBounds(): void {
     work, bubbleExpanded, bubbleExpanded ? bubblePanelSize : undefined, direction)
   // 头像窗口绝对不动：向上时舞台底边、向下时舞台顶边贴着头像底边，尺寸取
   // 布局计算值。展开/收起只改变面板窗口，人物在屏幕上的位置保持不变。
+  const bottom = avatar.y + avatar.height
   stageBounds = {
     x: avatar.x + avatar.width - next.width,
     y: direction === 'down' ? next.y : bottom - next.height,
@@ -637,6 +657,8 @@ const libraryStore = new LibraryStore(dataRoot, { homeDir: userHome, workspace: 
 const voiceService = new VoiceService({
   dataRoot,
   codec: electronSecretCodec(),
+  // 有官方 DeepSeek key 时语音优先走官方 TTS/ASR；没有就继续用设置里的在线语音。
+  deepseekKey: () => deepseekKey || apiKey || undefined,
   onJobProgress: (progress) => {
     if (settingsWindow && !settingsWindow.isDestroyed()) {
       settingsWindow.webContents.send('pet:voice:job-progress', progress)
@@ -1353,6 +1375,11 @@ function createAvatarWindow(): BrowserWindow {
     }
   })
   if (process.platform === 'win32') win.setShape(avatarShape({ width, height }))
+  // 透明人物窗口不允许页面缩放：Ctrl+滚轮或触摸板捏合会把 zoom 改掉，
+  // CSS 像素和窗口尺寸对不上，角色在窗口里下移，状态点看起来就往上飘。
+  win.webContents.setZoomFactor(1)
+  win.webContents.setVisualZoomLevelLimits(1, 1).catch(() => undefined)
+  win.webContents.on('zoom-changed', (event) => { event.preventDefault() })
   // 人物永远在最上层：连其他置顶窗口（面板、播放器）也不能把她盖住。
   win.setAlwaysOnTop(true, 'screen-saver')
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
@@ -1695,6 +1722,13 @@ function setBalanceOpen(open: boolean): void {
 function showPanel(): void {
   if (!panelOpen) {
     panelOpen = true
+    // 透明人物窗口闲置久了可能被系统停止合成或标记为不可见：打开面板时
+    // 顺手让它重绘并置顶，避免人物消失后再也点不到。
+    if (avatarWindow && !avatarWindow.isDestroyed()) {
+      if (!avatarWindow.isVisible()) avatarWindow.show()
+      avatarWindow.moveTop()
+      avatarWindow.webContents.invalidate()
+    }
     syncStageBounds()
     applyPointerShape()
     // 面板是独立窗口：要真正激活它，输入框才能拿到键盘。
@@ -1719,6 +1753,23 @@ function showPanel(): void {
   } else {
     panelWindow?.focus()
   }
+}
+
+/** 系统休眠/锁屏唤醒后，透明人物窗口可能被停止合成或标记为不可见；
+ *  重新 show + 重绘，面板开着就一起恢复，并补推一帧快照。 */
+function restoreAfterSuspend(): void {
+  const win = avatarWindow
+  if (win && !win.isDestroyed()) {
+    win.show()
+    win.moveTop()
+    win.webContents.invalidate()
+  }
+  const panel = panelWindow
+  if (panelOpen && panel && !panel.isDestroyed()) {
+    panel.show()
+    panel.webContents.invalidate()
+  }
+  publishSnapshot()
 }
 
 function openSettings(tab?: string): void {
@@ -1971,9 +2022,16 @@ function checkProviderHealth(): Promise<void> {
 }
 
 function createTray(): void {
+  // Windows 托盘槽位是 16 逻辑像素；按 DPI 选最接近的物理尺寸，避免系统再缩放一层。
+  const scale = screen.getPrimaryDisplay().scaleFactor
+  const target = Math.round(16 * scale)
+  const traySizes = [16, 20, 24, 32, 40, 48]
+  const traySize = traySizes.reduce((best, size) =>
+    Math.abs(size - target) < Math.abs(best - target) ? size : best, traySizes[0])
+  const trayFile = `whale-tray-icon-pixel-${traySize}.png`
   const asset = app.isPackaged
-    ? path.join(process.resourcesPath, 'whale-tray-icon-pixel-24.png')
-    : path.join(projectRoot, 'src', 'renderer', 'assets', 'whale-tray-icon-pixel-24.png')
+    ? path.join(process.resourcesPath, trayFile)
+    : path.join(projectRoot, 'src', 'renderer', 'assets', trayFile)
   const icon = nativeImage.createFromPath(asset)
   if (icon.isEmpty()) throw new Error(`通知区域图标资源不可用：${asset}`)
   contextMenu = Menu.buildFromTemplate([
@@ -1987,13 +2045,16 @@ function createTray(): void {
   tray.setContextMenu(contextMenu)
   tray.on('click', () => {
     // 隐藏后左击图标只把人物叫回来，不顺手弹开聊天气泡；人物可见时仍
-    // 按原来的行为打开/聚焦面板。
-    if (avatarWindow && !avatarWindow.isVisible()) {
-      avatarWindow.show()
-      avatarWindow.moveTop()
-      return
-    }
-    avatarWindow?.show()
+    // 按原来的行为打开/聚焦面板。无条件 show + invalidate：显示器休眠或
+    // 长时间闲置后，透明窗口可能被系统标记成不可见/停止合成，只判断
+    // isVisible() 会漏掉这种情况，人物就再也叫不回来。
+    const win = avatarWindow
+    if (!win || win.isDestroyed()) return
+    const wasHidden = !win.isVisible()
+    win.show()
+    win.moveTop()
+    win.webContents.invalidate()
+    if (wasHidden) return
     showPanel()
   })
   // Windows 11 默认把新图标收进任务栏溢出区；晚一点再把它标记为常驻显示。
@@ -2047,7 +2108,7 @@ function isScreenPoint(value: unknown): value is Electron.Point {
 function conversationSettingsPatch(value: unknown): Partial<ConversationSettings> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('会话设置无效。')
   const input = value as Record<string, unknown>
-  const editable = ['visibleConversationTabs', 'autoArchiveAfterDays', 'effort', 'goalMaxIterations', 'goalMaxMinutes', 'memoryEnabled', 'uiSize', 'avatarSize', 'avatarRenderer', 'toolRowDetail', 'webSearchEnabled', 'personaId', 'agentKernel', 'autoCompactPercent', 'panelAutoCollapseMinutes', 'roastEnabled', 'roastIntervalMinutes', 'roastIdlePauseMinutes', 'roastBurstLimit', 'roastPrompt', 'eyeEnabled', 'eyeIntervalSeconds', 'assistantAvatar', 'enableAutoTitleGeneration', 'showMessageTimestamps', 'showSenderBadges', 'senderRouteStyle', 'compactTimeline', 'userName', 'assistantName', 'panelPlacement', 'panelTheme',
+  const editable = ['visibleConversationTabs', 'autoArchiveAfterDays', 'effort', 'temperature', 'topP', 'statusDotMode', 'goalMaxIterations', 'goalMaxMinutes', 'memoryEnabled', 'uiSize', 'avatarSize', 'avatarRenderer', 'toolRowDetail', 'webSearchEnabled', 'personaId', 'agentKernel', 'autoCompactPercent', 'panelAutoCollapseMinutes', 'roastEnabled', 'roastIntervalMinutes', 'roastIdlePauseMinutes', 'roastBurstLimit', 'roastPrompt', 'eyeEnabled', 'eyeIntervalSeconds', 'assistantAvatar', 'enableAutoTitleGeneration', 'showMessageTimestamps', 'showSenderBadges', 'senderRouteStyle', 'compactTimeline', 'userName', 'assistantName', 'panelPlacement', 'panelTheme', 'windowOpacity', 'avatarOpacity',
     'outputStyle', 'appendSystemPrompt', 'autoScroll', 'expandFileEditsByDefault', 'sessionSort', 'titleLocale', 'titleModel', 'loadUserSettings']
   if (Object.keys(input).some((key) => !editable.includes(key))) throw new Error('会话设置无效。')
   const patch: Partial<ConversationSettings> = {}
@@ -2069,6 +2130,33 @@ function conversationSettingsPatch(value: unknown): Partial<ConversationSettings
   if (input.effort !== undefined) {
     if (!isEffortLevel(input.effort)) throw new Error('思考强度设置无效。')
     patch.effort = input.effort
+  }
+  if (input.temperature !== undefined) {
+    const value = input.temperature
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < TEMPERATURE_RANGE.min || value > TEMPERATURE_RANGE.max) {
+      throw new Error('Temperature 应为 0 到 2 之间的数字。')
+    }
+    patch.temperature = value
+  }
+  if (input.topP !== undefined) {
+    const value = input.topP
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < TOP_P_RANGE.min || value > TOP_P_RANGE.max) {
+      throw new Error('Top P 应为 0.01 到 1 之间的数字。')
+    }
+    patch.topP = value
+  }
+  if (input.statusDotMode !== undefined) {
+    const mode = input.statusDotMode
+    if (mode !== 'off' && mode !== 'float' && mode !== 'always') throw new Error('状态点模式无效。')
+    patch.statusDotMode = mode
+  }
+  for (const [name, raw] of [['窗口', input.windowOpacity], ['人物', input.avatarOpacity]] as const) {
+    if (raw === undefined) continue
+    if (typeof raw !== 'number' || !Number.isInteger(raw) || raw < 0 || raw > 100) {
+      throw new Error(`${name}不透明度应为 0 到 100 的整数。`)
+    }
+    if (name === '窗口') patch.windowOpacity = raw
+    else patch.avatarOpacity = raw
   }
   if (input.goalMaxIterations !== undefined) {
     const count = input.goalMaxIterations
@@ -2728,6 +2816,9 @@ app.on('second-instance', (_event, commandLine) => {
 })
 
 if (ownsSingleInstance) void app.whenReady().then(async () => {
+  // 休眠/锁屏唤醒后透明窗口可能不再合成：恢复人物、面板并补推快照。
+  powerMonitor.on('resume', restoreAfterSuspend)
+  powerMonitor.on('unlock-screen', restoreAfterSuspend)
   // 全局急停：任何桌面操作进行中都能一键打断，不必先切回面板。
   globalShortcut.register('Control+Alt+Shift+Esc', () => {
     void activeController().interruptTurn().catch(() => undefined);
@@ -2740,6 +2831,8 @@ if (ownsSingleInstance) void app.whenReady().then(async () => {
     return
   }
   await activeController().initialize()
+  // 预热内核：DSH 子进程和 ACP 握手在启动阶段做完，第一次发言不用等冷启动。
+  void activeController().warmup().catch(() => undefined)
   inboxWatcher = new InboxWatcher(path.join(dataRoot, 'inbox'), activeController())
   inboxWatcher.start()
   const initialSettings = (await activeController().getLibraryState()).settings
@@ -2897,6 +2990,8 @@ app.on('before-quit', (event) => {
   event.preventDefault()
   inboxWatcher?.stop()
   inboxWatcher = undefined
+  // 先拒绝新发送，再停回合：否则退出窗口里到达的消息只会留下一个空回合。
+  controller?.beginShutdown()
   controller?.stopAll(true)
   voiceService.dispose()
   void sideChat.discardAll()

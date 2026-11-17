@@ -74,4 +74,15 @@ describe('the rail’s ordinal ticks', () => {
     await act(async () => { nav.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })) })
     expect(host.querySelector('.panel-nav-progress')).not.toBeNull()
   })
+
+  it('only renders the visible window when the conversation is long', async () => {
+    const many = Array.from({ length: 200 }, (_, index) => ({ id: `m${index}`, role: 'user' as const, text: `第 ${index} 轮` }))
+    await act(async () => {
+      root.render(<TimelineNav marks={many} onJump={() => {}} />)
+    })
+    const nav = host.querySelector<HTMLElement>('.panel-nav')!
+    await act(async () => { nav.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })) })
+    // 展开窗口是 60 条：200 条对话不能全部塞进 DOM，否则内容一多就卡、行距错位。
+    expect(host.querySelectorAll('.panel-nav-row')).toHaveLength(60)
+  })
 })

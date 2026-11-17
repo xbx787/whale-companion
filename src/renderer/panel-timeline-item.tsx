@@ -157,9 +157,11 @@ export const TimelineItem = memo(function TimelineItem({ entry, running = false,
     // centered, muted line set it apart from the dialogue instead. Errors
     // take the same row but a warning tone and a leading mark.
     const failed = entry.tone === 'error';
-    return <article className={`panel-event panel-event-system${failed ? ' is-error' : ''}`} aria-label={`${kindLabels.system}${failed ? '，错误' : ''}`}>
+    const succeeded = entry.tone === 'success';
+    return <article className={`panel-event panel-event-system${failed ? ' is-error' : ''}${succeeded ? ' is-success' : ''}`} aria-label={`${kindLabels.system}${failed ? '，错误' : succeeded ? '，已完成' : ''}`}>
       <div className="panel-event-body">
         {failed && <span className="panel-event-system-mark" aria-hidden="true">!</span>}
+        {succeeded && <span className="panel-event-system-mark is-dot" aria-hidden="true" />}
         {entry.tag && <span className="panel-event-tag">{entry.tag}</span>}
         <p>{entry.text}</p>
         {entry.retryText && <button type="button" className="panel-event-retry"
@@ -214,6 +216,9 @@ export const TimelineItem = memo(function TimelineItem({ entry, running = false,
           </span>
         )}
         <MessageBody entry={bodyEntry} running={running} onOpenImage={onOpenImage} />
+        {entry.kind === 'user' && entry.halted && (
+          <span className="panel-event-halted">这条消息没有发出</span>
+        )}
         {sender?.target && (
           <span className="panel-event-route">
             <span className="route-link" aria-hidden="true">

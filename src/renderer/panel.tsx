@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type AnimationEvent, type MouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { normalizeApprovalMode, type AppSnapshot, type AskAnswers, type AskQuestionRequest, ApprovalMode, BubbleLayout, AppCommandOption, ContextUsageSnapshot, ConversationSummary, EffortLevel, ModelMode, ModelProfile, PanelDirection, PanelPlacement, PendingMessage, PetAPI, PhoneLinkStatus, PhoneSession, ProposedAction, SideChatSnapshot, TaskMetrics, TaskStatus, TimelineEntry, type ToolRowDetail, UserAttachment, VoiceConfig } from '../shared/contracts';
-import { AUTO_COMPACT_DEFAULT_PERCENT, AUTO_COMPACT_MAX_PERCENT, AUTO_COMPACT_MIN_PERCENT, PANEL_AUTO_COLLAPSE_DEFAULT_MINUTES, PANEL_MIN_HEIGHT, PANEL_MIN_WIDTH } from '../shared/contracts';
+import { AUTO_COMPACT_DEFAULT_PERCENT, AUTO_COMPACT_MAX_PERCENT, AUTO_COMPACT_MIN_PERCENT, DEFAULT_TEMPERATURE, DEFAULT_TOP_P, PANEL_AUTO_COLLAPSE_DEFAULT_MINUTES, PANEL_MIN_HEIGHT, PANEL_MIN_WIDTH } from '../shared/contracts';
 import { formatCommandDuration, formatDuration, formatToolDuration } from './duration'
 import { isImageAttachmentName } from '../shared/image-preview';
 import { EffortSlider } from './effort-slider';
@@ -1003,6 +1003,8 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
     const payload = attachments.map(({ name, content, path }) => ({ name, content, path }));
     sideSubmitLockRef.current.add(sessionId);
     setSideSendingIds(new Set(sideSubmitLockRef.current));
+    // 与主面板同理：同步清空 DOM，避免连按回车把同一句再发一遍。
+    editorRef.current?.clear();
     stashComposerState(sideComposerStash.current, sessionId, '', []);
     composerStateRef.current = { draft: '', attachments: [] };
     setDraft('');
@@ -1048,6 +1050,7 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
       const originId = activeConversationIdRef.current;
       if (!goal || submitLockRef.current.has(originId) || contextCompacting) return;
       const sentDraft = currentDraft;
+      editorRef.current?.clear();
       if (originId) {
         stashComposerState(composerStash.current, originId, '', attachments);
         goalPromptStash.current.set(originId, false);
@@ -1083,6 +1086,8 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
     const sentAttachments = attachments;
     const payload = attachments.map(({ name, content, path }) => ({ name, content, path }));
     if (!beginSubmission(originId)) return;
+    // 同步清空编辑器：下一次回车必须读到空值，不能把同一句再发一遍。
+    editorRef.current?.clear();
     if (originId) stashComposerState(composerStash.current, originId, '', []);
     composerStateRef.current = { draft: '', attachments: [] };
     setDraft('');
@@ -1176,6 +1181,11 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
   }
   async function chooseEffort(level: EffortLevel): Promise<void> {
     await chooseEffortImpl({ level, current: snapshot?.effort, destination: destinationRef.current, run });
+  }
+  /** 采样参数：侧会话沿用主线，不改；一次提交两个值。 */
+  async function chooseSampling(temperature: number, topP: number): Promise<void> {
+    if (destinationRef.current === 'side') return;
+    await run((bridge) => bridge.setSampling(temperature, topP));
   }
   /** 上下文弹窗里的阈值行：一格 5%，滚动只改预览，停下才提交。 */
   function nudgeAutoCompact(delta: number): void {
@@ -1397,7 +1407,7 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
     manager.toggle();
   }
 
-  async function openLibrary() {
+  async function openLibrary(options?: { rename?: { id: string; title: string }; remove?: { id: string } }) {
     await expandPanel();
     // 左右栏各占一半；面板不够宽时不允许同时打开，先收起右栏。
     if (rightRail !== 'closed' && bubbleWidth < 380) setRightRail('closed');
@@ -1405,8 +1415,14 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
     setModelPickerOpen(false);
     setSessionMenuOpen(false);
     setTabMenu(null);
-    setDeleteId(null);
-    setRenameId(null);
+    // 从顶栏菜单直接进来时把行内编辑/删除一并打开，省掉再点一次按钮。
+    if (options?.rename) {
+      setRenameDraft(options.rename.title);
+      setRenameId(options.rename.id);
+    } else {
+      setRenameId(null);
+    }
+    setDeleteId(options?.remove?.id ?? null);
     setLibraryError(null);
   }
 
@@ -1770,7 +1786,8 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
   const statusLive = status === 'planning' || status === 'executing' || status === 'verifying';
   const pendingMessages = sideExpanded ? sideChat?.pendingMessages ?? [] : snapshot?.pendingMessages ?? [];
   const queuedCount = pendingMessages.length;
-  const empty = !libraryOpen && !sendingCurrent && !error && !voiceError && status === 'idle' && !snapshot?.currentTask && !snapshot?.timeline.length && !snapshot?.proposal && queuedCount === 0;
+  // 有目标时不算空面板：目标条不能因为会话暂时没有消息就被紧凑态藏掉。
+  const empty = !libraryOpen && !sendingCurrent && !error && !voiceError && status === 'idle' && !snapshot?.currentTask && !snapshot?.timeline.length && !snapshot?.proposal && !snapshot?.goal && queuedCount === 0;
   // With no conversation left the bubble keeps its full shape: the ball form
   // has no tab strip and no room for the "+", and starting fresh is exactly
   // what the owner wants to do next.
@@ -1889,6 +1906,20 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
   // 跳到未渲染的条目时 jumpToEntry 会先扩大渲染窗口，再滚动过去。
   const navMarkList = useMemo(() => navMarks(groupTimeline(mergedTimeline, liveTurnStartMs)), [mergedTimeline, liveTurnStartMs]);
   const [earlierGroups, setEarlierGroups] = useState(0);
+  // 滑动窗口：翻回底部时把向上加载出来的渲染窗口收回尾部，让滚出视口的
+  // 旧消息真正离开 DOM。否则往上翻很多再翻下来，节点和纹理只增不减，
+  // 内存和显存会被越吃越多。
+  useEffect(() => {
+    if (!feedAtBottom) return;
+    setEarlierGroups(0);
+    // 渲染窗口也收回初始大小：只重置分组窗口的话，更早的条目仍然挂在
+    // timelineForRender 里，节点和纹理还是不会释放。
+    setHistoryEntries(INITIAL_HISTORY_ENTRIES);
+    // 按需拉回来的更早分页也一起丢掉：只缩 DOM 的话，几万条历史仍然占着
+    // 渲染进程的内存，面板进程会一路涨到接近 1GB。
+    setOlderEntries([]);
+    olderCountRef.current = 0;
+  }, [feedAtBottom]);
   const earlierAnchorRef = useRef<{ height: number } | null>(null);
   const pendingJumpRef = useRef<string | null>(null);
   // 同一时刻只允许一条跳转流程，连点时不会叠出好几条循环互相打架。
@@ -2193,10 +2224,10 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
         busy={libraryBusy}
         running={statusRunning(tabMenu.item)}
         current={tabMenu.item.id === library?.activeConversationId}
-        onRename={() => { openLibrary(); setRenameDraft(tabMenu.item.title); setRenameId(tabMenu.item.id); }}
+        onRename={() => { void openLibrary({ rename: tabMenu.item }); }}
         onCloseTab={() => { void closeQuickTab(tabMenu.item); }}
         onArchive={() => { void libraryAction((bridge) => bridge.archiveConversation(tabMenu.item.id), () => forgetParentSide(tabMenu.item.id, { sideSnapshots, activeConversationIdRef, applySideSnapshotRef, sideComposerStash, sideComposerOpenRef })); }}
-        onDelete={() => { openLibrary(); setDeleteId(tabMenu.item.id); }}
+        onDelete={() => { void openLibrary({ remove: tabMenu.item }); }}
         onClose={() => setTabMenu(null)}
       />}
       {turnMenu && visible && <TurnContextMenu
@@ -2237,7 +2268,7 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
             onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); setSessionMenuOpen(false); } }}>
             <div className="panel-session-menu-heading">快捷会话</div>
             {quickTabs.map((item, index) => <button key={item.id} type="button" role="menuitem" aria-current={item.id === library?.activeConversationId ? 'page' : undefined} aria-disabled={libraryBusy || item.id === library?.activeConversationId} onContextMenu={(event) => showTabMenu(event, item)} title={`${item.title}，${taskLabels[conversationStatus(item)]}`} onClick={() => { if (!libraryBusy && item.id !== library?.activeConversationId) void selectConversation(item); }}><i className={`panel-task-dot panel-task-dot-${conversationStatus(item)}`} aria-hidden="true" /><span className="panel-session-menu-number">{index + 1}</span><span className="panel-session-menu-title">{item.title}</span></button>)}
-            <button type="button" role="menuitem" className="panel-session-menu-all" onClick={openLibrary}>查看全部会话</button>
+            <button type="button" role="menuitem" className="panel-session-menu-all" onClick={() => { void openLibrary(); }}>查看全部会话</button>
           </div>}
           {/* The strip keeps its place even when the last conversation is
               closed: the "+" stays put so a new session is one click away,
@@ -2282,7 +2313,7 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
         <div className="panel-chat-main">
         <PanelStatusBar sideOpen={Boolean(sideSessionId)} sideExpanded={sideExpanded} onToggleSide={(expanded) => { void setSideExpanded(expanded); }} onDiscardSide={() => { void discardSide(); }} status={status} sideStatus={sideStatus} queuePaused={Boolean(sideChat?.queuePaused)} queueReason={sideChat?.pauseReason} snapshot={snapshot} conversationId={library?.activeConversationId ?? undefined} controlsEnabled={snapshot?.subagentControls !== false} onBackgroundTask={(task) => { const toolUseId = task.toolUseId; if (!toolUseId) return; void run(async (bridge) => { await bridge.backgroundTask(toolUseId, activeConversationIdRef.current ?? undefined); }); }} onStopTask={(task) => { void run(async (bridge) => { await bridge.stopTask(task.taskId, activeConversationIdRef.current ?? undefined); }); }} onMessageSubagent={(task, text) => { const toolUseId = task.toolUseId; if (!toolUseId) return; void run(async (bridge) => { await bridge.messageSubagent(toolUseId, text, activeConversationIdRef.current ?? undefined); }); }} />
         <div className="panel-feed-wrap" ref={feedWrapRef}>
-          <TimelineNav marks={navMarkList} onJump={jumpToEntry} windowSize={expanded ? NAV_WINDOW_WIDE : NAV_WINDOW_COMPACT} baseWidth={expanded ? 12 : 8.8} progressId={progressMarkId} />
+          <TimelineNav marks={navMarkList} onJump={jumpToEntry} windowSize={expanded ? NAV_WINDOW_WIDE : NAV_WINDOW_COMPACT} baseWidth={expanded ? 12 : 8.8} progressId={progressMarkId} follow={feedAtBottom} />
           <div className={`panel-feed${library?.settings.compactTimeline ? ' is-compact' : ''}${library?.settings.showSenderBadges === false ? ' is-no-sender' : ''}${library?.settings.senderRouteStyle === 'card' ? ' is-route-card' : ''}`} ref={feedRef} aria-label="对话与任务时间线" onScroll={onFeedScroll}>
             {sideExpanded && <p className="panel-side-intro">临时会话，记录不进入会话库</p>}
             {!snapshot && <p className="panel-history-loading" role="status">正在连接对话…</p>}
@@ -2461,7 +2492,7 @@ export function PanelBubble({ visible, snapshot: mainSnapshot, error, run, direc
                     event.target.value = '';
                     if (files.length) void addFiles(files);
                   }} />
-                <ModelPicker wrapperRef={modelPickerRef} open={modelPickerOpen} dsh={snapshot?.mode === 'dsh'} sideExpanded={sideExpanded} goalOn={goalPrompting || Boolean(snapshot?.goal)} planOn={Boolean(snapshot?.planMode)} webOn={library?.settings.webSearchEnabled !== false} goalTitle={goalPrompting || snapshot?.goal ? '关闭目标模式' : '打开后写目标；按 Tab 补上“全部完成前不要停”，回车设定'} profiles={library?.settings.modelProfiles ?? []} activeId={library?.settings.activeModelProfileId} effort={snapshot?.effort ?? 'max'} onToggle={() => setModelPickerOpen((open) => !open)} onClose={() => setModelPickerOpen(false)} onToggleGoal={toggleGoal} onChoosePlan={choosePlanMode} onToggleWeb={() => { void run((bridge) => bridge.setWebSearchEnabled(library?.settings.webSearchEnabled === false)); }} onPickProfile={(id) => { void switchModelProfile(id); }} onManage={() => { void run((bridge) => bridge.openSettings()); }} onOpenOnboarding={() => { void run((bridge) => bridge.openOnboarding()); }} onEffort={chooseEffort} phoneState={phoneStatus} onOpenPhone={openPhonePanel} />
+                <ModelPicker wrapperRef={modelPickerRef} open={modelPickerOpen} dsh={snapshot?.mode === 'dsh'} sideExpanded={sideExpanded} goalOn={goalPrompting || Boolean(snapshot?.goal)} planOn={Boolean(snapshot?.planMode)} webOn={library?.settings.webSearchEnabled !== false} goalTitle={goalPrompting || snapshot?.goal ? '关闭目标模式' : '打开后写目标；按 Tab 补上“全部完成前不要停”，回车设定'} profiles={library?.settings.modelProfiles ?? []} activeId={library?.settings.activeModelProfileId} effort={snapshot?.effort ?? 'max'} onToggle={() => setModelPickerOpen((open) => !open)} onClose={() => setModelPickerOpen(false)} onToggleGoal={toggleGoal} onChoosePlan={choosePlanMode} onToggleWeb={() => { void run((bridge) => bridge.setWebSearchEnabled(library?.settings.webSearchEnabled === false)); }} onPickProfile={(id) => { void switchModelProfile(id); }} onManage={() => { void run((bridge) => bridge.openSettings()); }} onOpenOnboarding={() => { void run((bridge) => bridge.openOnboarding()); }} onEffort={chooseEffort} temperature={library?.settings.temperature ?? DEFAULT_TEMPERATURE} topP={library?.settings.topP ?? DEFAULT_TOP_P} onSampling={(temperature, topP) => { void chooseSampling(temperature, topP); }} phoneState={phoneStatus} onOpenPhone={openPhonePanel} />
                 {snapshot?.mode === 'dsh' && <ApprovalMenu wrapperRef={approvalMenuRef} mode={approvalMode} open={approvalMenuOpen} disabled={sideExpanded} onToggle={() => setApprovalMenuOpen((open) => !open)} onClose={() => setApprovalMenuOpen(false)} onChoose={(mode) => { void chooseApprovalMode(mode); }} />}
                 <button type="button" className="panel-tool-button panel-attachment-button" aria-label="添加附件"
                   title="添加图片或文件（也可以直接拖入或粘贴）" onClick={() => attachmentInputRef.current?.click()}>

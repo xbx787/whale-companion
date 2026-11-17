@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { VoiceJobProgress, VoiceModelStatus, VoiceSettingsPublic } from '../shared/contracts'
-import { SILICONFLOW_KEY_PAGES, VOICE_PRESETS } from '../shared/voice'
+import { VOICE_PRESETS } from '../shared/voice'
 import { publicErrorText } from '../shared/error-copy'
 import type { SettingsAPI } from '../preload/settings'
 
@@ -157,7 +157,7 @@ export function SettingsVoiceSection({ api }: { api: SettingsAPI }) {
     <div className="settings-row">
       <div className="settings-copy">
         <label>语音服务</label>
-        <p>转写和朗读使用 SiliconFlow：SenseVoice 负责听，CosyVoice2 负责说。Key 只保存在本机，并用 Windows 加密。</p>
+        <p>转写和朗读使用 DeepSeek 官方语音接口，沿用应用里配置的 DeepSeek Key。</p>
       </div>
       <span className={`settings-voice-state${settings?.keyConfigured ? ' is-on' : ''}`}>
         {settings?.keyConfigured ? '已配置' : settings?.envKeyAvailable ? '环境变量可用' : '未配置'}
@@ -166,35 +166,11 @@ export function SettingsVoiceSection({ api }: { api: SettingsAPI }) {
     {settings?.protectionUnavailable && <p className="settings-voice-warning" role="alert">Windows 密钥保护暂不可用，Key 无法保存。</p>}
     {settings?.loadError && <p className="settings-voice-warning" role="alert">语音配置损坏，已使用默认值；保存后会重建。</p>}
     <div className="settings-voice-form">
-      <label>SiliconFlow API Key
-        <input type="password" value={keyDraft} autoComplete="off" spellCheck={false}
-          placeholder={settings?.keyConfigured ? '已保存，留空保持不变' : '粘贴 SiliconFlow API Key'}
-          disabled={busy} onChange={(event) => setKeyDraft(event.target.value)} />
-      </label>
-      <div className="settings-voice-actions">
-        <button type="button" disabled={busy} onClick={() => { void testConnection() }}>{busy ? '处理中…' : '测试连接'}</button>
-        {keyDraft.trim() && <button type="button" disabled={busy} onClick={() => { void save({ apiKey: keyDraft }) }}>保存 Key</button>}
-        {settings?.keyConfigured && <button type="button" disabled={busy} onClick={() => { void save({ clearKey: true }) }}>清除 Key</button>}
-        {!settings?.keyConfigured && settings?.envKeyAvailable &&
-          <button type="button" disabled={busy} onClick={() => { void save({ importEnvKey: true }) }}>使用环境变量中的 Key</button>}
-      </div>
-      {test && <p className={`settings-voice-test${test.ok ? ' is-ok' : ' is-error'}`} role="status">{test.message}</p>}
-      <p className="settings-voice-hint">
-        获取 Key：<span className="settings-voice-url">{SILICONFLOW_KEY_PAGES[0]}</span>
-        <button type="button" onClick={() => { void api.voiceOpenKeyPage() }}>打开</button>
-      </p>
-
       <label>朗读音色
-        <select value={settings?.voice ?? 'claire'} disabled={busy || !settings}
+        <select value={settings?.voice ?? 'stella'} disabled={busy || !settings}
           onChange={(event) => { void save({ voice: event.target.value }) }}>
           {VOICE_PRESETS.map((preset) => <option key={preset.id} value={preset.id}>{preset.label}（{preset.id}）</option>)}
         </select>
-      </label>
-      <label>语速 <span className="settings-voice-speed">{settings?.speed.toFixed(2) ?? '1.00'}×</span>
-        <input type="range" min="0.5" max="2" step="0.05" value={settings?.speed ?? 1} disabled={busy || !settings}
-          onChange={(event) => { setSettings((current) => current ? { ...current, speed: Number(event.target.value) } : current) }}
-          onPointerUp={(event) => { void save({ speed: Number(event.currentTarget.value) }) }}
-          onKeyUp={(event) => { void save({ speed: Number(event.currentTarget.value) }) }} />
       </label>
       <button type="button" role="switch" aria-checked={settings?.autoSpeak ?? true}
         className={`settings-voice-toggle${settings?.autoSpeak ?? true ? ' is-on' : ''}`} disabled={busy || !settings}

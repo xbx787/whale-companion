@@ -356,12 +356,27 @@ export class AgentRuntime {
   setConversationBridge(bridge?: {
     list: () => ConversationTarget[]
     send: (target: string, text: string, sourceConversationId: string) => Promise<{ id: string; title: string }>
+    create: () => Promise<{ id: string; title: string }>
+    rename: (target: string, title: string) => Promise<{ id: string; title: string }>
+    setPinned: (target: string, pinned: boolean) => Promise<{ id: string; title: string; pinned: boolean }>
+    move: (target: string, position: 'first' | 'last' | 'before' | 'after', anchor?: string) =>
+      Promise<{ id: string; title: string; order: string[] }>
+    archive: (target: string) => Promise<{ id: string; title: string }>
+    restore: (target: string) => Promise<{ id: string; title: string }>
+    remove: (target: string) => Promise<{ id: string; title: string }>
   }): void {
     const model = this.dshKernel as (ModelClient & { setConversationBridge?: (bridge?: ConversationBridge) => void }) | undefined
     if (!model?.setConversationBridge) return
     model.setConversationBridge(bridge ? {
       list: bridge.list,
-      send: (target, text) => bridge.send(target, text, this.conversationId)
+      send: (target, text) => bridge.send(target, text, this.conversationId),
+      create: bridge.create,
+      rename: bridge.rename,
+      setPinned: bridge.setPinned,
+      move: bridge.move,
+      archive: bridge.archive,
+      restore: bridge.restore,
+      remove: bridge.remove
     } : undefined)
   }
 
@@ -551,6 +566,11 @@ export class AgentRuntime {
     this.onChange()
   }
 
+  /** 采样参数：只影响小鲸引擎的请求体，下一轮进程重启后生效。 */
+  setSampling(temperature: number, topP: number): void {
+    this.dshKernel?.setSampling?.(temperature, topP)
+  }
+
   /** 当前时间线总条数。分页窗口之外的旧条目要按它算偏移，不能读被截断的数组。 */
   timelineLength(): number {
     return this.state.timeline.length
@@ -636,9 +656,10 @@ export class AgentRuntime {
       const usage = await model.compact(sessionId)
       if (generation !== this.contextGeneration || sessionId !== this.sdkSessionId) return
       this.state.contextUsage = { ...usage, checkedAt: new Date().toISOString() }
-      this.addSystem(usage.compactionOutcome === 'not_needed'
-        ? '当前对话较短，暂不需要压缩。'
-        : '上下文已压缩，可以继续当前对话。', undefined, undefined, '上下文压缩')
+      const compacted = usage.compactionOutcome !== 'not_needed'
+      this.addSystem(compacted
+        ? '上下文已压缩，可以继续当前对话。'
+        : '当前对话较短，暂不需要压缩。', compacted ? 'success' : undefined, undefined, '上下文压缩')
     } catch (error) {
       if (generation === this.contextGeneration && sessionId === this.sdkSessionId) {
         const message = error instanceof Error ? publicErrorText(error.message) : '上下文压缩失败。'
@@ -890,6 +911,12 @@ export class AgentRuntime {
         this.state.timeline.splice(index, 1)
       }
     }
+  }
+
+  /** 启动时预热内核：把 DSH 子进程拉起来，第一次发言不用再等冷启动。 */
+  async warmup(): Promise<void> {
+    const kernel = this.dshKernel as { warmup?: () => Promise<void> } | undefined
+    await kernel?.warmup?.()
   }
 
   async sendMessage(rawText: string, attachments: UserAttachment[] = [], sessionContext = '', displayText?: string, hiddenUser = false, divider = false,
@@ -1334,6 +1361,34 @@ export class AgentRuntime {
     this.emit()
   }
 
+  /** 这一轮在最后一条用户消息之后有没有产出（思考、回答、工具行）。 */
+  private turnProducedOutput(): boolean {
+    const timeline = this.state.timeline
+    let lastUserIndex = -1
+    for (let index = timeline.length - 1; index >= 0; index -= 1) {
+      if (timeline[index].kind === 'user') { lastUserIndex = index; break }
+    }
+    return timeline.slice(lastUserIndex + 1).some((entry) => entry.kind !== 'user')
+  }
+
+  /** 这一轮在模型开始产出之前就被停止：给用户消息打上标记。
+   *  没有这个标记，界面只剩一个「用时 00:00」的空回合，看不出消息其实没被处理。 */
+  private markHaltedTurn(): void {
+    const timeline = this.state.timeline
+    let lastUserIndex = -1
+    for (let index = timeline.length - 1; index >= 0; index -= 1) {
+      if (timeline[index].kind === 'user') { lastUserIndex = index; break }
+    }
+    if (lastUserIndex < 0) return
+    const user = timeline[lastUserIndex]
+    if (user.halted) return
+    // 已经有思考、回答或工具行，说明这一轮真的开始了；那属于“被中止”，
+    // 不是“没发出”，保持原来的中止语义。
+    if (this.turnProducedOutput()) return
+    user.halted = true
+    this.markTimelineDirty(user)
+  }
+
   /** `silent` is for app quit/restart: it stops the turn and keeps the
    *  transcript, but writes no "已停止思考" notice — closing the app should
    *  not look like the user stopped the task. */
@@ -1343,6 +1398,9 @@ export class AgentRuntime {
       return
     }
     if (!this.isBusy() && !this.state.goal) return
+    // 先标记空回合，再改 generation：之后 sendMessage 的收尾检查会直接返回，
+    // 没有这一步就没人再给这条消息补状态。
+    this.markHaltedTurn()
     // 停止时把还没露面的插话消息贴出来，别让它悄悄丢掉。
     this.flushDeferredSteer()
     this.pendingSteer = undefined
@@ -1492,7 +1550,7 @@ export class AgentRuntime {
       this.emit()
     }
     if (this.state.mode === 'dsh' && reply.sdkSessionId) this.sdkSessionId = reply.sdkSessionId
-    if (reply.compacted) this.addSystem('上下文已自动压缩，可继续当前会话。', undefined, undefined, '上下文压缩')
+    if (reply.compacted) this.addSystem('上下文已自动压缩，可继续当前会话。', 'success', undefined, '上下文压缩')
     if (reply.text) {
       this.history.push({ role: 'assistant', content: reply.text })
       if (!reply.timelineHandled) {
@@ -1532,6 +1590,12 @@ export class AgentRuntime {
       // landed" and raises a smile for a beat. The next turn's sendMessage
       // flips it back to 'thinking'.
       this.state.avatarState = 'success'
+      // 模型正常收尾但一个字段都没产出：不能静默显示成空回合。给一条可重试的
+      // 提示，让用户知道这次没有回答，而不是以为消息丢了。这里不用 error 色：
+      // 错误提示 20 秒后会自动消失，空回合的说明要跟着消息留在时间线上。
+      if (!reply.text && !this.turnProducedOutput()) {
+        this.addSystem('模型这次没有返回内容，这条消息没有得到回答。可以重试一次。', undefined, this.lastUserPrompt())
+      }
       // An ordinary reply does not prove a /goal iteration or a clear.
       if (this.state.goal && (this.state.goal.phase === 'requested' || this.state.goal.phase === 'stopping')) {
         this.state.goal = { ...this.state.goal, phase: 'unverified',
@@ -1667,7 +1731,7 @@ export class AgentRuntime {
   }
 
   private add(kind: TimelineEntry['kind'], text: string, images?: TimelineEntry['images'],
-    sender?: TimelineEntry['sender'], tone?: TimelineEntry['tone']): TimelineEntry {
+    sender?: TimelineEntry['sender'], tone?: TimelineEntry['tone'], insertByTime = false): TimelineEntry {
     const entry: TimelineEntry = {
       id: crypto.randomUUID(),
       time: new Date().toISOString(),
@@ -1677,7 +1741,15 @@ export class AgentRuntime {
       ...(sender ? { sender } : {}),
       ...(tone ? { tone } : {})
     }
-    this.state.timeline.push(entry)
+    if (insertByTime) {
+      // 跨会话转达可能在晚些时候才到达，但它的时间戳更早：按时间插回原位，
+      // 否则会追加到末尾，分组时被塞进后面的 turn 里，看起来像记录错乱。
+      const index = this.state.timeline.findIndex((item) => item.time > entry.time)
+      if (index < 0) this.state.timeline.push(entry)
+      else this.state.timeline.splice(index, 0, entry)
+    } else {
+      this.state.timeline.push(entry)
+    }
     this.markTimelineDirty(entry)
     this.emit()
     return entry
@@ -1739,7 +1811,7 @@ export class AgentRuntime {
    *  model turn. It is a visible notice, not part of the dialogue history. */
   appendExternalMessage(from: TimelineEntry['sender'], text: string): void {
     if (!text.trim()) return
-    this.add('user', text.trim().slice(0, 8_000), undefined, from)
+    this.add('user', text.trim().slice(0, 8_000), undefined, from, undefined, true)
   }
 
   /** Records that an entry changed since the last publisher take; the id-keyed

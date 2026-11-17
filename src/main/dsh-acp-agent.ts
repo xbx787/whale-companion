@@ -24,6 +24,7 @@ import type {
 } from '../shared/contracts'
 import type { ConversationBridge } from './conversation-tools'
 import type { EvolveBridge } from './evolve-tools'
+import { DEFAULT_TEMPERATURE, DEFAULT_TOP_P } from '../shared/contracts'
 import { resolveDeepSeekToolsKey } from './deepseek-tools'
 import { buildPersona } from './persona'
 import { toolLabel } from '../shared/tool-labels'
@@ -203,6 +204,13 @@ export class DshAcpAgentClient implements ModelClient {
   private readonly alwaysAllowedKinds = new Set<string>()
   /** 插话回显：DSH 把 steer 的用户消息写进会话后，用它确认投递。 */
   private steerEchoListener?: (messageId: string) => void
+  /** 上一轮 prompt 还没在 DSH 里收尾：新回合先等它结束。停止后 DSH 要等
+   *  agent 真正 idle 才让出 prompt 槽，直接发会报 “a prompt is already in
+   *  flight for this session”，界面就只剩一个空回合。 */
+  private promptInFlight: Promise<unknown> | undefined
+  /** 采样参数是进程级环境变量：改了之后等这一轮结束再重启 ACP 进程。 */
+  private sampling = { temperature: DEFAULT_TEMPERATURE, topP: DEFAULT_TOP_P }
+  private pendingSamplingRestart = false
   private lastContextUsage: ContextUsageSnapshot = { status: 'unavailable' }
   private personaId: string
   private identity: { userName?: string; assistantName?: string }
@@ -254,6 +262,11 @@ export class DshAcpAgentClient implements ModelClient {
     this.applyPersona()
   }
 
+  /** 启动时预热：先把 DSH 子进程和 ACP 握手做完，第一次发言就不用再等冷启动。 */
+  async warmup(): Promise<void> {
+    await this.runtime.start()
+  }
+
   private applyPersona(): void {
     const persona = buildPersona(this.personaId, {
       userAddress: this.identity.userName,
@@ -293,6 +306,11 @@ export class DshAcpAgentClient implements ModelClient {
       this.pendingRestart = false
       this.resetSession()
       this.applyPersona()
+      await this.runtime.close().catch(() => undefined)
+    }
+    // 采样参数在上一轮进行中改过：重启进程让新环境生效，会话 id 保留。
+    if (this.pendingSamplingRestart) {
+      this.pendingSamplingRestart = false
       await this.runtime.close().catch(() => undefined)
     }
     // 地址/Key 在回合中改过：下一轮换新进程，但保留会话 id 继续续接上下文。
@@ -350,7 +368,9 @@ export class DshAcpAgentClient implements ModelClient {
         usageReading = false
       }
     }
-    const usageTimer = setInterval(() => { void reportUsage(1) }, 1000)
+    // 轮中每 3 秒读一次：整份会话日志是同步解压的，10MB 的日志一次约
+    // 300ms；每秒一次会把主进程的 IPC 拖出可见延迟。
+    const usageTimer = setInterval(() => { void reportUsage(1) }, 3_000)
     usageTimer.unref?.()
 
     let interrupted = false
@@ -495,8 +515,26 @@ export class DshAcpAgentClient implements ModelClient {
     if (signal.aborted) interrupted = true
     try {
       if (!interrupted) {
-        const result = await this.runtime.prompt(sessionId, promptBlocks, TURN_TIMEOUT_MS)
-        if (result.stopReason === 'cancelled') interrupted = true
+        const previous = this.promptInFlight
+        if (previous) {
+          // 上一轮还在 ACP 里收尾：等它让出 prompt 槽。最多 20 秒，
+          // 超时就继续，让 ACP 的明确错误暴露出来，而不是无限挂住。
+          await Promise.race([
+            previous.catch(() => undefined),
+            new Promise<void>((resolve) => setTimeout(resolve, 20_000))
+          ])
+          if (signal.aborted) interrupted = true
+        }
+      }
+      if (!interrupted) {
+        const pending = this.runtime.prompt(sessionId, promptBlocks, TURN_TIMEOUT_MS)
+        this.promptInFlight = pending
+        try {
+          const result = await pending
+          if (result.stopReason === 'cancelled') interrupted = true
+        } finally {
+          if (this.promptInFlight === pending) this.promptInFlight = undefined
+        }
       }
     } catch (error) {
       if (signal.aborted) interrupted = true
@@ -514,7 +552,7 @@ export class DshAcpAgentClient implements ModelClient {
     }
 
     // 收尾再等一次落盘，补上最后一条 assistant/message 的用量。
-    await reportUsage(25)
+    await reportUsage(10)
     // 这一轮的回答只取最后一次工具调用之后的文字。把所有段落拼起来会让
     // 界面把整轮过程旁白当成答复再重复一遍（实测过，见 #1）。
     const ordered = [...messageTexts.entries()]
@@ -561,6 +599,9 @@ export class DshAcpAgentClient implements ModelClient {
   }
 
   private async ensureSession(sdkSessionId?: string | null): Promise<string> {
+    // 任何调用方都可能赶在 ACP 子进程启动前进来（例如启动后第一次就压缩）；
+    // start 是幂等的，已启动时直接复用同一个握手。
+    await this.runtime.start()
     const generation = this.runtime.generation
     if (this.sessionId && this.sessionGeneration === generation) return this.sessionId
     const target = this.sessionId ?? sdkSessionId ?? null
@@ -1013,6 +1054,19 @@ export class DshAcpAgentClient implements ModelClient {
     this.effort = level
   }
 
+  /** 设置里改了采样参数：写进下一轮进程的环境。正在跑的回合不打断，
+   *  等它收尾后重启 ACP 进程，新参数才会进请求体。 */
+  setSampling(temperature: number, topP: number): void {
+    if (this.sampling.temperature === temperature && this.sampling.topP === topP) return
+    this.sampling = { temperature, topP }
+    this.runtime.setSamplingEnvironment(this.sampling)
+    if (this.busy) {
+      this.pendingSamplingRestart = true
+      return
+    }
+    void this.runtime.close().catch(() => undefined)
+  }
+
   setWebSearchEnabled(on: boolean): void {
     if (this.webSearchEnabled === on) return
     this.webSearchEnabled = on
@@ -1180,6 +1234,9 @@ export class DshAcpAgentClient implements ModelClient {
 
   /** 手动压缩：调用我们补的 session/compact；没有可压缩内容时如实返回未压缩。 */
   async compact(_sessionId?: string | null): Promise<ContextUsageSnapshot> {
+    // 冷启动后第一次操作就是压缩时，ACP 子进程可能还没起来；先握手再压缩。
+    // 启动失败直接冒泡，别被下面的重试包装成“摘要模型没返回正文”。
+    await this.runtime.start()
     // 冷会话刚被打开时还没有 ACP sessionId：先按记录恢复，否则一进对话
     // 点压缩只会得到“还没有可压缩的会话”。
     const sessionId = await this.ensureSession(_sessionId)

@@ -78,3 +78,85 @@ export function resolveDeepSeekToolsKey(provider: { baseUrl: string; apiKey: str
   }
   return process.env.DEEPSEEK_API_KEY?.trim() || undefined;
 }
+
+/** 官方 OCR：识别 PDF、Word、PowerPoint 和图片里的文字，按页返回。
+ *  文件不会存进 Files API，也不会交给对话模型。 */
+export interface DeepSeekOcrPage {
+  index: number
+  text: string
+}
+
+export async function deepseekOcr(
+  file: Buffer,
+  filename: string,
+  purpose: 'text_recognition' | 'rich_layout_recognition',
+  apiKey: string
+): Promise<{ pages: DeepSeekOcrPage[]; pageCount: number }> {
+  const form = new FormData()
+  form.append('file', new Blob([new Uint8Array(file)]), filename)
+  form.append('purpose', purpose)
+  const response = await fetch(`${BASE_URL}/v1/tools/ocr`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}` },
+    body: form,
+    signal: AbortSignal.timeout(180_000)
+  })
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '')
+    throw new Error(`DeepSeek OCR 失败（HTTP ${response.status}）${detail ? `：${detail.slice(0, 200)}` : ''}`)
+  }
+  const data = (await response.json()) as {
+    page_count?: number
+    pages?: Array<{ index?: number; text?: string }>
+  }
+  const pages = (data.pages ?? []).map((page, index) => ({
+    index: typeof page.index === 'number' ? page.index : index,
+    text: String(page.text ?? '')
+  }))
+  return { pages, pageCount: data.page_count ?? pages.length }
+}
+
+/** 官方 ASR：一次发送完整音频，返回完整转写文本。只收 16 位 PCM WAV 或
+ *  Ogg Opus，录音端得先转成这两种格式。 */
+export async function deepseekAsr(file: Buffer, filename: string, apiKey: string): Promise<{ text: string; durationMs: number }> {
+  const form = new FormData()
+  form.append('file', new Blob([new Uint8Array(file)]), filename)
+  const response = await fetch(`${BASE_URL}/v1/tools/asr`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}` },
+    body: form,
+    signal: AbortSignal.timeout(300_000)
+  })
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '')
+    throw new Error(`DeepSeek ASR 失败（HTTP ${response.status}）${detail ? `：${detail.slice(0, 200)}` : ''}`)
+  }
+  const data = (await response.json()) as { text?: unknown; duration_ms?: unknown }
+  return { text: String(data.text ?? '').trim(), durationMs: Number(data.duration_ms) || 0 }
+}
+
+/** 官方 TTS：整段合成，响应体直接是音频。默认返回 wav。 */
+export async function deepseekTts(
+  text: string,
+  apiKey: string,
+  options: { voiceId?: 'stella' | 'tide'; format?: 'wav' | 'pcm'; filterMarkdown?: boolean } = {}
+): Promise<{ bytes: Buffer; mimeType: 'audio/wav' | 'audio/pcm' }> {
+  const format = options.format ?? 'wav'
+  const response = await fetch(`${BASE_URL}/v1/tools/tts`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      text,
+      voice_id: options.voiceId ?? 'stella',
+      format,
+      filter_markdown: options.filterMarkdown ?? true
+    }),
+    signal: AbortSignal.timeout(180_000)
+  })
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '')
+    throw new Error(`DeepSeek TTS 失败（HTTP ${response.status}）${detail ? `：${detail.slice(0, 200)}` : ''}`)
+  }
+  const bytes = Buffer.from(await response.arrayBuffer())
+  return { bytes, mimeType: format === 'wav' ? 'audio/wav' : 'audio/pcm' }
+}

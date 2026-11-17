@@ -54,7 +54,14 @@ describe.skipIf(!live)('DSH live adapter', () => {
     bridges.push(bridge)
     bridge.setConversationBridge({
       list: () => [{ id: 'dev1', title: '开发1', running: true, archived: false }],
-      send: async () => ({ id: 'dev1', title: '开发1' })
+      send: async () => ({ id: 'dev1', title: '开发1' }),
+      create: async () => ({ id: 'new', title: '新对话' }),
+      rename: async (target, title) => ({ id: target, title }),
+      setPinned: async (target, pinned) => ({ id: target, title: '置顶状态', pinned }),
+      move: async (target, position) => ({ id: target, title: '移动结果', order: [position] }),
+      archive: async (target) => ({ id: target, title: '归档' }),
+      restore: async (target) => ({ id: target, title: '恢复' }),
+      remove: async (target) => ({ id: target, title: '删除' })
     })
     const runtime = new DshRuntime({
       bin,

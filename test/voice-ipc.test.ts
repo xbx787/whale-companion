@@ -70,7 +70,7 @@ describe('voice IPC', () => {
 
   it('rejects a patch that both sets and clears the key', () => {
     expect(() => parseVoiceSettingsPatch({ apiKey: 'x', clearKey: true })).toThrow('无效')
-    expect(parseVoiceSettingsPatch({ voice: 'anna', speed: 1.1 })).toEqual({ voice: 'anna', speed: 1.1 })
+    expect(parseVoiceSettingsPatch({ voice: 'stella', speed: 1.1 })).toEqual({ voice: 'stella', speed: 1.1 })
   })
 
   it('opens only the fixed key page from settings', async () => {
